@@ -34,6 +34,10 @@ jobs:
         run: npm run test:production:smoke
         env:
           DATABASE_URL: file:../data/ci-build.db
+      - name: Backup restore upload and restart integration test
+        run: npm run test:backup:restore
+        env:
+          DATABASE_URL: file:../data/ci-build.db
 
   docker:
     needs: verify

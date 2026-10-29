@@ -99,6 +99,10 @@ async function run() {
   await page.reload();
   assert(await page.locator('textarea[aria-label="新授权令牌"]').count() === 0, "Token remained visible after reload");
 
+  await page.goto(host + "/admin/restore");
+  await page.getByText("站点已有旅行记录").waitFor();
+  assert(await page.locator('input[type="file"]').count() === 0, "Backup upload must be disabled on nonempty site");
+
   await page.goto(host + "/admin/destinations/test-island");
   await page.locator('input[name="title"]').fill("虚构岛屿·端到端测试");
   await page.getByRole("button", { name: "保存目的地修改" }).click();
@@ -150,6 +154,8 @@ async function run() {
   assert((await page.locator("body").innerText()).includes("示例小镇·编辑者测试"), "Partner editor cannot edit place");
   const restrictedResponse = await page.goto(host + "/admin/users");
   assert(restrictedResponse?.status() === 404, "Non-admin accessed account-management screen");
+  const restrictedRestore = await page.goto(host + "/admin/restore");
+  assert(restrictedRestore?.status() === 404, "Non-admin accessed backup restore screen");
 
   // Changing a password must revoke all existing sessions for this user.
   const secondaryContext = await browser.newContext();

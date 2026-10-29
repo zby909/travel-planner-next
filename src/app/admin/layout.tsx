@@ -18,6 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {user.role === "ADMIN" ? <Link href="/admin/users">账号管理</Link> : null}
           <Link href="/admin/account">修改密码</Link>
           <Link href="/admin/tokens">AI 授权</Link>
+          {user.role === "ADMIN" ? <Link href="/admin/restore">备份恢复</Link> : null}
           <Link href="/">公开站点 ↗</Link>
         </nav>
         <div className="admin-identity">

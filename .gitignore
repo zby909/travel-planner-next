@@ -56,3 +56,4 @@ next-env.d.ts
 /data/*-e2e.db*
 /data/production-smoke.db*
 /data/production-smoke-uploads/
+/data/restore-e2e/

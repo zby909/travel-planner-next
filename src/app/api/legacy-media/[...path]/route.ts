@@ -20,7 +20,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
     : name.endsWith(".webp") ? "image/webp" : null;
   if (!mime) return new Response("Not found", { status: 404 });
   try {
-    const root = process.env.LEGACY_MEDIA_DIR || join(process.cwd(), "data", "legacy-images");
+    const dataDir = process.env.RESTORE_DATA_DIR || (process.env.DATABASE_URL?.startsWith("file:/app/data/") ? "/app/data" : join(process.cwd(), "data"));
+    const root = process.env.LEGACY_MEDIA_DIR || join(dataDir, "legacy-images");
     const file = join(/* turbopackIgnore: true */ root, ...path);
     const bytes = await readFile(/* turbopackIgnore: true */ file);
     return new NextResponse(new Uint8Array(bytes), {
