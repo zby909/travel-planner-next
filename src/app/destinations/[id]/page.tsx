@@ -39,7 +39,7 @@ export default async function DestinationPage({ params }: PageProps) {
     <main>
       <SiteHeader />
       <section className="detail-hero">
-        <Image src={`/images/${destination.id}-0.jpg`} alt={destination.title} fill priority sizes="100vw" />
+        <Image unoptimized={Boolean(destination.imagePath?.startsWith("/api/media/"))} src={destination.imagePath ?? `/images/${destination.id}-0.jpg`} alt={destination.title} fill priority sizes="100vw" />
         <div className="hero-shade" />
         <div className="detail-hero-content page-width">
           <Link className="back-link" href="/#destinations">← 返回目的地</Link>
@@ -84,7 +84,7 @@ export default async function DestinationPage({ params }: PageProps) {
         <aside className="detail-aside">
           <section className="budget-panel">
             <p className="eyebrow">BUDGET FOR TWO</p>
-            <h2>{formatCny(destination.pickBudget)}</h2>
+            <h2>{destination.pickBudget ? formatCny(destination.pickBudget) : "预算待估算"}</h2>
             <p className="muted-copy">双人基准预算 · 总区间 {formatCny(destination.minBudget)}–{formatCny(destination.maxBudget)}</p>
             <div className="budget-breakdown">
               {budget.map(([label, value]) => <div key={label}><span>{label}</span><strong>{formatCny(value)}</strong></div>)}
@@ -92,7 +92,7 @@ export default async function DestinationPage({ params }: PageProps) {
             <p className="budget-warning">预算是规划参考，不是已锁定报价。出发前请重新核对机票、酒店和景区票价。</p>
           </section>
 
-          {destination.flightPricing && (
+          {destination.flightPricing && (destination.flightPricing.normalMax > 0 || destination.flightPricing.holidayMax > 0) && (
             <section className="flight-panel">
               <p className="eyebrow">FLIGHT PRICE RANGE</p>
               <h3>{destination.flightPricing.route}</h3>

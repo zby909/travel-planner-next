@@ -52,6 +52,12 @@ const groupNames: Record<string, string> = {
   mine: "我单独去过",
 };
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[char] ?? char));
+}
+
 function loadScript(src: string, isReady: () => boolean): Promise<void> {
   if (isReady()) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -161,11 +167,11 @@ export function VisitedMap({ places }: { places: MapPlace[] }) {
           const params = rawParams as EChartsParams;
           const item = params.data;
           if (item?.value) {
-            return `<strong>${String(item.name ?? params.name ?? "")}</strong><br/>${String(item.placeGroup ?? "已到访")}<br/><small>${String(item.note ?? "")}</small>`;
+            return `<strong>${escapeHtml(item.name ?? params.name)}</strong><br/>${escapeHtml(item.placeGroup ?? "已到访")}<br/><small>${escapeHtml(item.note)}</small>`;
           }
           const name = String(params.name ?? "");
           const matched = groupedRegions.get(name) ?? [];
-          return `<strong>${name}</strong><br/>${matched.map((item) => item.name).join("、") || "行政区域"}<br/><small>区域内有到访记录，不代表整个区域都已游览</small>`;
+          return `<strong>${escapeHtml(name)}</strong><br/>${matched.map((item) => escapeHtml(item.name)).join("、") || "行政区域"}<br/><small>区域内有到访记录，不代表整个区域都已游览</small>`;
         },
       },
       geo: {

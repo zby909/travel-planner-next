@@ -52,3 +52,4 @@ next-env.d.ts
 /data/*.db-shm
 /data/*.db-wal
 /data/uploads/
+/data/*-e2e.db*

@@ -10,6 +10,9 @@ data/*.db-wal
 data/uploads
 travel-2027-deploy.zip
 .claude
+.github
+cli
+skills
 AGENTS.md
 legacy
 *.log

@@ -30,6 +30,12 @@ if (bootstrap.status !== 0) {
   process.exit(1);
 }
 
+const mediaCleanup = spawnSync(process.execPath, ["scripts/prune-staged-media.mjs"], {
+  stdio: "inherit",
+  env: process.env,
+});
+if (mediaCleanup.status !== 0) console.warn("Image cleanup will retry on next restart.");
+
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0"], {
   stdio: "inherit",
   env: process.env,

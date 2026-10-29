@@ -1,0 +1,17 @@
+{
+  "name": "@zby909/travelctl",
+  "version": "0.1.0",
+  "description": "CLI and AI-agent workflows for self-hosted travel planner",
+  "type": "module",
+  "bin": {
+    "travelctl": "./bin/travelctl.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "bin/",
+    "README.md"
+  ],
+  "license": "MIT"
+}

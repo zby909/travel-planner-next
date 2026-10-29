@@ -65,7 +65,7 @@ export default async function HomePage() {
             return (
               <article className="destination-card" key={destination.id}>
                 <Link className="destination-photo" href={`/destinations/${destination.id}`}>
-                  <Image src={`/images/${destination.id}-0.jpg`} alt={destination.title} fill sizes="(max-width: 760px) 100vw, (max-width: 1100px) 50vw, 33vw" />
+                  <Image unoptimized={Boolean(destination.imagePath?.startsWith("/api/media/"))} src={destination.imagePath ?? `/images/${destination.id}-0.jpg`} alt={destination.title} fill sizes="(max-width: 760px) 100vw, (max-width: 1100px) 50vw, 33vw" />
                   <span className="photo-number">DESTINATION / {String(destination.rank).padStart(2, "0")}</span>
                   <span className="photo-arrow">↗</span>
                 </Link>
@@ -75,11 +75,11 @@ export default async function HomePage() {
                   <p className="destination-subtitle">{destination.subtitle}</p>
                   <p className="destination-vibe">{destination.vibe}</p>
                   <div className="tag-row">{types.slice(0, 3).map((type) => <span className="tag" key={type}>{type}</span>)}</div>
-                  <div className="budget-line"><span>双人预算参考</span><strong>{formatCny(destination.minBudget)}–{formatCny(destination.maxBudget)}</strong></div>
-                  <div className="flight-line">
+                  <div className="budget-line"><span>双人预算参考</span><strong>{destination.maxBudget === 0 ? "待估算" : `${formatCny(destination.minBudget)}–${formatCny(destination.maxBudget)}`}</strong></div>
+                  {destination.flightPricing && (destination.flightPricing.normalMax > 0 || destination.flightPricing.holidayMax > 0) && <div className="flight-line">
                     <span>平日机票</span><b>{formatCny(destination.flightPricing?.normalMin)}–{formatCny(destination.flightPricing?.normalMax)}</b>
                     <span>节假日</span><b>{formatCny(destination.flightPricing?.holidayMin)}–{formatCny(destination.flightPricing?.holidayMax)}</b>
-                  </div>
+                  </div>}
                   <Link className="card-more" href={`/destinations/${destination.id}`}>查看行程与预算 <span>↗</span></Link>
                 </div>
               </article>

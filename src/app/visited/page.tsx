@@ -73,7 +73,7 @@ export default async function VisitedPage() {
           {places.map((place, index) => (
             <article className="place-card" id={`place-${place.id}`} key={place.id}>
               <div className="place-photo">
-                <Image src={`/${place.image.replace(/^\//, "")}`} alt={place.image.endsWith(".svg") ? `${place.name}主题示意插画（非实景照片）` : `${place.name}代表性景观照片`} fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 25vw" />
+                <Image unoptimized={place.image.startsWith("api/media/")} src={`/${place.image.replace(/^\//, "")}`} alt={place.image.endsWith(".svg") ? `${place.name}主题示意插画（非实景照片）` : `${place.name}代表性景观照片`} fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 25vw" />
                 <span className="place-index">{String(index + 1).padStart(2, "0")}</span>
                 <span className={`group-chip group-${place.group}`}>{groupLabel[place.group] ?? "已到访"}</span>
               </div>

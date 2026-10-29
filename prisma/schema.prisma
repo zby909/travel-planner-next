@@ -24,6 +24,9 @@ model User {
   updatedAt    DateTime      @updatedAt
   sessions     AuthSession[]
   auditLogs    AuditLog[]
+  apiTokens    ApiToken[]
+  importDrafts ImportDraft[]
+  mediaAssets  MediaAsset[]
 }
 
 model AuthSession {
@@ -58,10 +61,53 @@ model AuditLog {
   @@index([actorId, createdAt])
 }
 
+model ApiToken {
+  id         String    @id @default(cuid())
+  userId     String
+  title      String
+  tokenHash  String    @unique
+  scopesJson String
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ImportDraft {
+  id          String    @id @default(cuid())
+  ownerId     String
+  kind        String
+  payloadJson String
+  status      String    @default("PREPARED")
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  committedAt DateTime?
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, status])
+}
+
+model MediaAsset {
+  id        String   @id @default(cuid())
+  ownerId   String
+  fileName  String
+  mimeType  String
+  byteSize  Int
+  status    String   @default("STAGED")
+  createdAt DateTime @default(now())
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, status])
+}
+
 model Destination {
   id              String              @id
   title           String
   subtitle        String
+  imagePath       String?
   flag            String
   kind            String
   typesJson       String

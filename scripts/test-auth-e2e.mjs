@@ -86,6 +86,15 @@ async function run() {
   }
   assert((await page.context().cookies()).some(cookie => cookie.name === "travel_session" && cookie.httpOnly), "Session cookie is missing HttpOnly");
 
+  await page.goto(host + "/admin/tokens");
+  await page.locator('input[name="title"]').fill("浏览器集成测试令牌");
+  await page.getByRole("button", { name: "生成授权令牌" }).click();
+  await page.locator('textarea[aria-label="新授权令牌"]').waitFor({ timeout: 20000 });
+  const issuedToken = await page.locator('textarea[aria-label="新授权令牌"]').inputValue();
+  assert(/^trv_[A-Za-z0-9_-]{43}$/.test(issuedToken), "Token management page did not return a valid one-time credential");
+  await page.reload();
+  assert(await page.locator('textarea[aria-label="新授权令牌"]').count() === 0, "Token remained visible after reload");
+
   await page.goto(host + "/admin/destinations/altay");
   await page.locator('input[name="title"]').fill("阿勒泰·端到端测试");
   await page.getByRole("button", { name: "保存目的地修改" }).click();

@@ -85,6 +85,108 @@ docker compose logs -f
 - 后台 `/admin/account` 可修改个人密码，保存后撤销账号的所有旧会话。密码丢失时不使用公开「忘记密码」入口；目前仍可通过容器终端上的运维工具处理。
 - Prisma 的 `db:seed` 是旧站数据导入脚本，只在首次部署使用。已有线上编辑数据后，不应手动重复执行，以免旧数据覆盖新编辑内容。
 
+## AI / CLI 批量导入：足迹 + 未来想去 + 图片
+
+目前已实现 **Skill + CLI + 限权 API Token**；用户不需要在网站中配置模型 API Key。
+CLI 源码在 `cli/`，Agent Skill 在 `skills/travel-import/SKILL.md`。
+Token 管理入口是登录后的 `/admin/tokens`，令牌创建后只显示一次，数据库仅保存其 SHA-256 哈希。
+
+### 本地开发安装 CLI（目前尚未发布 npm 或 exe）
+
+```powershell
+npm install -g .\cli
+travelctl auth login --server https://你的旅行网站域名
+travelctl auth status
+travelctl visits list
+travelctl destinations list
+```
+
+`auth login` 在本地终端隐藏输入并保存 Token，不会要求你将授权令牌发送给 AI。
+Node.js 22 及以上版本可直接运行 CLI。建议只发放所需权限，90 天过期；丢失后在网站中撤销。
+
+### 上传配图
+
+```powershell
+travelctl media upload .\my-trip.jpg
+```
+
+响应包含 `imageId`。第一版支持 JPEG、PNG、WebP，最大上传大小 8 MiB，服务器自动压缩成 WebP 并移除 EXIF/GPS 元信息。文件存放在 Docker 持久化目录 `/app/data/uploads`，数据库只保存图片元数据和引用。图片上传后处于 `STAGED` 状态，**只有经用户确认导入关联到公开足迹或目的地后，图片才会公开**。容器每次启动会清理超过 48 小时、且不被有效导入草稿引用的未公开图片；公开使用中的图片绝不会由该任务删除。也可以运行 `npm run media:cleanup` 手动清理。
+
+请不要自动上传未获授权的他人照片；添加到公开的旅行展示页后图片是可被访客访问的。
+
+### 导入已去过的地方
+
+准备一个 `visits.json`：
+
+```json
+{
+  "items": [{
+    "name": "东京",
+    "region": "日本 · 东京",
+    "when": "2025-05",
+    "group": "mine",
+    "country": "日本",
+    "latitude": 35.6762,
+    "longitude": 139.6503,
+    "note": "第一次旅行",
+    "imageId": "填入已上传的图片UUID"
+  }]
+}
+```
+
+`imageId` 可省略。年与月的精度应真实可靠；若只有年份，用 `"when":"2025"`；经纬度未知时可以省略，地点会保存但不显示地图点，不能让 AI 猜造坐标。
+
+```powershell
+travelctl visits prepare .\visits.json
+# 仔细核对草稿、警告和 draftId，明确同意后才提交：
+travelctl import commit <draftId> --confirm
+```
+
+重复的同名同区域地点不会覆盖现有记录，而是提示并跳过。
+
+### 导入未来旅行计划
+
+`future.json`：
+
+```json
+{
+  "items": [{
+    "title": "京都",
+    "subtitle": "日本 · 关西",
+    "months": "10–11月",
+    "days": "5天",
+    "vibe": "秋季红叶",
+    "reason": "和朋友看红叶",
+    "route": ["京都", "宇治"],
+    "spots": ["伏见稻荷大社"],
+    "guideDays": [{ "title": "抵达京都", "detail": "办理入住后散步" }],
+    "budget": {
+      "flight": 2400, "hotel": 1800, "group": 0, "food": 1000,
+      "tickets": 500, "transport": 500, "other": 300
+    }
+  }]
+}
+```
+
+所有预算字段为人民币**同行人员的总预算**，不是人均。缺少预算就留空，页面显示“待估算”，不会生成虚假的机票报价。也可以填 `imageId` 作为封面。
+
+```powershell
+travelctl destinations prepare .\future.json
+travelctl import commit <draftId> --confirm
+```
+
+接口只在用户确认 `commit` 后才以事务写入数据库，草稿默认 24 小时过期。
+`travelctl import cancel <draftId>` 可以放弃草稿。
+CLI 适合本地终端和能执行命令的 AI Agent，并非普通聊天网页自动拥有的功能。
+
+### 发布和数据隔离说明
+
+- `cli/package.json` 准备了 `@zby909/travelctl` 的 npm 包，但**尚未发布到 npm**。
+- `.github/workflows/cli-release.yml` 会在推送 `v*` 标签时使用 Node.js SEA 构建 Windows x64 exe，并打包为 GitHub Release 的 ZIP。此版本**尚未生成正式 EXE**；首次发布必须在 GitHub Actions 中实测。
+- `npm run test:import:e2e` 使用临时数据库和临时上传目录，测试 Token、图片私密分段、图片清理元信息、足迹/未来目的地导入与 CLI。
+- 现有旧版本使用的个人化 `both/her/mine` 分类以及历史种子数据仍在仓库和镜像中。**项目暂时还不是完全去个人化的空白开源镜像**；需要后续独立迁移旧图片和种子数据，避免破坏已部署用户的数据。
+- 第一版只支持每个足迹或目的地一张封面图；暂不支持视频、图片批量相册、自动抓取第三方图片或无人工确认的导入。
+
 ## GitHub Actions → GHCR
 
 仓库公开后，每次向 `main` 分支推送代码或手动执行 **Build and publish Docker image** 工作流，会先跑 lint 和生产构建，再构建 `linux/amd64` 镜像并推送到：
