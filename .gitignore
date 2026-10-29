@@ -53,3 +53,5 @@ next-env.d.ts
 /data/*.db-wal
 /data/uploads/
 /data/*-e2e.db*
+/data/production-smoke.db*
+/data/production-smoke-uploads/

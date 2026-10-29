@@ -30,6 +30,10 @@ jobs:
         run: npm run build
         env:
           DATABASE_URL: file:../data/ci-build.db
+      - name: Production startup and persistence smoke test
+        run: npm run test:production:smoke
+        env:
+          DATABASE_URL: file:../data/ci-build.db
 
   docker:
     needs: verify
@@ -53,14 +57,73 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,format=short
-      - name: Build and push linux/amd64 image
+      - name: Build and load linux/amd64 image
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
-          push: true
+          load: true
+          push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
+      - name: Test real Linux container with StackNest resource limits
+        shell: bash
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          image="$(head -n 1 <<< "$IMAGE_TAGS")"
+          docker volume create travel-planner-smoke-data
+          cleanup() {
+            docker rm -f travel-planner-smoke >/dev/null 2>&1 || true
+            docker volume rm -f travel-planner-smoke-data >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          run_app() {
+            docker run -d --name travel-planner-smoke \
+              --cpus 0.5 --memory 512m --memory-swap 512m --pids-limit 128 \
+              --init --security-opt no-new-privileges:true \
+              --tmpfs /tmp:rw,nosuid,nodev,size=16m \
+              -p 127.0.0.1:13016:3000 \
+              -v travel-planner-smoke-data:/app/data \
+              -e BOOTSTRAP_ADMIN_USERNAME=ci_owner \
+              -e BOOTSTRAP_ADMIN_DISPLAY_NAME=CI \
+              -e BOOTSTRAP_ADMIN_PASSWORD="$(openssl rand -hex 24)" \
+              "$image" >/dev/null
+          }
+          wait_ready() {
+            local start=$SECONDS
+            until curl --fail --silent --max-time 2 http://127.0.0.1:13016/api/health >/dev/null; do
+              if (( SECONDS - start > 55 )); then
+                echo "Container failed to become healthy within StackNest's 60s window"
+                docker logs --tail 100 travel-planner-smoke
+                exit 1
+              fi
+              if [[ "$(docker inspect -f '{{.State.Running}}' travel-planner-smoke)" != "true" ]]; then
+                docker logs --tail 100 travel-planner-smoke
+                exit 1
+              fi
+              sleep 1
+            done
+          }
+          run_app
+          wait_ready
+          docker exec travel-planner-smoke node -e 'const {PrismaClient}=require("@prisma/client");const db=new PrismaClient();(async()=>{const admin=await db.user.findUnique({where:{username:"ci_owner"}});const count=await db.visitedPlace.count();if(!admin||admin.role!=="ADMIN"||count!==31)throw Error("first-run admin or travel seed failed");await db.visitedPlace.update({where:{id:"zhongshan"},data:{mapNote:"CI_DOCKER_PERSISTENCE_PROBE"}});})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>db.$disconnect())'
+          docker rm -f travel-planner-smoke >/dev/null
+          run_app
+          wait_ready
+          docker exec travel-planner-smoke node -e 'const {PrismaClient}=require("@prisma/client");const db=new PrismaClient();(async()=>{const place=await db.visitedPlace.findUnique({where:{id:"zhongshan"}});const admin=await db.user.findUnique({where:{username:"ci_owner"}});if(place?.mapNote!=="CI_DOCKER_PERSISTENCE_PROBE"||!admin)throw Error("persistent database was lost or reset");})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>db.$disconnect())'
+          echo "LINUX_DOCKER_SMOKE_PASS"
+      - name: Push image after Docker smoke test
+        shell: bash
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            [[ -n "$tag" ]] || continue
+            docker push "$tag"
+          done <<< "$IMAGE_TAGS"

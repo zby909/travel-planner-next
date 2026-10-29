@@ -49,6 +49,8 @@ npm run user:create -- wangying "王颖" EDITOR
 
 **不要把密码写进命令参数、项目源码、环境变量模板或聊天记录。**
 
+生产启动验证：先执行 `npm run build`，再运行 `npm run test:production:smoke`，会自动创建独立测试数据库，检查数据库迁移、初始资料导入、管理员初始化和重启后数据持久化；测试完成会清理临时数据库。GitHub Actions 在构建 Docker 镜像前自动运行这项验证。此测试不等同于 Linux Docker 容器的真实部署验证。
+
 安全测试：`npm run test:auth:e2e` 会自动建立独立的 `data/auth-e2e.db`，运行 Chrome 登录、双人权限和修改数据测试，完成后删除测试库，不会碰主库 `data/travel.db`。需要本机安装 Google Chrome。
 
 后台已实现：目的地基础资料与预算拆分修改、机票报价样本新增/删除、足迹地点归属/描述编辑、账号创建、个人密码修改和审计日志。时间轴事件增删、旅游计划/开销/照片上传暂未实现。
