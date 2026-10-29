@@ -96,9 +96,9 @@ export default async function DestinationPage({ params }: PageProps) {
             <section className="flight-panel">
               <p className="eyebrow">FLIGHT PRICE RANGE</p>
               <h3>{destination.flightPricing.route}</h3>
-              <div className="flight-range"><span>普通日期 · 两人往返</span><strong>{formatCny(destination.flightPricing.normalMin)}–{formatCny(destination.flightPricing.normalMax)}</strong></div>
+              <div className="flight-range"><span>普通日期 · 往返总额</span><strong>{formatCny(destination.flightPricing.normalMin)}–{formatCny(destination.flightPricing.normalMax)}</strong></div>
               <p>{destination.flightPricing.normalSample}</p>
-              <div className="flight-range"><span>节假日 · 两人往返</span><strong>{formatCny(destination.flightPricing.holidayMin)}–{formatCny(destination.flightPricing.holidayMax)}</strong></div>
+              <div className="flight-range"><span>节假日 · 往返总额</span><strong>{formatCny(destination.flightPricing.holidayMin)}–{formatCny(destination.flightPricing.holidayMax)}</strong></div>
               <p>{destination.flightPricing.holidaySample}</p>
               <p className="muted-copy">{destination.flightNote}</p>
               {destination.flightSource && <a className="source-link" href={destination.flightSource} target="_blank" rel="noreferrer">查看参考来源 ↗</a>}
@@ -110,7 +110,7 @@ export default async function DestinationPage({ params }: PageProps) {
               <h3>已保存的机票价格样本</h3>
               {destination.priceSamples.map(item => (
                 <div className="saved-flight-entry" key={item.id}>
-                  <strong>{item.totalPrice == null ? formatCny(item.pricePerPerson) + "/人" : formatCny(item.totalPrice) + "/两人"}</strong>
+                  <strong>{item.totalPrice == null ? formatCny(item.pricePerPerson) + "/人" : formatCny(item.totalPrice) + "/总价"}</strong>
                   <span>{item.sourceType === "PLANNING_ESTIMATE" ? "规划估算（非报价）" : item.sourceType === "USER_REPORTED" ? "用户实际查询" : item.sourceType === "HISTORICAL" ? "历史样本" : "公开价格参考"}</span>
                   <small>{formatDate(item.departureDate)}—{formatDate(item.returnDate)}</small>
                   <p>{item.notes || "此价格的行李政策、航司及购买条件应再次核实。"}</p>

@@ -35,7 +35,7 @@ export default async function AdminFlights({ searchParams }: { searchParams: Pro
               {item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="source-link">查看原始报价来源 ↗</a> : null}
             </div>
             <div className="admin-record-right">
-              <b>{item.totalPrice === null ? "两人总价未填写" : formatCny(item.totalPrice)}</b>
+              <b>{item.totalPrice === null ? "同行总价未填写" : formatCny(item.totalPrice)}</b>
               <span>{item.pricePerPerson === null ? "人均价未填写" : `人均 ${formatCny(item.pricePerPerson)}`}</span>
               <form action={deleteFlightAction}>
                 <input type="hidden" name="id" value={item.id} />

@@ -99,7 +99,7 @@ export default async function HomePage() {
               <p className="muted-copy">{sample.notes}</p>
             </div>
             <div className="sample-price">
-              <span>两人往返参考</span>
+              <span>同行往返总额</span>
               <strong>{formatCny(sample.totalPrice)}</strong>
               <small>{formatCny(sample.pricePerPerson)} / 人 · 用户提供样本</small>
             </div>
