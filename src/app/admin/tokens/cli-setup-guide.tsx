@@ -26,8 +26,8 @@ export function CliSetupGuide() {
         <div>
           <strong>① 安装 CLI</strong>
           <p>Windows 用户直接下载 <code>travelctl.exe</code>，放入固定文件夹并将该文件夹加入 PATH，即可在终端与 AI Skill 中使用。无需安装 Node.js 或 npm。</p>
-          <p><a className="source-link" href={`${repo}/releases`} target="_blank" rel="noopener noreferrer">GitHub Releases（Windows EXE）</a> · <a className="source-link" href={`${repo}/tree/main/cli`} target="_blank" rel="noopener noreferrer">CLI 源码 / 本地安装说明</a></p>
-          <p className="muted-copy">若尚未生成 GitHub Release，可在 Actions 查看最新构建状态；建议只从本项目官方发布页下载。</p>
+          <p><a className="source-link" href={`${repo}/releases/latest/download/travelctl.exe`} target="_blank" rel="noopener noreferrer">下载 Windows EXE（最新版）</a> · <a className="source-link" href={`${repo}/releases`} target="_blank" rel="noopener noreferrer">所有版本 / 校验信息</a></p>
+          <p className="muted-copy">首次发布版本 v0.1.0 已通过 Windows 原生构建与 CLI 联调；EXE 无代码签名，Windows 可能显示 SmartScreen 提醒。请从 GitHub 官方 Release 下载。</p>
         </div>
         <div>
           <strong>② 安装 AI Skill</strong>
