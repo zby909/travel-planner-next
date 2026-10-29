@@ -72,7 +72,8 @@ async function unzipToStaging(bytes: Buffer, folder: string) {
           const isLegacy = name.startsWith("legacy-images/images/") && validImageName(name.slice("legacy-images/".length));
           const isUpload = name.startsWith("uploads/") && validImageName(name);
           // Historical seed scripts and documentation are never extracted or executed.
-          const ignored = name === "BACKUP-README.txt" || name === "backup.json" || name.startsWith("legacy-seed/");
+          const ignored = name === "BACKUP-README.txt" || name === "backup.json" || name.startsWith("legacy-seed/")
+            || (name.startsWith("legacy-images/images/") && (name.toLowerCase().endsWith(".json") || name.toLowerCase().endsWith(".html")));
           if (!isDb && !isLegacy && !isUpload && !ignored) throw Error("不支持的压缩包条目：" + name.slice(0, 100));
           if (ignored) return;
           if (isDb && hasDb) throw Error("备份中存在多个数据库文件");

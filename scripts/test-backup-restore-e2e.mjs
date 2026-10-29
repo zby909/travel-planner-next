@@ -32,6 +32,7 @@ async function zipBackup() {
   archive.addFile(join(source, "travel.db"), "travel.db");
   archive.addBuffer(Buffer.from("legacy-photo"), "legacy-images/images/visited/test.jpg");
   archive.addBuffer(Buffer.from("legacy-cover"), "legacy-images/images/test-island-0.jpg");
+  archive.addBuffer(Buffer.from("<html>historical credits</html>"), "legacy-images/images/credits.html");
   archive.end();
   await new Promise((yes, no) => {
     archive.outputStream.pipe(createWriteStream(output)).on("close", yes).on("error", no);
@@ -127,6 +128,18 @@ async function run() {
     check(preview.counts.places === 1 && preview.counts.destinations === 1 && preview.counts.users === 1,
       "Preview data counts incorrect");
     check(preview.images.legacy === 2, "Restore archive photos missing");
+    // Optional private compatibility check, enabled only by a locally supplied
+    // file path. Never log, commit or upload real personal backup contents.
+    if (process.env.PRIVATE_BACKUP_ZIP) {
+      const privateForm = new FormData();
+      privateForm.append("backup", new Blob([await readFile(process.env.PRIVATE_BACKUP_ZIP)],
+        { type: "application/zip" }), "private-backup.zip");
+      const privatePreview = await request("/api/admin/restore/prepare", { method: "POST", body: privateForm });
+      check(privatePreview.counts.places === 31 && privatePreview.counts.destinations === 14,
+        "Private backup schema preview was not recognized");
+      check(privatePreview.images.legacy >= 45, "Private backup media was not recognized");
+      console.log("OPTIONAL_PRIVATE_BACKUP_SCHEMA_PASS: archive validated locally");
+    }
     const unchanged = db(targetUrl);
     try { check((await unchanged.visitedPlace.count()) === 0, "Upload mutated live DB"); }
     finally { await unchanged.$disconnect(); }
