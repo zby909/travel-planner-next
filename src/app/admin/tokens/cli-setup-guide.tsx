@@ -25,9 +25,9 @@ export function CliSetupGuide() {
       <div className="cli-guide-steps">
         <div>
           <strong>① 安装 CLI</strong>
-          <p>Windows 用户可从 GitHub Releases 直接下载 EXE（正式发布后）；开发者可用 npm 安装（发布后），不需要 ZIP 安装包。</p>
+          <p>Windows 用户直接下载 <code>travelctl.exe</code>，放入固定文件夹并将该文件夹加入 PATH，即可在终端与 AI Skill 中使用。无需安装 Node.js 或 npm。</p>
           <p><a className="source-link" href={`${repo}/releases`} target="_blank" rel="noopener noreferrer">GitHub Releases（Windows EXE）</a> · <a className="source-link" href={`${repo}/tree/main/cli`} target="_blank" rel="noopener noreferrer">CLI 源码 / 本地安装说明</a></p>
-          <p className="muted-copy">目前 npm 包和 EXE 发行版仍在准备中，不能把它们当作已发布的安装包。</p>
+          <p className="muted-copy">若尚未生成 GitHub Release，可在 Actions 查看最新构建状态；建议只从本项目官方发布页下载。</p>
         </div>
         <div>
           <strong>② 安装 AI Skill</strong>

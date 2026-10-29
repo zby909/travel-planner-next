@@ -24,6 +24,12 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           node --build-sea cli/sea-config.json
           ./dist/travelctl.exe --help
+      - name: Exercise real Windows EXE against local API mock
+        run: node scripts/test-travelctl-exe.mjs
+      - name: Record executable SHA-256
+        shell: pwsh
+        run: |
+          Get-FileHash dist/travelctl.exe -Algorithm SHA256 | Format-List
       - name: Upload Windows executable artifact
         uses: actions/upload-artifact@v4
         with:

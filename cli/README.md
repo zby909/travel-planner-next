@@ -1,8 +1,10 @@
 # travelctl
 
-Node.js 22+ CLI for a self-hosted Next.js Travel Planner. Not yet published on npm.
+Standalone Windows executable (Node.js runtime bundled) for a self-hosted Next.js Travel Planner. npm is not required.
 
-During development:
+Download `travelctl.exe` directly from the [GitHub Releases](https://github.com/zby909/travel-planner-next/releases) page. Keep it in a permanent folder and add that folder to your PATH, or call the executable by its absolute path. You do **not** need npm or a separate Node.js install.
+
+For source development only:
 
 ```bash
 npm install -g ./cli

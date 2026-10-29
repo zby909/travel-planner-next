@@ -9,7 +9,7 @@ The `travelctl` CLI connects this agent to the **user's own** Travel Planner web
 
 ## First-use onboarding (before accessing data)
 
-1. Check if the local CLI exists with `travelctl --help`. If missing, guide the user to the site's **Admin → AI 授权** page, where the npm / Windows executable and this Skill's download instructions are shown. Do not pretend an unpublished npm package or executable is available.
+1. Check if the local Windows executable is accessible with `travelctl --help` (or `travelctl.exe --help`). On first install, guide the user to their site's **Admin → AI 授权** page to download the official Windows executable and this Skill. The user should save `travelctl.exe` in a persistent folder and make that folder available on their PATH, then reopen the Agent's terminal. If the user prefers not to change PATH, ask for the full local path to the executable and consistently invoke that path instead. Never download or run an unknown executable without the user's approval. No npm installation or Node.js is required for the Windows EXE.
 2. Run `travelctl auth status`. If authenticated, proceed without prompting for anything. An expired/revoked Token or unreachable server means that re-authentication may be necessary; tell the user why.
 3. When configuration is absent, explain the one-time setup:
    - Open the user's own website's **管理后台 → AI 授权** page and create a scoped API Token.
