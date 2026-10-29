@@ -50,8 +50,8 @@ async function run() {
   server.stderr.on("data", chunk => { errors = (errors + String(chunk)).slice(-2000); });
   await waitForHealth();
 
-  check((await api("/api/v1/visits")).items.length === 31, "Legacy visits not present");
-  check((await api("/api/v1/destinations")).items.length === 14, "Legacy future destinations not present");
+  check((await api("/api/v1/visits")).items.length === 1, "Legacy visits not present");
+  check((await api("/api/v1/destinations")).items.length === 1, "Legacy future destinations not present");
   const anon = await fetch(host + "/api/v1/visits");
   check(anon.status === 401, "Anonymous read was allowed");
 
@@ -75,11 +75,11 @@ async function run() {
   });
   check(draft.draftId && draft.items.length === 1, "Visit draft missing");
   const beforeCommit = await db.visitedPlace.count();
-  check(beforeCommit === 31, "Prepare unexpectedly changed actual visits");
+  check(beforeCommit === 1, "Prepare unexpectedly changed actual visits");
 
   const saved = await api("/api/v1/imports/" + draft.draftId + "/commit", { method: "POST" });
   check(saved.created.length === 1 && saved.created[0].name === "测试旅途小镇", "Visit commit missing");
-  check((await db.visitedPlace.count()) === 32, "Visit not persisted");
+  check((await db.visitedPlace.count()) === 2, "Visit not persisted");
   const imageResponse = await fetch(host + "/api/media/" + picture.imageId);
   check(imageResponse.ok && imageResponse.headers.get("content-type") === "image/webp", "Committed photo not public");
   const stored = await sharp(Buffer.from(await imageResponse.arrayBuffer())).metadata();

@@ -7,9 +7,9 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 const groupLabel: Record<string, string> = {
-  both: "我们都去过",
-  her: "王颖单独去过",
-  mine: "我单独去过",
+  both: "两位成员都去过",
+  her: "成员 B 的足迹",
+  mine: "成员 A 的足迹",
 };
 
 export default async function VisitedPage() {
@@ -29,12 +29,12 @@ export default async function VisitedPage() {
     <main>
       <SiteHeader />
       <section className="visited-hero">
-        <Image src="/images/visited/sichuan.jpg" alt="川西旅行风景" fill priority sizes="100vw" />
+        <Image src="/images/place-placeholder.svg" alt="旅行足迹插画" fill priority sizes="100vw" />
         <div className="hero-shade" />
         <div className="visited-hero-content page-width">
           <p className="eyebrow eyebrow-light">OUR TRAVEL ARCHIVE · VOL. 01</p>
           <h1>有些地方，<br /><em>已经去过。</em></h1>
-          <p>把一起走过的路和各自看过的风景，<br />慢慢拼成属于两个人的地图。</p>
+          <p>把一起走过的路和各自看过的风景，<br />慢慢拼成属于自己的旅行地图。</p>
           <Link className="button button-light" href="/#destinations">继续挑选下一站 ↗</Link>
         </div>
       </section>
@@ -42,13 +42,13 @@ export default async function VisitedPage() {
       <section className="page-width section-block">
         <div className="section-heading">
           <div><p className="eyebrow">COLLECTED PLACES · NOT CHECKLISTS</p><h2>所有走过的路，<em>慢慢拼成我们的地图。</em></h2></div>
-          <p>“我们都去过”表示双方各自曾到访，不一定结伴同行。生活足迹和旅行记录分开理解，没有记录的月份不会凭空补上。</p>
+          <p>成员 A、成员 B 是可兼容历史数据的足迹分类。双方都去过不一定代表结伴同行。没有记录的月份不会凭空补上。</p>
         </div>
         <div className="stats-row visited-stats">
           <div><strong>{places.length}</strong><span>个足迹地点</span></div>
           <div><strong>{bothCount}</strong><span>双方都去过</span></div>
-          <div><strong>{herCount}</strong><span>王颖单独去过</span></div>
-          <div><strong>{mineCount}</strong><span>我单独去过</span></div>
+          <div><strong>{herCount}</strong><span>成员 B 到访</span></div>
+          <div><strong>{mineCount}</strong><span>成员 A 到访</span></div>
           <div><strong>{timeline.length}</strong><span>条时间轴记录</span></div>
         </div>
         <VisitedMap places={places.map((place) => ({
@@ -69,11 +69,12 @@ export default async function VisitedPage() {
           <div><p className="eyebrow">PLACE ATLAS</p><h2>我们走过的<em>每一个地方。</em></h2></div>
           <p>地点保留原始归属和时间备注。后续可以在管理后台新增记录、修正日期与补充自己的旅行照片。</p>
         </div>
+        {places.length === 0 && <div className="empty-state"><h3>还没有到访记录</h3><p>通过 AI 助手导入去过的地方，地图和时间轴就会自动更新。</p><Link className="button button-dark" href="/admin/tokens">设置旅行助手</Link></div>}
         <div className="place-grid">
           {places.map((place, index) => (
             <article className="place-card" id={`place-${place.id}`} key={place.id}>
               <div className="place-photo">
-                <Image unoptimized={place.image.startsWith("api/media/")} src={`/${place.image.replace(/^\//, "")}`} alt={place.image.endsWith(".svg") ? `${place.name}主题示意插画（非实景照片）` : `${place.name}代表性景观照片`} fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 25vw" />
+                <Image unoptimized src={place.image.startsWith("api/") ? `/${place.image}` : place.image === "images/place-placeholder.svg" ? "/images/place-placeholder.svg" : `/api/legacy-media/${place.image.replace(/^\//, "")}`} alt={place.image.endsWith(".svg") ? `${place.name}主题示意插画（非实景照片）` : `${place.name}代表性景观照片`} fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 25vw" />
                 <span className="place-index">{String(index + 1).padStart(2, "0")}</span>
                 <span className={`group-chip group-${place.group}`}>{groupLabel[place.group] ?? "已到访"}</span>
               </div>

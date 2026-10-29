@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <Link className="brand" href="/"><span className="brand-mark">✳</span><span className="brand-name">下一站<small>THE NEXT JOURNEY</small></span></Link>
         <p className="eyebrow auth-eyebrow">OUR PRIVATE SPACE</p>
         <h1>欢迎回来。</h1>
-        <p className="muted-copy">旅行展示页对所有人开放。管理目的地、机票和足迹，需要你或王颖的账号登录。</p>
+        <p className="muted-copy">旅行展示页对所有人开放。管理目的地、机票和足迹，需要使用管理员或编辑账号登录。</p>
         {(await searchParams).changed === "1" ? <p className="form-success" role="status">密码已更新。所有旧会话已注销，请使用新密码登录。</p> : null}
         <LoginForm error={(await searchParams).error} />
         <Link className="source-link" href="/">← 返回公开展示页</Link>

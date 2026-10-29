@@ -19,7 +19,7 @@ function run(label, args) {
 try {
   clean();
   run("Create ephemeral SQLite DB", ["node_modules/prisma/build/index.js", "migrate", "deploy"]);
-  run("Import existing seed into ephemeral DB", ["node_modules/tsx/dist/cli.mjs", "prisma/seed.ts"]);
+  run("Create synthetic test fixtures", ["scripts/seed-test-fixtures.mjs"]);
   run("Run HTTP and CLI import E2E", ["scripts/test-import-e2e.mjs"]);
   console.log("IMPORT_TESTS_SUCCEEDED");
 } catch (e) { console.error(e.message); process.exitCode = 1; }

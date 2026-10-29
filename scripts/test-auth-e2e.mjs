@@ -99,35 +99,36 @@ async function run() {
   await page.reload();
   assert(await page.locator('textarea[aria-label="新授权令牌"]').count() === 0, "Token remained visible after reload");
 
-  await page.goto(host + "/admin/destinations/altay");
-  await page.locator('input[name="title"]').fill("阿勒泰·端到端测试");
+  await page.goto(host + "/admin/destinations/test-island");
+  await page.locator('input[name="title"]').fill("虚构岛屿·端到端测试");
   await page.getByRole("button", { name: "保存目的地修改" }).click();
-  await page.waitForURL("**/admin/destinations/altay?saved=1");
-  const dest = await page.goto(host + "/destinations/altay");
-  assert(dest?.status() === 200 && (await page.locator("body").innerText()).includes("阿勒泰·端到端测试"), "Destination save failed");
+  await page.waitForURL("**/admin/destinations/test-island?saved=1");
+  const dest = await page.goto(host + "/destinations/test-island");
+  assert(dest?.status() === 200 && (await page.locator("body").innerText()).includes("虚构岛屿·端到端测试"), "Destination save failed");
 
   await page.goto(host + "/admin/flights");
-  await page.locator('select[name="destinationId"]').selectOption("altay");
-  await page.locator('input[name="route"]').fill("广州往返乌鲁木齐·自动化测试");
-  await page.locator('input[name="destinationName"]').fill("乌鲁木齐");
+  await page.locator('select[name="destinationId"]').selectOption("test-island");
+  await page.locator('input[name="route"]').fill("示例城市往返虚构岛屿·自动化测试");
+  await page.locator('input[name="origin"]').fill("示例城市");
+  await page.locator('input[name="destinationName"]').fill("虚构岛屿");
   await page.locator('input[name="totalPrice"]').fill("4567");
   await page.locator('input[name="departureDate"]').fill("2026-11-11");
   await page.locator('input[name="returnDate"]').fill("2026-11-18");
   await page.getByRole("button", { name: "保存机票样本" }).click();
   await page.waitForURL("**/admin/flights?added=1");
-  assert((await page.locator("body").innerText()).includes("广州往返乌鲁木齐·自动化测试"), "Flight save failed");
-  await page.goto(host + "/destinations/altay");
+  assert((await page.locator("body").innerText()).includes("示例城市往返虚构岛屿·自动化测试"), "Flight save failed");
+  await page.goto(host + "/destinations/test-island");
   assert((await page.locator("body").innerText()).includes("4,567"), "Saved flight evidence not shown on public destination page");
 
-  await page.goto(host + "/admin/places/zhongshan");
-  await page.locator('input[name="whenLabel"]').fill("广东的家·测试");
+  await page.goto(host + "/admin/places/test-town");
+  await page.locator('input[name="whenLabel"]').fill("示例小镇·测试");
   await page.getByRole("button", { name: "保存足迹修改" }).click();
-  await page.waitForURL("**/admin/places/zhongshan?saved=1");
+  await page.waitForURL("**/admin/places/test-town?saved=1");
   await page.goto(host + "/visited");
-  assert((await page.locator("body").innerText()).includes("广东的家·测试"), "Place save failed");
+  assert((await page.locator("body").innerText()).includes("示例小镇·测试"), "Place save failed");
 
   await page.goto(host + "/admin/users");
-  await page.locator('input[name="username"]').fill("wangying_test");
+  await page.locator('input[name="username"]').fill("partner_test");
   await page.locator('input[name="displayName"]').fill("测试编辑者");
   await page.locator('input[name="password"]').fill(partnerPass);
   await page.locator('input[name="confirm"]').fill(partnerPass);
@@ -136,17 +137,17 @@ async function run() {
   await page.getByRole("button", { name: "退出登录" }).click();
   await page.waitForURL("**/login");
 
-  await page.locator('input[name="username"]').fill("wangying_test");
+  await page.locator('input[name="username"]').fill("partner_test");
   await page.locator('input[name="password"]').fill(partnerPass);
   await page.getByRole("button", { name: "登录私人后台" }).click();
   await page.waitForURL("**/admin");
-  const editorResponse = await page.goto(host + "/admin/places/zhongshan");
+  const editorResponse = await page.goto(host + "/admin/places/test-town");
   assert(editorResponse?.status() === 200, "Partner editor cannot access edit form");
-  await page.locator('input[name="whenLabel"]').fill("广东的家·编辑者测试");
+  await page.locator('input[name="whenLabel"]').fill("示例小镇·编辑者测试");
   await page.getByRole("button", { name: "保存足迹修改" }).click();
-  await page.waitForURL("**/admin/places/zhongshan?saved=1");
+  await page.waitForURL("**/admin/places/test-town?saved=1");
   await page.goto(host + "/visited");
-  assert((await page.locator("body").innerText()).includes("广东的家·编辑者测试"), "Partner editor cannot edit place");
+  assert((await page.locator("body").innerText()).includes("示例小镇·编辑者测试"), "Partner editor cannot edit place");
   const restrictedResponse = await page.goto(host + "/admin/users");
   assert(restrictedResponse?.status() === 404, "Non-admin accessed account-management screen");
 
@@ -154,7 +155,7 @@ async function run() {
   const secondaryContext = await browser.newContext();
   const secondaryPage = await secondaryContext.newPage();
   await secondaryPage.goto(host + "/login");
-  await secondaryPage.locator('input[name="username"]').fill("wangying_test");
+  await secondaryPage.locator('input[name="username"]').fill("partner_test");
   await secondaryPage.locator('input[name="password"]').fill(partnerPass);
   await secondaryPage.getByRole("button", { name: "登录私人后台" }).click();
   await secondaryPage.waitForURL("**/admin");
@@ -168,7 +169,7 @@ async function run() {
   await secondaryPage.goto(host + "/admin");
   assert(secondaryPage.url().includes("/login"), "Old secondary session was not revoked");
   await secondaryContext.close();
-  await page.locator('input[name="username"]').fill("wangying_test");
+  await page.locator('input[name="username"]').fill("partner_test");
   await page.locator('input[name="password"]').fill(nextPartnerPass);
   await page.getByRole("button", { name: "登录私人后台" }).click();
   await page.waitForURL("**/admin");

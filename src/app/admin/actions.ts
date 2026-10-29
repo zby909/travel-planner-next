@@ -70,7 +70,7 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
     if (pickBudget < minBudget || pickBudget > maxBudget) throw new Error("预算分项合计必须落在预算区间内");
 
     const flight = {
-      route: stringField(form, "route", 140, true),
+      route: stringField(form, "route", 140),
       normalMin: amount(form, "normalMin"),
       normalMax: amount(form, "normalMax"),
       holidayMin: amount(form, "holidayMin"),
@@ -79,6 +79,7 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
       holidaySample: stringField(form, "holidaySample", 4000),
     };
     if (flight.normalMin > flight.normalMax || flight.holidayMin > flight.holidayMax) throw new Error("机票价格区间的下限不能超过上限");
+    if (!flight.route && [flight.normalMin, flight.normalMax, flight.holidayMin, flight.holidayMax].some(value => value > 0)) throw new Error("填写机票价格时需要同时填写航线");
 
     const data = {
       title: stringField(form, "title", 100, true),
@@ -98,11 +99,15 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
     };
     await prisma.$transaction(async (tx) => {
       await tx.destination.update({ where: { id }, data });
-      await tx.flightPricing.upsert({
-        where: { destinationId: id },
-        update: flight,
-        create: { destinationId: id, ...flight },
-      });
+      if (flight.route) {
+        await tx.flightPricing.upsert({
+          where: { destinationId: id },
+          update: flight,
+          create: { destinationId: id, ...flight },
+        });
+      } else {
+        await tx.flightPricing.deleteMany({ where: { destinationId: id } });
+      }
       await tx.auditLog.create({ data: { actorId: actor.id, action: "更新", entity: "目的地", entityId: id, summary: data.title } });
     });
     revalidatePath("/");
@@ -131,7 +136,7 @@ export async function createFlightAction(_state: FormState, form: FormData): Pro
     if (departureDate && returnDate && returnDate < departureDate) throw new Error("回程日期不能早于去程日期");
     const totalPrice = optionalAmount(form, "totalPrice");
     const pricePerPerson = optionalAmount(form, "pricePerPerson");
-    if (totalPrice === null && pricePerPerson === null) throw new Error("请至少填写两人总价或每人价格");
+    if (totalPrice === null && pricePerPerson === null) throw new Error("请至少填写同行总价或每人价格");
     const bag = stringField(form, "baggageIncluded", 8);
     if (!["", "unknown", "yes", "no"].includes(bag)) throw new Error("行李政策参数无效");
     const flightType = stringField(form, "flightType", 20);

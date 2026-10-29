@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireEditor } from "@/lib/auth";
 
-const groupLabels: Record<string, string> = { both: "我们都去过", her: "王颖单独去过", mine: "我单独去过" };
+const groupLabels: Record<string, string> = { both: "两位成员都去过", her: "成员 B 的足迹", mine: "成员 A 的足迹" };
 export default async function AdminPlaces() {
   await requireEditor();
   const places = await prisma.visitedPlace.findMany({ orderBy: { sortOrder: "asc" } });

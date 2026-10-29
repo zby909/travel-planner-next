@@ -6,11 +6,10 @@
     "dev": "next dev --hostname 0.0.0.0",
     "build": "prisma generate && next build",
     "start": "next start --hostname 0.0.0.0",
-    "lint": "eslint src prisma/seed.ts scripts",
+    "lint": "eslint src scripts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts",
     "db:check": "node scripts/check-data.mjs",
     "media:cleanup": "node scripts/prune-staged-media.mjs",
     "user:create": "node scripts/create-user.mjs",
@@ -19,9 +18,6 @@
     "test:bootstrap": "node scripts/test-bootstrap.mjs",
     "test:production:smoke": "node scripts/test-production-smoke.mjs",
     "db:studio": "prisma studio"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

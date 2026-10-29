@@ -1,25 +1,9 @@
 import { spawn, spawnSync } from "node:child_process";
-import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
-
-try {
-  const seedMarker = await prisma.appSetting.findUnique({ where: { key: "legacy_seed_v1" } });
-  if (!seedMarker) {
-    console.log("Initial seed marker missing; importing bundled travel data once.");
-    const result = spawnSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", "prisma/seed.ts"], {
-      stdio: "inherit",
-      env: process.env,
-    });
-    if (result.status !== 0) {
-      throw new Error("Initial database seed failed.");
-    }
-  } else {
-    console.log("Initial seed is complete; preserving all existing database records.");
-  }
-} finally {
-  await prisma.$disconnect();
-}
+// The portable open-source image deliberately starts with an empty SQLite database.
+// Prisma migrations are applied by the Docker entrypoint; personal travel data is
+// restored separately from a private backup into the persistent /app/data volume.
+console.log("Travel Planner: keeping existing SQLite data, no bundled personal seed.");
 
 const bootstrap = spawnSync(process.execPath, ["scripts/bootstrap-admin.mjs"], {
   stdio: "inherit",

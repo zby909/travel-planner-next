@@ -39,7 +39,7 @@ export default async function DestinationPage({ params }: PageProps) {
     <main>
       <SiteHeader />
       <section className="detail-hero">
-        <Image unoptimized={Boolean(destination.imagePath?.startsWith("/api/media/"))} src={destination.imagePath ?? `/images/${destination.id}-0.jpg`} alt={destination.title} fill priority sizes="100vw" />
+        <Image unoptimized={!destination.imagePath || destination.imagePath.startsWith("/api/")} src={destination.imagePath ?? `/api/legacy-media/images/${destination.id}-0.jpg`} alt={destination.title} fill priority sizes="100vw" />
         <div className="hero-shade" />
         <div className="detail-hero-content page-width">
           <Link className="back-link" href="/#destinations">← 返回目的地</Link>
@@ -83,9 +83,9 @@ export default async function DestinationPage({ params }: PageProps) {
 
         <aside className="detail-aside">
           <section className="budget-panel">
-            <p className="eyebrow">BUDGET FOR TWO</p>
+            <p className="eyebrow">TOTAL TRAVEL BUDGET</p>
             <h2>{destination.pickBudget ? formatCny(destination.pickBudget) : "预算待估算"}</h2>
-            <p className="muted-copy">双人基准预算 · 总区间 {formatCny(destination.minBudget)}–{formatCny(destination.maxBudget)}</p>
+            <p className="muted-copy">旅行预算 · 总区间 {formatCny(destination.minBudget)}–{formatCny(destination.maxBudget)}</p>
             <div className="budget-breakdown">
               {budget.map(([label, value]) => <div key={label}><span>{label}</span><strong>{formatCny(value)}</strong></div>)}
             </div>

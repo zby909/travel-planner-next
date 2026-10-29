@@ -22,7 +22,7 @@ try {
   // The test database is an explicitly named disposable file; never touch data/travel.db.
   clean();
   run("TEST: Prisma migrate deploy", ["node_modules/prisma/build/index.js", "migrate", "deploy"]);
-  run("TEST: seed copied sample data", ["node_modules/tsx/dist/cli.mjs", "prisma/seed.ts"]);
+  run("TEST: generic synthetic fixtures", ["scripts/seed-test-fixtures.mjs"]);
   run("TEST: Chrome login and editor flows", ["scripts/test-auth-e2e.mjs"]);
   console.log("AUTH_E2E_SUCCEEDED");
 } catch (error) {

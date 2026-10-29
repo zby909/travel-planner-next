@@ -103,9 +103,9 @@ try {
       db.appSetting.findUnique({ where: { key: "legacy_seed_v1" } }),
     ]);
     check(admin && admin.role === "ADMIN" && admin.passwordHash.startsWith("scrypt-v1:"), "Admin did not auto-bootstrap on first start");
-    check(visits === 31 && destinations === 14 && seed, "Seed did not import the expected records");
+    check(visits === 0 && destinations === 0 && !seed, "Generic first deployment unexpectedly contains personal travel data");
     const home = await fetch(app.origin + "/");
-    check(home.ok && (await home.text()).includes("阿勒泰"), "Public home unavailable in production");
+    check(home.ok && (await home.text()).includes("还没有未来目的地"), "Generic empty home unavailable in production");
     const visitedPage = await fetch(app.origin + "/visited");
     check(visitedPage.ok, "Visited page unavailable in production");
     const tokenPage = await fetch(app.origin + "/admin/tokens", { redirect: "manual" });
@@ -116,24 +116,22 @@ try {
     await stop(app.child);
   }
 
-  const modifiedTitle = "持久化检查：保存后不能被旧种子覆盖";
-  const place = await db.visitedPlace.findFirst({ where: { name: "中山" } });
-  check(place, "Seed place missing");
-  await db.visitedPlace.update({ where: { id: place.id }, data: { mapNote: modifiedTitle } });
+  const modifiedTitle = "持久化验证：重启之后原数据不变";
+  await db.appSetting.create({ data: { key: "production_smoke_value", value: modifiedTitle } });
   const hash = (await db.user.findUniqueOrThrow({ where: { username: "smoke_admin" } })).passwordHash;
   app = await launch(port);
   try {
     const [persisted, admin] = await Promise.all([
-      db.visitedPlace.findUnique({ where: { id: place.id } }),
+      db.appSetting.findUnique({ where: { key: "production_smoke_value" } }),
       db.user.findUniqueOrThrow({ where: { username: "smoke_admin" } }),
     ]);
-    check(persisted?.mapNote === modifiedTitle, "Data was overwritten on restart");
+    check(persisted?.value === modifiedTitle, "Data was overwritten on restart");
     check(admin.passwordHash === hash, "Bootstrap reset existing password on restart");
     check((await fetch(app.origin + "/api/health")).ok, "Database health unavailable after restart");
   } finally {
     await stop(app.child);
   }
-  console.log("PRODUCTION_SMOKE_PASS: migration, one-time seed, initial admin, auth protection, restart data persistence");
+  console.log("PRODUCTION_SMOKE_PASS: migrations, empty generic database, initial admin, auth, persistence");
 } catch (error) {
   console.error("PRODUCTION_SMOKE_FAIL:", error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

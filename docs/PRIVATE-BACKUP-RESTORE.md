@@ -1,0 +1,51 @@
+# 个人 SQLite 数据与图片离线恢复
+
+通用 Docker 镜像默认启动一个**零旅行记录**的 SQLite 数据库，不含任何人的旅行足迹、未来想去数据或历史旅行图片。
+
+## 私人备份位置
+
+请将 SQLite 一致性快照和图片保存在**源码仓库之外**的私人目录，例如 `private-travel-backups/backup.zip`。该备份由每个站点的部署者自行保存，通用镜像和公开源码均不包含；ZIP 如未加密，必须保护存取权限。
+
+包内结构：
+
+```text
+travel.db
+legacy-images/
+  images/
+    altay-0.jpg
+    visited/tokyo.jpg
+    ...
+legacy-seed/           # 历史存档，不需要恢复
+BACKUP-README.txt
+```
+
+## 恢复到 StackNest
+
+1. 先用通用 Docker 镜像创建应用，设置持久化目录目标 **`/app/data`**。首次启动会创建空白 SQLite 表和管理员账号（前提是设置了 `BOOTSTRAP_ADMIN_PASSWORD`）。
+2. **停止这个应用容器**。找到 StackNest 分配给该应用的独立宿主机数据目录。它以应用 ID 隔离；实际物理路径取决于服务器配置，不能根据容器内路径推测。
+3. 解压自己的私有 ZIP；只复制 `travel.db` 和 `legacy-images/` 两项到 StackNest 对应宿主机数据目录，确保容器中可看到：
+
+```text
+/app/data/
+  travel.db
+  legacy-images/
+    images/
+      visited/tokyo.jpg
+      altay-0.jpg
+      ...
+  uploads/             # 新 AI/CLI 上传的图片（若已有，必须保留）
+```
+
+4. 若首次空白启动已经创建了 `travel.db`，**先备份它再覆盖**。不要在容器运行时替换 SQLite 文件，也不要把单独的 `-wal`、`-shm` 文件当成有效数据库。
+5. 确保容器非特权用户 **UID 1001** 对数据库和图片目录有读写权限。根据宿主机的权限策略按需调整，避免宽泛开放目录权限。
+6. 重新启动容器。入口自动执行 `prisma migrate deploy` 处理数据库升级，但不会重新导入内置资料。访问 `/api/health`，查看足迹、未来目的地和旧图片是否恢复。
+
+本次 SQLite 快照中 `User` 表没有管理员账号，恢复后仍然允许通过 `BOOTSTRAP_ADMIN_*` 首次创建账户。对其他 SQLite 备份不能作同样假设：已有账号、API Token、密码哈希与会话都会跟随 SQLite 恢复，必须认真确认备份来源。
+
+## 备份与迁移原则
+
+- **个人记录、账号与授权**属于 `travel.db`；**历史旅行配图**属于 `legacy-images/`；后续上传的图片在 `uploads/`。定期备份应包含全部三项。
+- 每次重启或升级 Docker 镜像均不会覆写持久化目录。不要手动执行旧种子脚本。
+- 这是**停机恢复 SQLite**，不是网页在线上传不可信的 SQLite 文件并替换正在读写的数据库；后者必须另行设计安全的逻辑导入及回滚流程。
+- 仓库的旧 Git 历史和旧 GHCR 镜像可能仍包含历史私人图片和数据；删除当前版本资源并不能撤销旧版本已经公开的内容。
+- 如果只需要新站点，不需要复制任何备份，直接创建 API Token 并使用 travel-import Skill 和 travelctl.exe 导入足迹、未来计划和封面图即可。

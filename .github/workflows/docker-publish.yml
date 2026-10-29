@@ -111,11 +111,11 @@ jobs:
           }
           run_app
           wait_ready
-          docker exec travel-planner-smoke node -e 'const {PrismaClient}=require("@prisma/client");const db=new PrismaClient();(async()=>{const admin=await db.user.findUnique({where:{username:"ci_owner"}});const count=await db.visitedPlace.count();if(!admin||admin.role!=="ADMIN"||count!==31)throw Error("first-run admin or travel seed failed");await db.visitedPlace.update({where:{id:"zhongshan"},data:{mapNote:"CI_DOCKER_PERSISTENCE_PROBE"}});})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>db.$disconnect())'
+          docker exec travel-planner-smoke node -e 'const {PrismaClient}=require("@prisma/client");const db=new PrismaClient();(async()=>{const admin=await db.user.findUnique({where:{username:"ci_owner"}});const count=await db.visitedPlace.count();const future=await db.destination.count();if(!admin||admin.role!=="ADMIN"||count!==0||future!==0)throw Error("first-run generic DB or admin failed");await db.appSetting.create({data:{key:"ci_docker_persistence",value:"CI_DOCKER_PERSISTENCE_PROBE"}});})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>db.$disconnect())'
           docker rm -f travel-planner-smoke >/dev/null
           run_app
           wait_ready
-          docker exec travel-planner-smoke node -e 'const {PrismaClient}=require("@prisma/client");const db=new PrismaClient();(async()=>{const place=await db.visitedPlace.findUnique({where:{id:"zhongshan"}});const admin=await db.user.findUnique({where:{username:"ci_owner"}});if(place?.mapNote!=="CI_DOCKER_PERSISTENCE_PROBE"||!admin)throw Error("persistent database was lost or reset");})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>db.$disconnect())'
+          docker exec travel-planner-smoke node -e 'const {PrismaClient}=require("@prisma/client");const db=new PrismaClient();(async()=>{const saved=await db.appSetting.findUnique({where:{key:"ci_docker_persistence"}});const admin=await db.user.findUnique({where:{username:"ci_owner"}});if(saved?.value!=="CI_DOCKER_PERSISTENCE_PROBE"||!admin)throw Error("persistent database was lost or reset");})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>db.$disconnect())'
           echo "LINUX_DOCKER_SMOKE_PASS"
       - name: Push image after Docker smoke test
         shell: bash

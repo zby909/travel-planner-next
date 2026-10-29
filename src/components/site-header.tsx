@@ -16,7 +16,7 @@ export function SiteHeader() {
         <Link href="/#flight-sample">机票样本</Link>
         <Link href="/admin">管理后台</Link>
       </nav>
-      <span className="topbar-note">广州出发 · 两个人</span>
+      <span className="topbar-note">记录旅途 · 规划下一站</span>
     </header>
   );
 }

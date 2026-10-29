@@ -65,7 +65,7 @@ export function DestinationEditForm({ data }: { data: DestinationData }) {
         <label>当地拼团及住宿备注<textarea name="groupText" rows={3} defaultValue={data.groupText} /></label>
       </section>
       <section className="admin-panel">
-        <h2>双人预算（人民币）</h2>
+        <h2>旅行总预算（人民币）</h2>
         <p className="muted-copy">基准预算由下方七项自动合计，避免数字不一致；最低与最高预算请手动填写。</p>
         <div className="admin-form-grid">
           <Field name="minBudget" label="预算下限" type="number" value={data.minBudget} min={0} required />
@@ -76,7 +76,7 @@ export function DestinationEditForm({ data }: { data: DestinationData }) {
       <section className="admin-panel">
         <h2>机票规划依据</h2>
         <div className="admin-form-grid">
-          <Field name="route" label="往返航线" value={data.flightPricing?.route ?? ""} required />
+          <Field name="route" label="往返航线（可选）" value={data.flightPricing?.route ?? ""} />
           <Field name="flightSource" label="参考来源链接" value={data.flightSource} type="url" />
           {([
             ["normalMin", "平日最低"], ["normalMax", "平日最高"], ["holidayMin", "节假日最低"], ["holidayMax", "节假日最高"],
@@ -100,14 +100,14 @@ export function FlightCreateForm({ destinations }: { destinations: { id: string;
       <div className="admin-form-grid">
         <label>关联目的地<select name="destinationId" defaultValue=""><option value="">暂不关联</option>{destinations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></label>
         <label>证据类型<select name="sourceType" defaultValue="USER_REPORTED"><option value="USER_REPORTED">用户实际查询</option><option value="PUBLIC_REFERENCE">公开价格参考</option><option value="HISTORICAL">历史价格样本</option><option value="PLANNING_ESTIMATE">规划估算（非报价）</option></select></label>
-        <Field name="route" label="航线描述" required value="广州往返" />
-        <Field name="origin" label="出发城市" required value="广州" />
+        <Field name="route" label="航线描述" required />
+        <Field name="origin" label="出发城市" required />
         <Field name="destinationName" label="到达城市" required />
         <Field name="sourceName" label="平台 / 数据来源" />
         <Field name="departureDate" label="去程日期" type="date" />
         <Field name="returnDate" label="返程日期" type="date" />
         <Field name="pricePerPerson" label="每人往返价（元）" type="number" min={0} />
-        <Field name="totalPrice" label="两人往返总价（元）" type="number" min={0} />
+        <Field name="totalPrice" label="同行总价（元）" type="number" min={0} />
         <Field name="checkedAt" label="查询日期" type="date" />
         <Field name="airline" label="航司（未知可空）" />
         <label>航班类型<select name="flightType" defaultValue=""><option value="">未确认</option><option value="DIRECT">直飞</option><option value="TRANSFER">中转</option></select></label>
@@ -129,7 +129,7 @@ export function PlaceEditForm({ data }: { data: { id: string; name: string; grou
       <div className="admin-form-grid">
         <Field name="name" label="地点名称" value={data.name} required />
         <Field name="region" label="国家 / 省份" value={data.region} required />
-        <label>到访归属<select name="group" defaultValue={data.group}><option value="both">我们都去过</option><option value="her">王颖单独到访</option><option value="mine">我单独到访</option></select></label>
+        <label>到访归属<select name="group" defaultValue={data.group}><option value="both">我们都去过</option><option value="her">成员 B 到访</option><option value="mine">成员 A 到访</option></select></label>
         <Field name="whenLabel" label="到访日期或生活描述" value={data.whenLabel} />
       </div>
       <label>地图说明<textarea name="mapNote" rows={3} defaultValue={data.mapNote ?? ""} /></label>

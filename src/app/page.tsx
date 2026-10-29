@@ -14,35 +14,35 @@ export default async function HomePage() {
     }),
     prisma.visitedPlace.count(),
     prisma.timelineEntry.count(),
-    prisma.flightPriceSample.findUnique({ where: { id: "user-sample-guangzhou-urumqi-2026-11" } }),
+    prisma.flightPriceSample.findFirst({ orderBy: { createdAt: "desc" } }),
   ]);
 
   return (
     <main>
       <SiteHeader />
       <section className="hero">
-        <Image className="hero-image" src="/images/altay-0.jpg" alt="新疆阿勒泰山地风景" fill priority sizes="100vw" />
+        <Image className="hero-image" src="/images/destination-placeholder.svg" alt="旅行主题背景" fill priority sizes="100vw" />
         <div className="hero-shade" />
         <div className="hero-content page-width">
-          <p className="eyebrow eyebrow-light">A JOURNEY FOR TWO · 2027</p>
-          <h1>下一站，<br /><em>和你去看</em><br />世界。</h1>
-          <p className="hero-copy">想和你在北国看雪，在海边吹风，<br />走过京都的小巷，也看一看遥远的沙漠。<br />远方很多，我们慢慢来。</p>
+          <p className="eyebrow eyebrow-light">YOUR TRAVEL PLANNER</p>
+          <h1>下一站，<br /><em>去看</em><br />世界。</h1>
+          <p className="hero-copy">记录已经走过的路，规划未来的旅行。<br />从第一段回忆，到下一个目的地。</p>
           <div className="hero-actions">
-            <Link className="button button-light" href="#destinations">一起挑选下一站 <span>↗</span></Link>
+            <Link className="button button-light" href="#destinations">挑选下一站 <span>↗</span></Link>
             <Link className="text-link text-link-light" href="/visited">翻看已经走过的地方 ↗</Link>
           </div>
-          <p className="hero-footnote">广州出发 · 两个人 · 预算务实 · 天数不硬凑</p>
+          <p className="hero-footnote">属于你的旅行地图与计划</p>
         </div>
-        <div className="hero-side-note">VOL. 01 / OUR TRAVEL DIARY</div>
+        <div className="hero-side-note">YOUR TRAVEL DIARY</div>
       </section>
 
       <section className="intro-band page-width">
         <div>
           <p className="eyebrow">A LITTLE NOTE TO US</p>
-          <h2>不是收集地名，<br />是期待<em>还没一起看过的世界。</em></h2>
+          <h2>不止是收集地名，<br />还有<em>值得期待的风景。</em></h2>
         </div>
         <div className="intro-copy">
-          <p>先找到真正期待的风景，再决定出发日期。不为了凑假期赶景点，也不为了花满预算而消费。</p>
+          <p>把想去的地方添加到心愿清单，也把走过的路留在自己的旅行时间轴里。</p>
           <div className="stats-row">
             <div><strong>{destinations.length}</strong><span>个未来目的地</span></div>
             <div><strong>{visitedCount}</strong><span>个旅行与生活足迹</span></div>
@@ -57,15 +57,16 @@ export default async function HomePage() {
             <p className="eyebrow">THE NEXT JOURNEY</p>
             <h2>下一站，<em>去哪里？</em></h2>
           </div>
-          <p>预算按两个人合计。机票区分平日与节假日，价格样本和规划估算分开看。</p>
+          <p>预算为旅行总额，可按照自己的出行人数调整；仅显示真实保存的计划和报价样本。</p>
         </div>
+        {destinations.length === 0 && <div className="empty-state"><h3>还没有未来目的地</h3><p>登录管理后台创建 AI 授权，通过 travel-import Skill + travelctl 导入想去的地方。</p><Link className="button button-dark" href="/admin/tokens">前往 AI 授权设置</Link></div>}
         <div className="destination-grid">
           {destinations.map((destination) => {
             const types = parseJsonArray<string>(destination.typesJson);
             return (
               <article className="destination-card" key={destination.id}>
                 <Link className="destination-photo" href={`/destinations/${destination.id}`}>
-                  <Image unoptimized={Boolean(destination.imagePath?.startsWith("/api/media/"))} src={destination.imagePath ?? `/images/${destination.id}-0.jpg`} alt={destination.title} fill sizes="(max-width: 760px) 100vw, (max-width: 1100px) 50vw, 33vw" />
+                  <Image unoptimized={!destination.imagePath || destination.imagePath.startsWith("/api/")} src={destination.imagePath ?? `/api/legacy-media/images/${destination.id}-0.jpg`} alt={destination.title} fill sizes="(max-width: 760px) 100vw, (max-width: 1100px) 50vw, 33vw" />
                   <span className="photo-number">DESTINATION / {String(destination.rank).padStart(2, "0")}</span>
                   <span className="photo-arrow">↗</span>
                 </Link>
@@ -75,7 +76,7 @@ export default async function HomePage() {
                   <p className="destination-subtitle">{destination.subtitle}</p>
                   <p className="destination-vibe">{destination.vibe}</p>
                   <div className="tag-row">{types.slice(0, 3).map((type) => <span className="tag" key={type}>{type}</span>)}</div>
-                  <div className="budget-line"><span>双人预算参考</span><strong>{destination.maxBudget === 0 ? "待估算" : `${formatCny(destination.minBudget)}–${formatCny(destination.maxBudget)}`}</strong></div>
+                  <div className="budget-line"><span>总预算参考</span><strong>{destination.maxBudget === 0 ? "待估算" : `${formatCny(destination.minBudget)}–${formatCny(destination.maxBudget)}`}</strong></div>
                   {destination.flightPricing && (destination.flightPricing.normalMax > 0 || destination.flightPricing.holidayMax > 0) && <div className="flight-line">
                     <span>平日机票</span><b>{formatCny(destination.flightPricing?.normalMin)}–{formatCny(destination.flightPricing?.normalMax)}</b>
                     <span>节假日</span><b>{formatCny(destination.flightPricing?.holidayMin)}–{formatCny(destination.flightPricing?.holidayMax)}</b>
@@ -111,17 +112,17 @@ export default async function HomePage() {
           <p className="eyebrow">WHERE WE HAVE BEEN</p>
           <h2>过去值得珍藏，<br /><em>未来值得期待。</em></h2>
           <p>把去过的地方、各自的旅行时间和共同回忆慢慢整理起来。生活足迹和真正的旅行记录，也可以被认真保存。</p>
-          <Link className="button button-dark" href="/visited">打开我们的旅行足迹 <span>↗</span></Link>
+          <Link className="button button-dark" href="/visited">查看旅行足迹 <span>↗</span></Link>
         </div>
         <div className="visited-invite-photo">
-          <Image src="/images/visited/sichuan.jpg" alt="川西旅行风景" fill sizes="(max-width: 760px) 100vw, 45vw" />
+          <Image src="/images/place-placeholder.svg" alt="旅行记忆插画" fill sizes="(max-width: 760px) 100vw, 45vw" />
           <span>MEMORIES WE KEEP</span>
         </div>
       </section>
 
       <footer className="site-footer page-width">
         <Link className="brand brand-footer" href="/"><span className="brand-mark">✳</span><span className="brand-name">下一站<small>THE NEXT JOURNEY</small></span></Link>
-        <p>慢慢规划，认真出发。<br />一份属于两个人的旅行档案。</p>
+        <p>慢慢规划，认真出发。<br />一份属于自己的旅行档案。</p>
       </footer>
     </main>
   );

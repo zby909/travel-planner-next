@@ -47,9 +47,9 @@ const groupColors: Record<string, string> = {
 };
 
 const groupNames: Record<string, string> = {
-  both: "我们都去过",
-  her: "王颖单独去过",
-  mine: "我单独去过",
+  both: "两位成员都去过",
+  her: "成员 B 到访",
+  mine: "成员 A 到访",
 };
 
 function escapeHtml(value: unknown): string {
@@ -215,7 +215,7 @@ export function VisitedMap({ places }: { places: MapPlace[] }) {
           <select aria-label="筛选到访人" value={group} onChange={(event) => setGroup(event.target.value as typeof group)}>
             <option value="all">所有足迹</option>
             <option value="both">我们都去过</option>
-            <option value="her">王颖单独去过</option>
+            <option value="her">成员 B 到访</option>
             <option value="mine">我单独去过</option>
           </select>
         </div>
