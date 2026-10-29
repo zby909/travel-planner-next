@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.env
+.env.*
+data/*.db
+data/*.db-journal
+data/*.db-shm
+data/*.db-wal
+data/uploads
+travel-2027-deploy.zip
+.claude
+AGENTS.md
+legacy
+*.log

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="img" aria-labelledby="title desc">
+<title id="title">中山城市印象示意插画</title>
+<desc id="desc">广东的家；项目绘制的城市主题矢量示意，非实景照片或精确地标复刻</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#183e50"/><stop offset="1" stop-color="#517d77"/></linearGradient>
+<linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e5cba1" stop-opacity=".7"/><stop offset="1" stop-color="#0f4556" stop-opacity=".7"/></linearGradient>
+</defs>
+<rect width="960" height="640" fill="url(#bg)"/>
+<circle cx="770" cy="132" r="93" fill="#e5cba1" opacity=".21"/>
+<circle cx="770" cy="132" r="127" fill="none" stroke="#e5cba1" stroke-opacity=".12" stroke-width="2"/>
+<path d="M0 510Q200 478 412 516t548-16v140H0Z" fill="url(#ground)"/>
+<g fill="#f0d9ab" opacity=".96"><path d="M170 352L321 245 472 352V514H170Z"/><path d="M501 337L611 267 738 337V514H501Z" fill="#c6d7ba"/><path d="M130 367L321 226 516 367" fill="none" stroke="#fff0d1" stroke-width="17" stroke-linecap="round"/><rect x="277" y="402" width="86" height="112" rx="41" fill="#5f8b82"/><rect x="553" y="383" width="62" height="59" rx="8" fill="#668e90"/><rect x="636" y="383" width="62" height="59" rx="8" fill="#668e90"/></g><g fill="#a5cfb1"><circle cx="100" cy="350" r="54"/><circle cx="834" cy="357" r="80"/><circle cx="85" cy="414" r="50"/></g><g fill="#2e6e72"><rect x="95" y="400" width="12" height="140"/><rect x="829" y="411" width="16" height="125"/></g>
+<path d="M0 515Q195 492 380 520T960 518v122H0Z" fill="#0c3648" opacity=".56"/>
+<rect x="42" y="505" width="525" height="107" rx="14" fill="#092b3c" opacity=".75"/>
+<text x="66" y="554" fill="#fff6e7" font-family="Microsoft YaHei,PingFang SC,sans-serif" font-size="44" font-weight="700">中山</text>
+<text x="68" y="589" fill="#d9e8df" font-family="Microsoft YaHei,PingFang SC,sans-serif" font-size="22">广东的家</text>
+<text x="670" y="604" fill="#e0ebe2" font-family="Microsoft YaHei,PingFang SC,sans-serif" font-size="16" opacity=".78">示意插画 · 非实景</text>
+</svg>

@@ -1,0 +1,343 @@
+{
+  "images": [
+    {
+      "id": "beijing",
+      "index": 0,
+      "label": "北京环球影城",
+      "file": "Universal_Studios_Beijing_globe_square_(20210907121340).jpg",
+      "title": "Universal Beijing",
+      "bytes": 188111
+    },
+    {
+      "id": "beijing",
+      "index": 1,
+      "label": "故宫",
+      "file": "The_Forbidden_City_-_View_from_Coal_Hill.jpg",
+      "title": "Forbidden City",
+      "bytes": 73082
+    },
+    {
+      "id": "beijing",
+      "index": 2,
+      "label": "慕田峪长城",
+      "file": "Great_Wall_of_China_July_2006.JPG",
+      "title": "Mutianyu",
+      "bytes": 247766
+    },
+    {
+      "id": "dongbei",
+      "index": 0,
+      "label": "哈尔滨冰雪大世界",
+      "file": "Harbin_Ice_Festival.jpg",
+      "title": "Harbin International Ice and Snow Sculpture Festival",
+      "bytes": 177610
+    },
+    {
+      "id": "dongbei",
+      "index": 1,
+      "label": "中国雪乡",
+      "file": "Morning_in_China_Snow_Town.jpg",
+      "title": "China Snow Town",
+      "bytes": 196168
+    },
+    {
+      "id": "dongbei",
+      "index": 2,
+      "label": "圣索菲亚教堂",
+      "file": "West_facade_of_St._Sophia_Cathedral,_Harbin_(20230721150450).jpg",
+      "title": "Saint Sophia Cathedral, Harbin",
+      "bytes": 238511
+    },
+    {
+      "id": "qinggan",
+      "index": 0,
+      "label": "鸣沙山月牙泉",
+      "file": "Crescent_Lake_from_the_Singing_Sand_Dunes_(20230918101214).jpg",
+      "title": "Crescent Lake (Dunhuang)",
+      "bytes": 120137
+    },
+    {
+      "id": "qinggan",
+      "index": 1,
+      "label": "莫高窟",
+      "file": "Mogao_Caves_(54376969262).jpg",
+      "title": "Mogao Caves",
+      "bytes": 194712
+    },
+    {
+      "id": "qinggan",
+      "index": 2,
+      "label": "张掖七彩丹霞",
+      "file": "Zhangye_National_Geopark_5.jpg",
+      "title": "Zhangye National Geopark",
+      "bytes": 246269
+    },
+    {
+      "id": "kansai",
+      "index": 0,
+      "label": "清水寺",
+      "file": "Kiyomizu.jpg",
+      "title": "Kiyomizu-dera",
+      "bytes": 264737
+    },
+    {
+      "id": "kansai",
+      "index": 1,
+      "label": "伏见稻荷",
+      "file": "Torii_path_with_lantern_at_Fushimi_Inari_Taisha_Shrine,_Kyoto,_Japan.jpg",
+      "title": "Fushimi Inari-taisha",
+      "bytes": 215037
+    },
+    {
+      "id": "kansai",
+      "index": 2,
+      "label": "奈良公园",
+      "file": "Nara_Park_-_panoramio_(2).jpg",
+      "title": "Nara Park",
+      "bytes": 180840
+    },
+    {
+      "id": "yili",
+      "index": 0,
+      "label": "赛里木湖",
+      "file": "赛里木湖远景，摄于湖畔山丘.jpg",
+      "title": "Sayram Lake",
+      "bytes": 137304
+    },
+    {
+      "id": "yili",
+      "index": 1,
+      "label": "那拉提草原",
+      "file": "Nalati Grassland 2.jpg",
+      "title": "Nalati Grassland",
+      "bytes": 168449
+    },
+    {
+      "id": "yili",
+      "index": 2,
+      "label": "果子沟",
+      "file": "Guozigou_Bridge.jpg",
+      "title": "Guozigou Bridge",
+      "bytes": 132500
+    },
+    {
+      "id": "vietnam",
+      "index": 0,
+      "label": "会安古城",
+      "file": "Hội An, Ancient Town, 2020-01 CN-06.jpg",
+      "title": "Hội An",
+      "bytes": 223909
+    },
+    {
+      "id": "vietnam",
+      "index": 1,
+      "label": "巴拿山佛手桥",
+      "file": "Golden_Bridge_at_Ba_Na_Hills_20250718.jpg",
+      "title": "Golden Bridge (Vietnam)",
+      "bytes": 252653
+    },
+    {
+      "id": "vietnam",
+      "index": 2,
+      "label": "顺化皇城",
+      "file": "Đại_nội.jpg",
+      "title": "Imperial City of Huế",
+      "bytes": 289671
+    },
+    {
+      "id": "thailand",
+      "index": 0,
+      "label": "郑王庙",
+      "file": "เจดีย์ประธานทรงปรางค์วัดอรุณ2.jpg",
+      "title": "Wat Arun",
+      "bytes": 160159
+    },
+    {
+      "id": "thailand",
+      "index": 1,
+      "label": "大城遗址",
+      "file": "Ayutthaya_World_Heritage_sign.jpg",
+      "title": "Ayutthaya Historical Park",
+      "bytes": 260980
+    },
+    {
+      "id": "thailand",
+      "index": 2,
+      "label": "清迈双龙寺",
+      "file": "Wat_Phra_That_Doi_Suthep_-_Chiang_Mai.jpg",
+      "title": "Wat Phra That Doi Suthep",
+      "bytes": 180706
+    },
+    {
+      "id": "korea",
+      "index": 0,
+      "label": "景福宫",
+      "file": "광화문_월대.jpg",
+      "title": "Gyeongbokgung",
+      "bytes": 191372
+    },
+    {
+      "id": "korea",
+      "index": 1,
+      "label": "北村韩屋",
+      "file": "Bukchon_Hanok_Village_01.jpg",
+      "title": "Bukchon Hanok Village",
+      "bytes": 231089
+    },
+    {
+      "id": "korea",
+      "index": 2,
+      "label": "南山塔",
+      "file": "NamsanTower_(Cropped).jpeg",
+      "title": "Namsan Seoul Tower",
+      "bytes": 135926
+    },
+    {
+      "id": "zhangjiajie",
+      "index": 0,
+      "label": "张家界森林公园",
+      "file": "1_tianzishan_wulingyuan_zhangjiajie_2012.jpg",
+      "title": "Zhangjiajie National Forest Park",
+      "bytes": 141991
+    },
+    {
+      "id": "zhangjiajie",
+      "index": 1,
+      "label": "天门山",
+      "file": "Tianmen_38330-Zhangjiajie_(49047525877).jpg",
+      "title": "Tianmen Mountain",
+      "bytes": 313895
+    },
+    {
+      "id": "zhangjiajie",
+      "index": 2,
+      "label": "凤凰古城",
+      "file": "Fenghuang_hunan.jpg",
+      "title": "Fenghuang County",
+      "bytes": 197930
+    },
+    {
+      "id": "altay",
+      "index": 1,
+      "label": "禾木村",
+      "file": "Hemu Village in the snow.jpg",
+      "title": "Hemu Village",
+      "bytes": 198465
+    },
+    {
+      "id": "altay",
+      "index": 2,
+      "label": "布尔津",
+      "file": "Burqin.jpg",
+      "title": "Burqin County",
+      "bytes": 92782
+    },
+    {
+      "id": "tibet",
+      "index": 0,
+      "label": "布达拉宫",
+      "file": "Potala_Palace_HQ.jpg",
+      "title": "Potala Palace",
+      "bytes": 199568
+    },
+    {
+      "id": "tibet",
+      "index": 1,
+      "label": "羊卓雍措",
+      "file": "LAC_YAMDROK.jpg",
+      "title": "Yamdrok Lake",
+      "bytes": 125611
+    },
+    {
+      "id": "tibet",
+      "index": 2,
+      "label": "大昭寺",
+      "file": "Jokhang_Temple_in_Tibet.jpg",
+      "title": "Jokhang",
+      "bytes": 146209
+    },
+    {
+      "id": "bali",
+      "index": 0,
+      "label": "乌布",
+      "file": "Ubud_(49818456887).jpg",
+      "title": "Ubud",
+      "bytes": 249666
+    },
+    {
+      "id": "bali",
+      "index": 1,
+      "label": "乌鲁瓦图寺",
+      "file": "Pura_Luhur_Uluwatu_2017-08-17_(34).jpg",
+      "title": "Uluwatu Temple",
+      "bytes": 213161
+    },
+    {
+      "id": "bali",
+      "index": 2,
+      "label": "德格拉朗梯田",
+      "file": "Rice terraces, Bali.jpg",
+      "title": "Tegallalang Rice Terrace",
+      "bytes": 304872
+    },
+    {
+      "id": "weihai",
+      "index": 0,
+      "label": "威海海滨",
+      "file": "Gate_of_happiness_山东_威海_-_panoramio.jpg",
+      "title": "Weihai",
+      "bytes": 105238
+    },
+    {
+      "id": "weihai",
+      "index": 1,
+      "label": "青岛栈桥",
+      "file": "青岛栈桥_Ehemalige_Landungsbrücke_Qingdao.jpg",
+      "title": "Zhanqiao Pier",
+      "bytes": 161646
+    },
+    {
+      "id": "singapore",
+      "index": 0,
+      "label": "滨海湾花园",
+      "file": "Supertree_Grove,_Gardens_by_the_Bay,_Singapore_-_20120712-02.jpg",
+      "title": "Gardens by the Bay",
+      "bytes": 253517
+    },
+    {
+      "id": "singapore",
+      "index": 1,
+      "label": "滨海湾金沙",
+      "file": "Marina_Bay_Sands_(I).jpg",
+      "title": "Marina Bay Sands",
+      "bytes": 157671
+    },
+    {
+      "id": "singapore",
+      "index": 2,
+      "label": "星耀樟宜",
+      "file": "Jewel_Changi_Airport_13-11-2023(1).jpg",
+      "title": "Jewel Changi Airport",
+      "bytes": 220212
+    },
+    {
+      "id": "altay",
+      "index": 0,
+      "label": "喀纳斯湖",
+      "file": "Lake_Kanas.jpg",
+      "title": "Kanas Lake",
+      "bytes": 104723
+    },
+    {
+      "id": "weihai",
+      "index": 2,
+      "label": "崂山",
+      "file": "20240730_Dabiao_Mountain_of_Mount_Lao_01.jpg",
+      "title": "Mount Lao",
+      "bytes": 262662
+    }
+  ],
+  "missing": [],
+  "downloaded": 42,
+  "total": 42
+}

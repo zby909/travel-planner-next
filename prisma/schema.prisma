@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id           String        @id @default(cuid())
+  username     String        @unique
+  displayName  String
+  passwordHash String
+  role         String        @default("EDITOR")
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  sessions     AuthSession[]
+  auditLogs    AuditLog[]
+}
+
+model AuthSession {
+  tokenHash String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model LoginThrottle {
+  username    String    @id
+  failures    Int       @default(0)
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String
+  summary   String
+  createdAt DateTime @default(now())
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+}
+
+model Destination {
+  id              String              @id
+  title           String
+  subtitle        String
+  flag            String
+  kind            String
+  typesJson       String
+  months          String
+  seasonsJson     String
+  days            String
+  minBudget       Int
+  maxBudget       Int
+  pickBudget      Int
+  rank            Int
+  budgetFlight    Int
+  budgetHotel     Int
+  budgetGroup     Int
+  budgetFood      Int
+  budgetTickets   Int
+  budgetTransport Int
+  budgetOther     Int
+  groupText       String
+  flightNote      String
+  flightSource    String?
+  vibe            String
+  reason          String
+  spotsJson       String
+  routeJson       String
+  warning         String?
+  style           String?
+  badge           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  flightPricing   FlightPricing?
+  guide           DestinationGuide?
+  priceSamples    FlightPriceSample[]
+  plans           TravelPlan[]
+
+  @@index([rank])
+}
+
+model FlightPricing {
+  destinationId String      @id
+  route         String
+  normalMin     Int
+  normalMax     Int
+  holidayMin    Int
+  holidayMax    Int
+  normalSample  String
+  holidaySample String
+  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+}
+
+model DestinationGuide {
+  destinationId String      @id
+  intro         String
+  pace          String
+  stay          String
+  transport     String
+  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  days          GuideDay[]
+}
+
+model GuideDay {
+  id        String           @id
+  guideId   String
+  day       String
+  title     String
+  detail    String
+  sortOrder Int
+  guide     DestinationGuide @relation(fields: [guideId], references: [destinationId], onDelete: Cascade)
+
+  @@unique([guideId, sortOrder])
+}
+
+model FlightPriceSample {
+  id              String       @id
+  route           String
+  origin          String
+  destinationName String
+  departureDate   DateTime?
+  returnDate      DateTime?
+  tripNights      Int?
+  pricePerPerson  Int?
+  totalPrice      Int?
+  currency        String       @default("CNY")
+  sourceType      String
+  sourceName      String?
+  sourceUrl       String?
+  airline         String?
+  flightType      String?
+  baggageIncluded Boolean?
+  baggageDetails  String?
+  checkedAt       DateTime?
+  notes           String?
+  destinationId   String?
+  destination     Destination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+  createdAt       DateTime     @default(now())
+
+  @@index([destinationId])
+  @@index([departureDate, returnDate])
+  @@index([sourceType])
+}
+
+model VisitedPlace {
+  id        String          @id
+  group     String
+  name      String
+  region    String
+  image     String
+  whenLabel String
+  sortOrder Int
+  longitude Float?
+  latitude  Float?
+  country   String?
+  province  String?
+  city      String?
+  mapNote   String?
+  timeline  TimelinePlace[]
+
+  @@index([group, sortOrder])
+}
+
+model TimelineEntry {
+  id        String          @id
+  date      String
+  year      Int
+  group     String
+  title     String
+  note      String
+  sortOrder Int
+  places    TimelinePlace[]
+
+  @@index([year, sortOrder])
+}
+
+model TimelinePlace {
+  timelineEntryId String
+  placeId         String
+  sortOrder       Int
+  timelineEntry   TimelineEntry @relation(fields: [timelineEntryId], references: [id], onDelete: Cascade)
+  place           VisitedPlace  @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@id([timelineEntryId, placeId])
+  @@index([placeId])
+}
+
+model TravelPlan {
+  id            String          @id @default(cuid())
+  title         String
+  destinationId String?
+  startDate     DateTime?
+  endDate       DateTime?
+  status        String          @default("PLANNED")
+  plannedBudget Int?
+  actualBudget  Int?
+  currency      String          @default("CNY")
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  destination   Destination?    @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+  days          TravelPlanDay[]
+  expenses      Expense[]
+  memories      TravelMemory[]
+  photos        TravelPhoto[]   @relation("PlanPhotos")
+
+  @@index([status, startDate])
+}
+
+model TravelPlanDay {
+  id        String     @id @default(cuid())
+  planId    String
+  date      DateTime?
+  dayNumber Int
+  title     String
+  details   String
+  plan      TravelPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, dayNumber])
+}
+
+model Expense {
+  id          String     @id @default(cuid())
+  planId      String
+  category    String
+  amountFen   Int
+  description String
+  spentAt     DateTime?
+  paidBy      String?
+  receiptPath String?
+  createdAt   DateTime   @default(now())
+  plan        TravelPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, spentAt])
+  @@index([category])
+}
+
+model TravelMemory {
+  id         String        @id @default(cuid())
+  planId     String?
+  title      String
+  content    String
+  happenedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  plan       TravelPlan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+  photos     TravelPhoto[] @relation("MemoryPhotos")
+}
+
+model TravelPhoto {
+  id        String        @id @default(cuid())
+  planId    String?
+  memoryId  String?
+  filePath  String
+  altText   String?
+  sortOrder Int           @default(0)
+  createdAt DateTime      @default(now())
+  plan      TravelPlan?   @relation("PlanPhotos", fields: [planId], references: [id], onDelete: SetNull)
+  memory    TravelMemory? @relation("MemoryPhotos", fields: [memoryId], references: [id], onDelete: SetNull)
+
+  @@index([planId, sortOrder])
+  @@index([memoryId, sortOrder])
+}
