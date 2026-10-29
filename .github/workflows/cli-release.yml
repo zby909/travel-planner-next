@@ -24,16 +24,11 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           node --build-sea cli/sea-config.json
           ./dist/travelctl.exe --help
-      - name: Package Windows download
-        shell: pwsh
-        run: |
-          Copy-Item cli/README.md dist/README.md
-          Compress-Archive -Path dist/travelctl.exe,dist/README.md -DestinationPath travelctl-windows-x64.zip
-      - name: Upload release bundle artifact
+      - name: Upload Windows executable artifact
         uses: actions/upload-artifact@v4
         with:
           name: travelctl-windows-x64
-          path: travelctl-windows-x64.zip
+          path: dist/travelctl.exe
       - name: Attach to GitHub Release (tag pushes only)
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -42,6 +37,6 @@ jobs:
         run: |
           gh release view "${{ github.ref_name }}" 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create "${{ github.ref_name }}" --title "travelctl ${{ github.ref_name }}" --notes "Windows CLI ZIP and source release"
+            gh release create "${{ github.ref_name }}" --title "travelctl ${{ github.ref_name }}" --notes "Windows executable and source code release"
           }
-          gh release upload "${{ github.ref_name }}" travelctl-windows-x64.zip --clobber
+          gh release upload "${{ github.ref_name }}" dist/travelctl.exe --clobber

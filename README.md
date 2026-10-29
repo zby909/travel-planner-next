@@ -95,13 +95,15 @@ Token 管理入口是登录后的 `/admin/tokens`，令牌创建后只显示一�
 
 ```powershell
 npm install -g .\cli
-travelctl auth login --server https://你的旅行网站域名
+travelctl auth login
+# CLI 会在本地终端询问网站地址和授权令牌，只需首次设置一次。
+# 也可以跳过网站地址提示：travelctl auth login --server https://你的旅行网站域名
 travelctl auth status
 travelctl visits list
 travelctl destinations list
 ```
 
-`auth login` 在本地终端隐藏输入并保存 Token，不会要求你将授权令牌发送给 AI。
+`auth login` 在本地终端引导输入网站 URL 和隐藏输入 Token，校验成功后会自动保存两者。Skill 首次使用先检查 `travelctl auth status`，没有配置才引导完成绑定；之后不会每次再问地址和授权码。Windows 配置位于 `%APPDATA%\travelctl\config.json`，Linux/macOS 通常为 `~/.config/travelctl/config.json`；当前使用本地文件而不是操作系统加密钥匙串，请妥善保护。无需将授权令牌发送给 AI。后台 `/admin/tokens` 也提供 CLI / Skill 下载入口及对应网站的登录命令提示。
 Node.js 22 及以上版本可直接运行 CLI。建议只发放所需权限，90 天过期；丢失后在网站中撤销。
 
 ### 上传配图
@@ -182,7 +184,7 @@ CLI 适合本地终端和能执行命令的 AI Agent，并非普通聊天网页�
 ### 发布和数据隔离说明
 
 - `cli/package.json` 准备了 `@zby909/travelctl` 的 npm 包，但**尚未发布到 npm**。
-- `.github/workflows/cli-release.yml` 会在推送 `v*` 标签时使用 Node.js SEA 构建 Windows x64 exe，并打包为 GitHub Release 的 ZIP。此版本**尚未生成正式 EXE**；首次发布必须在 GitHub Actions 中实测。
+- `.github/workflows/cli-release.yml` 会在推送 `v*` 标签时使用 Node.js SEA 构建 Windows x64 exe，并将 EXE 直接添加到 GitHub Release 供下载。此版本**尚未生成正式 EXE**；首次发布必须在 GitHub Actions 中实测。
 - `npm run test:import:e2e` 使用临时数据库和临时上传目录，测试 Token、图片私密分段、图片清理元信息、足迹/未来目的地导入与 CLI。
 - 现有旧版本使用的个人化 `both/her/mine` 分类以及历史种子数据仍在仓库和镜像中。**项目暂时还不是完全去个人化的空白开源镜像**；需要后续独立迁移旧图片和种子数据，避免破坏已部署用户的数据。
 - 第一版只支持每个足迹或目的地一张封面图；暂不支持视频、图片批量相册、自动抓取第三方图片或无人工确认的导入。

@@ -2,6 +2,7 @@ import { requireEditor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TokenCreateForm } from "./token-form";
 import { revokeTokenAction } from "./actions";
+import { CliSetupGuide } from "./cli-setup-guide";
 
 export default async function TokensPage() {
   const user = await requireEditor();
@@ -11,6 +12,7 @@ export default async function TokensPage() {
       <p className="eyebrow">AI & CLI ACCESS</p><h1>AI 助手授权</h1>
       <p>创建只允许读取、导入足迹、导入未来旅行或上传图片的专用 Token。令牌不能登录网页或管理用户。</p>
     </div>
+    <CliSetupGuide />
     <TokenCreateForm />
     <section className="admin-panel">
       <h2>已有令牌</h2>

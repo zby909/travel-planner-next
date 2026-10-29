@@ -87,6 +87,10 @@ async function run() {
   assert((await page.context().cookies()).some(cookie => cookie.name === "travel_session" && cookie.httpOnly), "Session cookie is missing HttpOnly");
 
   await page.goto(host + "/admin/tokens");
+  await page.getByText("第一次使用 AI 助手").waitFor();
+  await page.getByText("travelctl auth login --server " + host).waitFor();
+  assert((await page.locator('a[href*="/releases"]').count()) > 0, "Windows executable download entry missing");
+  assert((await page.locator('a[href*="/skills/travel-import"]').count()) > 0, "Skill download entry missing");
   await page.locator('input[name="title"]').fill("浏览器集成测试令牌");
   await page.getByRole("button", { name: "生成授权令牌" }).click();
   await page.locator('textarea[aria-label="新授权令牌"]').waitFor({ timeout: 20000 });

@@ -1,22 +1,33 @@
 ---
 name: travel-import
-description: Import travel footprints and future destination ideas into a self-hosted Travel Planner using travelctl.
+description: Assist with importing travel visits and future destinations (with optional cover photos) into a self-hosted Travel Planner using the locally installed travelctl CLI.
 ---
 
 # Travel Planner Import Skill
 
-Use the locally installed `travelctl` command. Never request the user's API Token in chat; have the user run `travelctl auth login --server https://their-travel-site` locally. Never print or open the saved credentials file.
+The `travelctl` CLI connects this agent to the **user's own** Travel Planner website. It stores the website address and API Token locally after initial login. The Skill itself must never contain or store the user's credentials.
 
-## Workflow
+## First-use onboarding (before accessing data)
 
-1. Check `travelctl auth status`. If not configured, ask the user to open the site's **AI 授权** page and complete interactive CLI login.
-2. For past trips, run `travelctl visits list` before preparing new places. For plans, run `travelctl destinations list` to avoid duplicates.
-3. Preserve date precision: only a known year means `when: "2025"`; a known month means `when: "2025-05"`. Never invent dates, companions, locations or coordinates. **Future intentions must never be imported as past visits.**
-4. If the user supplied a **local** photo file, run `travelctl media upload path/to/photo.jpg`; copy only the returned `imageId` into the JSON. Images are re-encoded to WebP and stripped of EXIF. Do not auto-download images or reuse someone else's work without permission. Images become public when attached to a published visit/destination.
-5. Write a JSON file to a safe working path. For past trips: `{"items":[{"name":"东京","region":"日本","when":"2025-05","group":"mine","country":"日本","latitude":35.68,"longitude":139.69,"imageId":"<uploaded-id>"}]}`. Geocoordinates must come from verified location data; omit if unknown. `group` is a temporary legacy compatibility field (`mine`, `her`, `both`).
-6. For future ideas: `{"items":[{"title":"京都","subtitle":"日本·关西","months":"10-11月","days":"5天","route":["京都","宇治"],"spots":["伏见稻荷大社"],"reason":"红叶季","imageId":"<uploaded-id>"}]}`. Optional budget uses `budget:{flight,hotel,group,food,tickets,transport,other}` in CNY total, not per person. Unknown budget must be omitted, not invented.
-7. Run `travelctl visits prepare file.json` or `travelctl destinations prepare file.json`. Examine the returned draft ID, items and all warnings. Present a clear summary to the user and **obtain explicit confirmation**.
-8. Only after explicit confirmation run `travelctl import commit DRAFT_ID --confirm`. If canceled, run `travelctl import cancel DRAFT_ID`.
-9. Never bypass preview, alter another person's existing records, or silently commit a batch. Never send tokens, raw credentials or private photos into model context without user permission.
+1. Check if the local CLI exists with `travelctl --help`. If missing, guide the user to the site's **Admin → AI 授权** page, where the npm / Windows executable and this Skill's download instructions are shown. Do not pretend an unpublished npm package or executable is available.
+2. Run `travelctl auth status`. If authenticated, proceed without prompting for anything. An expired/revoked Token or unreachable server means that re-authentication may be necessary; tell the user why.
+3. When configuration is absent, explain the one-time setup:
+   - Open the user's own website's **管理后台 → AI 授权** page and create a scoped API Token.
+   - **In their own local terminal**, run `travelctl auth login`. The CLI itself asks for the website address first, then prompts for the Token with hidden input. The user can alternatively run `travelctl auth login --server https://their-real-domain`, which skips the address prompt.
+   - CLI checks the Token against the specified site's authenticated API endpoint **before** saving the site's origin and Token in its local configuration directory.
+   - Windows: `%APPDATA%\\travelctl\\config.json`; Linux/macOS: `$XDG_CONFIG_HOME/travelctl/config.json` or `~/.config/travelctl/config.json`. This version uses a local file, **not an encrypted OS credential vault**; do not share, print, or commit it. Keep the local computer account protected. A new login replaces the previous single-site configuration.
+4. Ask the user to return after successful login, then call `travelctl auth status` again. The user may share their site URL in chat if needed (it's not a secret), **but NEVER ask them to paste their API Token into chat, a skill, a source file, or a CLI command argument**. Do not read the local credentials file with an agent tool or expose Tokens in tool logs.
+5. From then on, use `travelctl` commands automatically with the saved configuration, without requesting the URL or Token again.
 
-This version supports single-image cover per record, no video uploads, no arbitrary remote image fetching, and imports **new** records only. Existing duplicates are skipped.
+## Import workflow
+
+1. For past trips, run `travelctl visits list` before adding records. For future plans, use `travelctl destinations list` to avoid duplicates.
+2. Preserve date precision: a known year means `when: "2025"`; a known month means `when: "2025-05"`. Do not invent exact dates, companions, locations or coordinates. **Future intentions are never past visits.**
+3. For a **local** photo the user wants publicly attached, run `travelctl media upload path/to/photo.jpg`. Copy the returned `imageId` into the JSON. Images are re-encoded as WebP and stripped of EXIF. Do not fetch or upload third-party work without authorization. Staged images remain private until an import referencing them is confirmed.
+4. Write a JSON file in the working directory. Past example: `{"items":[{"name":"东京","region":"日本","when":"2025-05","group":"mine","country":"日本","latitude":35.68,"longitude":139.69,"imageId":"<uploaded-id>"}]}`. Coordinates must come from verified geographical data; omit if unknown. `group` currently retains legacy choices `mine`, `her`, `both`.
+5. Future example: `{"items":[{"title":"京都","subtitle":"日本·关西","months":"10-11月","days":"5天","route":["京都","宇治"],"spots":["伏见稻荷大社"],"reason":"红叶季","imageId":"<uploaded-id>"}]}`. Optional `budget:{flight,hotel,group,food,tickets,transport,other}` is the CNY *total*, not per person. Missing budgets stay missing.
+6. Run `travelctl visits prepare file.json` or `travelctl destinations prepare file.json`. Review the draft ID, warnings and preview. Summarize intended additions for the user and **obtain explicit confirmation before the database write**.
+7. Only after confirmation run `travelctl import commit DRAFT_ID --confirm`. Otherwise `travelctl import cancel DRAFT_ID`. Never silently commit.
+8. Tokens authorize only their permitted scopes. Do not attempt to circumvent authorization or overwrite someone else's existing records.
+
+This version supports one image per record, no video uploads, no automatic remote image fetching; duplicate existing records are skipped.

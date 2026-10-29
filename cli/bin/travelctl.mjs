@@ -12,7 +12,10 @@ const configFile = join(configDir, "config.json");
 function usage() {
   console.log(`travelctl — AI-assisted travel import CLI
 
-Setup:
+First-time setup:
+  travelctl auth login
+  # asks for website URL and API Token locally, then saves configuration
+  # or skip the URL prompt:
   travelctl auth login --server https://travel.example.com
   travelctl auth status
 
@@ -36,10 +39,12 @@ Run commands with --json for structured output where supported.
 function error(message) { console.error(`travelctl: ${message}`); process.exitCode = 1; }
 async function readConfig() {
   try { return JSON.parse(await readFile(configFile, "utf8")); }
-  catch { throw new Error("not logged in; run travelctl auth login --server https://your-site"); }
+  catch { throw new Error("not configured; run travelctl auth login in your own terminal to set up your website and API Token"); }
 }
-async function askHidden(label) {
-  if (!stdin.isTTY || !stdin.setRawMode) throw new Error("login requires an interactive terminal; never pass a token as a command argument");
+async function askTerminal(label, { hidden = false, maxLength = 512 } = {}) {
+  if (!stdin.isTTY || !stdin.setRawMode) {
+    throw new Error("first-time login requires an interactive local terminal; never pass a token as a command argument or paste it into an AI conversation");
+  }
   stdout.write(label);
   let result = "";
   const oldRaw = stdin.isRaw;
@@ -50,11 +55,23 @@ async function askHidden(label) {
       for (const character of data.toString("utf8")) {
         if (character === "\u0003") { cleanup(); reject(new Error("canceled")); return; }
         if (character === "\r" || character === "\n") { cleanup(); resolve(result); return; }
-        if (character === "\u007f" || character === "\b") result = result.slice(0,-1);
-        else if (character >= " " && result.length < 256) result += character;
+        if (character === "\u007f" || character === "\b") {
+          if (result) {
+            result = result.slice(0, -1);
+            if (!hidden) stdout.write("\b \b");
+          }
+        } else if (character >= " " && result.length < maxLength) {
+          result += character;
+          if (!hidden) stdout.write(character);
+        }
       }
     };
-    function cleanup() { stdin.off("data", listener); stdin.setRawMode(oldRaw); stdin.pause(); stdout.write("\n"); }
+    function cleanup() {
+      stdin.off("data", listener);
+      stdin.setRawMode(oldRaw);
+      stdin.pause();
+      stdout.write("\n");
+    }
     stdin.on("data", listener);
   });
 }
@@ -92,18 +109,22 @@ async function main() {
   const [topic, operation, arg] = args;
   if (!topic || ["help", "--help", "-h"].includes(topic)) return usage();
   if (topic === "auth" && operation === "login") {
-    const rawServer = getFlag(args, "--server");
-    if (!rawServer) throw new Error("--server is required");
-    const url = new URL(rawServer);
+    console.log("Travel Planner first-time setup (all input stays in your local terminal).");
+    const rawServer = getFlag(args, "--server")
+      || (await askTerminal("Your Travel Planner website URL (https://...): ")).trim();
+    let url;
+    try { url = new URL(rawServer); }
+    catch { throw new Error("invalid website address; include https:// and your actual site domain"); }
     if (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))) {
       throw new Error("HTTPS is required except on localhost");
     }
+    if (url.username || url.password) throw new Error("website URL must not contain credentials");
     const server = url.origin;
-    const token = (await askHidden("Paste travel Token (input hidden): ")).trim();
+    const token = (await askTerminal("Paste the API Token from site settings (hidden): ", { hidden: true, maxLength: 100 })).trim();
     if (!/^trv_[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("invalid token format");
     const profile = await api("/api/v1/me", {}, { server, token });
     await saveConfig(server, token);
-    console.log(`Connected to ${server} as ${profile.user.username}. Credentials saved to ${configFile}`);
+    console.log(`Connected to ${server} as ${profile.user.username}. Configuration saved in ${configFile}`);
     return;
   }
   if (topic === "auth" && operation === "status") {
