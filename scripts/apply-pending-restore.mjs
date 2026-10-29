@@ -23,7 +23,17 @@ async function apply() {
   const newFile = join(dir, "ready-db.db");
   const input = join(dir, "travel.db");
   if (existsSync(original)) {
-    // Last launch may have swapped the DB but terminated before the marker was cleared.
+    // Power loss after the first rename can leave travel.db temporarily absent.
+    // Recover the original database instead of incorrectly declaring success.
+    if (!existsSync(dbPath)) {
+      await rename(original, dbPath);
+      throw Error("数据库切换中断，已回退到原站点数据；请重新上传备份");
+    }
+    if (existsSync(newFile)) {
+      throw Error("检测到未完成的数据库切换，保留原数据库，请人工检查恢复任务");
+    }
+    // An old DB copy plus a valid active DB, with no pending ready DB, means
+    // that the swap finished but the success marker was interrupted.
     console.log("Restored database already rotated, finishing pending marker.");
     await writeFile(join(root, "last-result.json"), JSON.stringify({
       id: pending.id, ownerId: pending.ownerId, status: "APPLIED", completedAt: new Date().toISOString(),

@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import yazl from "yazl";
@@ -195,7 +195,23 @@ async function run() {
     cwd: process.cwd(), env, encoding: "utf8", timeout: 60000,
   });
   check(again.status === 0, "Restore startup is not idempotent");
-  console.log("BACKUP_RESTORE_E2E_PASS: auth and CSRF, ZIP validation, preview without writes, queued restart, current admin, revoked old accounts/tokens, photos, rollback");
+  // Inject a simulated crash between moving the old DB and moving the restored DB.
+  const crashRoot = join(base, "simulated-power-loss");
+  const crashId = randomUUID();
+  const crashStage = join(crashRoot, "restore-staging", crashId);
+  await mkdir(crashStage, { recursive: true });
+  await copyFile(join(target, "travel.db"), join(crashStage, "previous-db.db"));
+  const crashQueue = { id: crashId, ownerId: id, sha256: "simulated-checksum" };
+  await writeFile(join(crashStage, "manifest.json"), JSON.stringify(crashQueue));
+  await writeFile(join(crashRoot, "restore-staging", "pending.json"), JSON.stringify(crashQueue));
+  const crashed = spawnSync(process.execPath, ["scripts/apply-pending-restore.mjs"], {
+    cwd: process.cwd(), env: { ...env, RESTORE_DATA_DIR: crashRoot }, encoding: "utf8", timeout: 60000,
+  });
+  check(crashed.status === 0 && existsSync(join(crashRoot, "travel.db")),
+    "Simulated interrupted restore did not put original database back");
+  const failed = JSON.parse(await readFile(join(crashRoot, "restore-staging", "last-result.json"), "utf8"));
+  check(failed.status === "FAILED", "Interrupted SQLite swap must not report success");
+  console.log("BACKUP_RESTORE_E2E_PASS: auth, ZIP preview, restart, user/token isolation, photos, rollback, crash recovery");
 }
 
 try { await run(); }

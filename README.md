@@ -183,7 +183,7 @@ CLI 适合本地终端和能执行命令的 AI Agent，并非普通聊天网页�
 - `cli/package.json` 准备了 `@zby909/travelctl` 的 npm 包，但**尚未发布到 npm**。
 - `.github/workflows/cli-release.yml` 会在推送 `v*` 标签时使用 Node.js SEA 构建 Windows x64 exe，并将 EXE 直接添加到 GitHub Release 供下载。正式版本以 GitHub Releases 中可下载的 exe 文件和 GitHub Actions Windows 构建测试为准。
 - `npm run test:import:e2e` 使用临时数据库和临时上传目录，测试 Token、图片私密分段、图片清理元信息、足迹/未来目的地导入与 CLI。
-- 现有旧版本使用的个人化 `both/her/mine` 分类以及历史种子数据仍在仓库和镜像中。**项目暂时还不是完全去个人化的空白开源镜像**；需要后续独立迁移旧图片和种子数据，避免破坏已部署用户的数据。
+- 当前新版镜像默认空白，旧版历史个人种子与照片已从当前代码和新镜像中剥离；`both/her/mine` 仍是兼容旧数据的内部分类字段，网页显示成员 A/B。**历史 Git 提交及过去已经发布的旧镜像仍可能包含之前公开的资料**，不应把删除当前文件等同于清除历史。
 - 第一版只支持每个足迹或目的地一张封面图；暂不支持视频、图片批量相册、自动抓取第三方图片或无人工确认的导入。
 
 ## GitHub Actions → GHCR
