@@ -155,7 +155,7 @@ export function DestinationExplorer({ destinations, currency = "CNY" }: { destin
           ))}
         </div>
       ) : (
-        <div className="journal-empty-state">
+        <div className="journal-empty-state" data-testid="empty-destinations">
           <span aria-hidden="true">✳</span>
           <h3>{destinations.length === 0 ? "我们的心愿清单，还等着第一站。" : "暂时没有符合条件的目的地。"}</h3>
           <p>{destinations.length === 0 ? "从一个想去的地方开始，慢慢把它写满吧。" : "换一个季节或预算，也许会遇见新的心动。"}</p>
