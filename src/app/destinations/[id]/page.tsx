@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
+import { TravelMotion } from "@/components/travel-motion";
 import { formatDate, formatMoney, parseJsonArray } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site-settings";
 import { prisma } from "@/lib/prisma";
@@ -42,18 +43,22 @@ export default async function DestinationPage({ params }: PageProps) {
   return (
     <main className="travel-detail">
       <SiteHeader brandName={settings.siteName} brandSubtitle={settings.siteSubtitle} />
-      <section className="story-cover page-width" aria-labelledby="story-cover-title">
-        <div className="story-cover-top"><Link href="/#destinations">← BACK TO THE INDEX</Link><span>THE NEXT JOURNEY / FIELD NOTES</span><span>VOL. {String(destination.rank).padStart(2, "0")}</span></div>
-        <div className="story-cover-heading">
-          <div><p className="editorial-overline">A PLACE WE DREAM OF VISITING</p><h1 id="story-cover-title">{destination.title}</h1><p>{destination.subtitle}</p></div>
-          <div className="story-cover-intro"><span>DESTINATION / {String(destination.rank).padStart(2, "0")}</span><p>{destination.vibe || "一场等待出发的旅程。"}</p></div>
+      <TravelMotion />
+      <section className="cinematic-story" aria-labelledby="story-cover-title">
+        <Image className="cinematic-backdrop" unoptimized src={destination.imagePath ?? `/api/legacy-media/images/${destination.id}-0.jpg`} alt="" fill priority sizes="100vw" />
+        <div className="cinematic-vignette" aria-hidden="true" />
+        <div className="cinematic-story-inner page-width">
+          <Link className="cinematic-story-back" href="/#destinations">← 返回所有目的地</Link>
+          <div className="cinematic-story-content">
+            <p className="cinematic-kicker"><span /> THE NEXT JOURNEY / FIELD NOTES {String(destination.rank).padStart(2, "0")}</p>
+            <h1 id="story-cover-title">{destination.title}</h1>
+            <p className="cinematic-story-subtitle">{destination.subtitle}</p>
+            <p className="cinematic-story-vibe">{destination.vibe || "一段等待出发的旅程。"}</p>
+          </div>
+          <div className="cinematic-story-bottom"><span>POSTCARDS FROM THE FUTURE</span><span>01 / THE STORY BEGINS</span></div>
         </div>
       </section>
-      <figure className="story-cover-photo page-width">
-        <Image unoptimized src={destination.imagePath ?? `/api/legacy-media/images/${destination.id}-0.jpg`} alt={`${destination.title}旅行风景`} fill priority sizes="(max-width: 760px) 100vw, 92vw" />
-        <figcaption><span>PHOTOGRAPHIC JOURNAL / {destination.title}</span><span>01 / THE STORY BEGINS</span></figcaption>
-      </figure>
-      <div className="story-keyfacts page-width">
+      <div className="story-keyfacts page-width" data-motion="rise">
         <div><span>IDEAL SEASON</span><strong>{destination.months || "待确定"}</strong></div>
         <div><span>TIME TO SPEND</span><strong>{destination.days || "待规划"}</strong></div>
         <div><span>TRAVEL STYLE</span><strong>{types.join(" · ") || destination.kind}</strong></div>
@@ -61,10 +66,16 @@ export default async function DestinationPage({ params }: PageProps) {
       </div>
 
       <section className="detail-layout page-width">
-        <div className="detail-main">
+        <div className="detail-main" data-motion="rise">
           <p className="eyebrow">WHY THIS JOURNEY</p>
           <h2>去往远方的<em>一个理由。</em></h2>
           <p className="lead-copy">{destination.reason}</p>
+          {!destination.imagePath && (
+            <div className="cinematic-story-gallery" aria-label={`${destination.title}的旅行景观组图`}>
+              <figure><Image src={`/api/legacy-media/images/${destination.id}-1.jpg`} alt={`${destination.title}的另一处风景`} fill unoptimized sizes="(max-width: 760px) 90vw, 31vw" /><figcaption>SCENE / 02</figcaption></figure>
+              <figure><Image src={`/api/legacy-media/images/${destination.id}-2.jpg`} alt={`${destination.title}的景点摄影`} fill unoptimized sizes="(max-width: 760px) 90vw, 31vw" /><figcaption>SCENE / 03</figcaption></figure>
+            </div>
+          )}
           {destination.guide && (
             <section className="guide-section">
               <div className="section-heading compact-heading"><div><p className="eyebrow">DAY BY DAY</p><h2>行程攻略</h2></div><span>{destination.days}</span></div>
@@ -91,7 +102,7 @@ export default async function DestinationPage({ params }: PageProps) {
           </section>
         </div>
 
-        <aside className="detail-aside">
+        <aside className="detail-aside" data-motion="rise">
           <section className="budget-panel">
             <p className="eyebrow">BUDGET FOR TWO</p>
             <h2>{destination.pickBudget ? formatMoney(destination.pickBudget, settings.currency) : "预算待估算"}</h2>

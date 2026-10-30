@@ -1,0 +1,101 @@
+/* 旅行摄影动效：无 JS 不隐藏内容；仅在观察器挂载后渐入。 */
+.travel-progress{position:fixed;top:0;left:0;right:0;z-index:120;height:3px;background:linear-gradient(90deg,#e5b17e,#f3dbab);transform:scaleX(var(--travel-progress,0));transform-origin:left center;pointer-events:none;box-shadow:0 1px 8px rgba(236,175,113,.3);}
+.travel-motion-ready [data-motion]{opacity:0;transform:translate3d(0,28px,0) var(--motion-rest,translateZ(0));transition:opacity .75s cubic-bezier(.2,.72,.25,1),transform .75s cubic-bezier(.2,.72,.25,1);transition-delay:var(--motion-delay,0ms);}
+.travel-motion-ready [data-motion="photo"]{transform:translate3d(0,35px,0) scale(.975) var(--motion-rest,translateZ(0));transition-duration:.95s;}
+.travel-motion-ready [data-motion].is-visible{opacity:1;transform:var(--motion-rest,translate3d(0,0,0));}
+.travel-motion-ready .editorial-moments-photo-large[data-motion]{--motion-rest:rotate(-4deg);}
+.travel-motion-ready .cinematic-season-grid [data-motion]:nth-child(2){--motion-delay:90ms;}
+.travel-motion-ready .cinematic-season-grid [data-motion]:nth-child(3){--motion-delay:180ms;}
+.travel-motion-ready .editorial-destination-grid [data-motion]:nth-child(3n+2){--motion-delay:70ms;}
+.travel-motion-ready .editorial-destination-grid [data-motion]:nth-child(3n+3){--motion-delay:140ms;}
+.travel-home .editorial-destination.is-visible:hover{transform:translateY(-4px);}
+.travel-home .editorial-destination.is-visible:focus-within{box-shadow:0 16px 36px rgba(36,58,49,.12);}
+.travel-visited .atlas-photo-entry.is-visible:hover{transform:translateY(-3px);}
+.travel-home .cinematic-stack{transform:translate3d(var(--stack-x,0px),calc(var(--stack-y,0px) + var(--stack-scroll,0px)),0);transition:transform .65s cubic-bezier(.18,.8,.3,1);}
+@keyframes travelKenBurns{from{transform:scale(1.04) translate3d(0,var(--cinema-scroll,0px),0);}to{transform:scale(1.13) translate3d(-1.2%,var(--cinema-scroll,0px),0);}}
+.travel-home .cinematic-hero>.cinematic-backdrop,.travel-visited .cinematic-archive>.cinematic-backdrop,.travel-detail .cinematic-story>.cinematic-backdrop{animation:travelKenBurns 24s ease-in-out infinite alternate;will-change:transform;}
+.travel-motion-ready .cinematic-hero:not(.cinema-in-view)>.cinematic-backdrop,.travel-motion-ready .cinematic-archive:not(.cinema-in-view)>.cinematic-backdrop,.travel-motion-ready .cinematic-story:not(.cinema-in-view)>.cinematic-backdrop{animation-play-state:paused;}
+.cinematic-hero::after,.cinematic-archive::after,.cinematic-story::after{position:absolute;inset:0;z-index:-1;opacity:.13;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)' opacity='.32'/%3E%3C/svg%3E");pointer-events:none;content:"";}
+@keyframes travelOpening{from{opacity:0;transform:translateY(23px);}to{opacity:1;transform:translateY(0);}}
+.cinematic-hero .cinematic-kicker,.cinematic-archive .cinematic-kicker,.cinematic-story .cinematic-kicker{animation:travelOpening .8s .07s both;}
+.cinematic-hero h1,.cinematic-archive h1,.cinematic-story h1{animation:travelOpening .94s .18s both;}
+.cinematic-hero .cinematic-description,.cinematic-archive-inner>p:not(.cinematic-kicker),.cinematic-story .cinematic-story-subtitle{animation:travelOpening .85s .34s both;}
+.cinematic-hero .cinematic-actions,.cinematic-archive .cinematic-actions,.cinematic-story .cinematic-story-vibe{animation:travelOpening .84s .48s both;}
+.cinematic-hero .cinematic-footnote,.cinematic-archive .cinematic-archive-plate{animation:travelOpening .84s .64s both;}
+@keyframes postcardBreathe{from{translate:0 0;}to{translate:0 -12px;}}
+.cinematic-postcard-1{animation:postcardBreathe 7s ease-in-out -.8s infinite alternate;}
+.cinematic-postcard-2{animation:postcardBreathe 8.2s ease-in-out -2.1s infinite alternate-reverse;}
+.cinematic-postcard-3{animation:postcardBreathe 9.3s ease-in-out -3.5s infinite alternate;}
+.cinematic-stack .cinematic-postcard:hover{animation-play-state:paused;}
+.cinematic-stamp{animation:cinematicStamp 7s ease-in-out infinite alternate;}
+@keyframes cinematicStamp{to{transform:rotate(3deg) scale(1.035);}}
+/* 旧版连续滚动的橙色刊带；复制两份文案确保始终无空白。 */
+.travel-home .editorial-marquee{display:block;height:58px;min-height:58px;padding:14px 0;overflow:hidden;white-space:nowrap;background:#e9c398;}
+.cinematic-ticker-track{display:flex;align-items:center;width:max-content;animation:cinematicTicker 30s linear infinite;}
+.cinematic-ticker-copy{display:flex;flex:0 0 auto;align-items:center;justify-content:space-around;min-width:100vw;gap:50px;padding-right:50px;color:#374b40;font:700 11px Georgia,serif;letter-spacing:.17em;}
+.travel-home .editorial-marquee .cinematic-ticker-copy span{display:inline!important;flex-shrink:0;}
+.travel-home .editorial-marquee .cinematic-ticker-copy .editorial-sparkle{font-size:15px;color:#a76c4b;}
+.travel-home .editorial-marquee:hover .cinematic-ticker-track{animation-play-state:paused;}
+@keyframes cinematicTicker{to{transform:translateX(-50%);}}
+.cinematic-season img{transform:scale(1.035) translate3d(var(--photo-x,0px),var(--photo-y,0px),0);transition:transform .6s cubic-bezier(.2,.7,.2,1);}
+.cinematic-season:hover img{transform:scale(1.09) translate3d(var(--photo-x,0px),var(--photo-y,0px),0);}
+.cinematic-season-title em{transition:letter-spacing .25s;}
+.cinematic-season:hover .cinematic-season-title em{letter-spacing:.24em;}
+.cinematic-card-media{position:relative;}
+.cinematic-gallery-trigger{position:absolute;top:12px;right:12px;z-index:5;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid rgba(255,255,255,.35);border-radius:24px;background:rgba(11,46,36,.77);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.16);cursor:pointer;backdrop-filter:blur(10px);font-size:12px;font-weight:700;transition:background .2s,transform .2s;}
+.cinematic-gallery-trigger span{font-size:10px;}
+.cinematic-gallery-trigger:hover{transform:translateY(-2px);background:rgba(15,63,48,.95);}
+.cinematic-gallery-trigger:focus-visible,.cinematic-lightbox button:focus-visible{outline:3px solid #e6b17e;outline-offset:4px;}
+/* 图片灯箱：单张封面也可放大，三图封面支持方向键与移动端手势。 */
+.cinematic-lightbox-overlay{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:24px;background:rgba(5,25,24,.84);backdrop-filter:blur(12px);animation:lightboxFadeIn .2s ease both;}
+.cinematic-lightbox{display:flex;flex-direction:column;width:min(1140px,100%);max-height:95dvh;padding:20px 24px 17px;background:#f9f7f0;box-shadow:0 35px 90px rgba(0,0,0,.4);}
+.cinematic-lightbox-top{display:flex;justify-content:space-between;gap:20px;align-items:center;padding-bottom:16px;color:#31473c;}
+.cinematic-lightbox-top span,.cinematic-lightbox-bottom{color:#859185;font:10px Georgia,serif;letter-spacing:.16em;}
+.cinematic-lightbox-top h2{margin:5px 0 0;font:500 25px "Songti SC","STSong",serif;}
+.cinematic-lightbox-close{width:36px;height:36px;border:1px solid #d7dbd0;border-radius:50%;background:none;color:#31473c;font-size:25px;line-height:1;cursor:pointer;}
+.cinematic-lightbox-close:hover{background:#e8e8dd;}
+.cinematic-lightbox-stage{position:relative;height:min(70dvh,730px);min-height:250px;overflow:hidden;background:#19342d;touch-action:pan-y;}
+.cinematic-lightbox-stage img{object-fit:contain;animation:lightboxFadeIn .28s ease both;}
+@keyframes lightboxFadeIn{from{opacity:0;}to{opacity:1;}}
+.cinematic-lightbox-arrow{position:absolute;top:50%;z-index:2;display:grid;place-items:center;width:44px;height:56px;padding:0;border:0;border-radius:3px;background:rgba(14,38,33,.68);color:#fff;font:37px/1 Georgia,serif;transform:translateY(-50%);cursor:pointer;}
+.cinematic-lightbox-arrow:hover{background:rgba(17,52,43,.94);}
+.cinematic-lightbox-arrow.is-prev{left:15px;}
+.cinematic-lightbox-arrow.is-next{right:15px;}
+.cinematic-lightbox-bottom{display:flex;justify-content:space-between;align-items:center;gap:15px;padding-top:11px;min-height:62px;}
+.cinematic-lightbox-bottom>span{flex:1;min-width:0;}
+.cinematic-lightbox-bottom>span:last-child{text-align:right;}
+.cinematic-lightbox-filmstrip{display:flex;justify-content:center;align-items:center;gap:8px;}
+.cinematic-lightbox-filmstrip button{position:relative;width:52px;height:39px;overflow:hidden;border:2px solid transparent;border-radius:2px;padding:0;background:#243e35;opacity:.6;cursor:pointer;transition:opacity .18s,border-color .18s,transform .18s;}
+.cinematic-lightbox-filmstrip button img{object-fit:cover;}
+.cinematic-lightbox-filmstrip button.is-current{opacity:1;border-color:#b57d56;transform:translateY(-2px);}
+.cinematic-lightbox-filmstrip button:hover{opacity:1;}
+@media(max-width:760px){
+ .travel-home .cinematic-stack{transform:translate3d(0,0,0);transition:none;}
+ .travel-home .editorial-marquee{height:49px;min-height:49px;padding:12px 0;}
+ .cinematic-ticker-copy{font-size:9px;gap:27px;padding-right:27px;}
+ .travel-motion-ready [data-motion]{transition-duration:.65s;transition-delay:0ms;}
+ .cinematic-lightbox-overlay{padding:10px;}
+ .cinematic-lightbox{max-height:96dvh;padding:14px 13px;}
+ .cinematic-lightbox-top h2{font-size:20px;}
+ .cinematic-lightbox-stage{height:min(72dvh,670px);min-height:220px;}
+ .cinematic-lightbox-arrow{width:34px;height:48px;font-size:30px;}
+ .cinematic-lightbox-arrow.is-prev{left:5px;}
+ .cinematic-lightbox-arrow.is-next{right:5px;}
+ .cinematic-gallery-trigger{padding:7px 10px;}
+ .cinematic-lightbox-filmstrip button{width:42px;height:34px;}
+ .cinematic-lightbox-bottom{gap:5px;font-size:9px;}
+ .cinematic-lightbox-bottom>span:first-child{max-width:95px;line-height:1.6;}
+}
+@media(prefers-reduced-motion:reduce){
+ html{scroll-behavior:auto;}
+ .travel-progress{box-shadow:none;}
+ .travel-motion-ready [data-motion],.travel-motion-ready [data-motion="photo"]{opacity:1;transform:var(--motion-rest,none);transition:none;}
+ .cinematic-hero>.cinematic-backdrop,.cinematic-archive>.cinematic-backdrop,.cinematic-story>.cinematic-backdrop{animation:none!important;will-change:auto;transform:none!important;}
+ .cinematic-hero .cinematic-kicker,.cinematic-archive .cinematic-kicker,.cinematic-story .cinematic-kicker,
+ .cinematic-hero h1,.cinematic-archive h1,.cinematic-story h1,
+ .cinematic-hero .cinematic-description,.cinematic-archive-inner>p:not(.cinematic-kicker),.cinematic-story .cinematic-story-subtitle,
+ .cinematic-hero .cinematic-actions,.cinematic-archive .cinematic-actions,.cinematic-story .cinematic-story-vibe,
+ .cinematic-hero .cinematic-footnote,.cinematic-archive .cinematic-archive-plate{animation:none!important;}
+ .cinematic-postcard-1,.cinematic-postcard-2,.cinematic-postcard-3,.cinematic-stamp,.cinematic-ticker-track,.cinematic-lightbox-overlay,.cinematic-lightbox-stage img{animation:none!important;}
+ .cinematic-gallery-trigger,.cinematic-season img,.cinematic-lightbox-arrow,.cinematic-lightbox-filmstrip button{transition:none;}
+}

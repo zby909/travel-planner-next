@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { DestinationPhotoLightbox, type PhotoGallerySelection } from "@/components/destination-photo-lightbox";
 
 export type DestinationExplorerItem = {
   id: string;
@@ -49,6 +50,8 @@ export function DestinationExplorer({ destinations, currency = "CNY" }: { destin
   const [season, setSeason] = useState("全部");
   const [budget, setBudget] = useState(0);
   const [sort, setSort] = useState("recommend");
+  const [gallery, setGallery] = useState<PhotoGallerySelection | null>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
   const kindFilters = useMemo(() => [
     { label: "全部旅程", value: "全部" },
     ...[...new Set(destinations.flatMap(item => item.types.length ? item.types : [item.kind]).filter(Boolean))].sort().map(value => ({ label: value, value })),
@@ -82,6 +85,21 @@ export function DestinationExplorer({ destinations, currency = "CNY" }: { destin
     setSort("recommend");
   }
 
+  // 预览真实景点组图，并保存焦点位置以便关闭后回到原照片。
+  function openGallery(item: DestinationExplorerItem) {
+    previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setGallery({
+      title: item.title,
+      images: item.imagePath ? [item.imagePath] : [0, 1, 2].map(index => `/api/legacy-media/images/${item.id}-${index}.jpg`),
+    });
+  }
+
+  // 关闭照片灯箱后恢复键盘焦点。
+  function closeGallery() {
+    setGallery(null);
+    window.requestAnimationFrame(() => previousFocus.current?.focus());
+  }
+
   return (
     <div className="editorial-explorer">
       <div className="editorial-filter">
@@ -100,11 +118,22 @@ export function DestinationExplorer({ destinations, currency = "CNY" }: { destin
       {visibleDestinations.length > 0 ? (
         <div className="editorial-destination-grid" aria-live="polite">
           {visibleDestinations.map((item, index) => (
-            <article className={`editorial-destination${index === 0 ? " is-feature" : ""}`} key={item.id}>
-              <Link className="editorial-destination-photo" href={`/destinations/${item.id}`} aria-label={`查看${item.title}的旅行计划`}>
-                <Image src={item.imagePath ?? `/api/legacy-media/images/${item.id}-0.jpg`} alt={`${item.title}的风景照片`} fill unoptimized sizes={index === 0 ? "(max-width: 760px) 100vw, 60vw" : "(max-width: 760px) 100vw, 45vw"} />
-                <span className="editorial-photo-label">TRAVEL FRAME / {String(index + 1).padStart(2, "0")}</span>
-              </Link>
+            <article className="editorial-destination" data-motion="rise" key={item.id}>
+              <div className="cinematic-card-media">
+                <Link className={`editorial-destination-photo cinematic-card-photo${item.imagePath ? " is-single" : ""}`} href={`/destinations/${item.id}`} aria-label={`查看${item.title}的旅行计划`}>
+                <span className="cinematic-card-main">
+                  <Image src={item.imagePath ?? `/api/legacy-media/images/${item.id}-0.jpg`} alt={`${item.title}的代表风景`} fill unoptimized sizes="(max-width: 700px) 70vw, 23vw" />
+                </span>
+                {!item.imagePath && (
+                  <span className="cinematic-card-thumbnails">
+                    <span><Image src={`/api/legacy-media/images/${item.id}-1.jpg`} alt={`${item.title}另一处风景`} fill unoptimized sizes="(max-width: 700px) 30vw, 11vw" /></span>
+                    <span><Image src={`/api/legacy-media/images/${item.id}-2.jpg`} alt={`${item.title}的旅行影像`} fill unoptimized sizes="(max-width: 700px) 30vw, 11vw" /></span>
+                  </span>
+                )}
+                  <span className="editorial-photo-label">TRAVEL / {String(index + 1).padStart(2, "0")}</span>
+                </Link>
+                <button className="cinematic-gallery-trigger" type="button" aria-label={`放大查看${item.title}的风景照片`} onClick={() => openGallery(item)}>⤢ <span>查看照片</span></button>
+              </div>
               <div className="editorial-destination-copy">
                 <div className="editorial-destination-kicker"><span>NO. {String(index + 1).padStart(2, "0")}</span><span>{item.flag} {item.kind}</span></div>
                 <h3><Link href={`/destinations/${item.id}`}>{item.title}</Link></h3>
@@ -124,6 +153,7 @@ export function DestinationExplorer({ destinations, currency = "CNY" }: { destin
           {destinations.length === 0 ? <Link href="/login">开始写下第一站 ↗</Link> : <button type="button" onClick={resetFilters}>查看全部目的地 ↗</button>}
         </div>
       )}
+      {gallery && <DestinationPhotoLightbox selection={gallery} onClose={closeGallery} />}
     </div>
   );
 }
