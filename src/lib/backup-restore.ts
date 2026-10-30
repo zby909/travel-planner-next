@@ -133,9 +133,13 @@ export async function isBlankForRestore() {
   return counts.every(n => n === 0);
 }
 export async function prepareRestore(file: File, userId: string): Promise<BackupPreview> {
+  return prepareRestoreBytes(Buffer.from(await file.arrayBuffer()), file.name, userId);
+}
+
+export async function prepareRestoreBytes(bytes: Buffer, fileName: string, userId: string): Promise<BackupPreview> {
   if (!await isBlankForRestore()) throw Error("仅允许在没有旅行数据的新实例恢复；请先备份现有站点");
-  if (file.size < 100 || file.size > MAX_BACKUP_ZIP) throw Error("ZIP 大小需在 100 B 到 48 MiB 之间");
-  if (!file.name.toLowerCase().endsWith(".zip")) throw Error("请选择 ZIP 备份文件");
+  if (bytes.length < 100 || bytes.length > MAX_BACKUP_ZIP) throw Error("ZIP 大小需在 100 B 到 48 MiB 之间");
+  if (!fileName.toLowerCase().endsWith(".zip")) throw Error("请选择 ZIP 备份文件");
   const root = restoreRoot();
   await mkdir(root, { recursive: true, mode: 0o700 });
   try { await stat(join(root, "pending.json")); throw Error("已有等待重启的恢复任务"); }
@@ -158,7 +162,6 @@ export async function prepareRestore(file: File, userId: string): Promise<Backup
   const folder = join(root, id);
   await mkdir(folder, { mode: 0o700 });
   try {
-    const bytes = Buffer.from(await file.arrayBuffer());
     const images = await unzipToStaging(bytes, folder);
     const dbPath = join(folder, "travel.db");
     const dbBytes = await readFile(dbPath);

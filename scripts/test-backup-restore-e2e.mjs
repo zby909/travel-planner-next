@@ -33,6 +33,7 @@ async function zipBackup() {
   archive.addBuffer(Buffer.from("legacy-photo"), "legacy-images/images/visited/test.jpg");
   archive.addBuffer(Buffer.from("legacy-cover"), "legacy-images/images/test-island-0.jpg");
   archive.addBuffer(Buffer.from("<html>historical credits</html>"), "legacy-images/images/credits.html");
+  archive.addBuffer(randomBytes(900 * 1024), "uploads/test.webp");
   archive.end();
   await new Promise((yes, no) => {
     archive.outputStream.pipe(createWriteStream(output)).on("close", yes).on("error", no);
@@ -49,6 +50,52 @@ async function request(path, options = {}, code = 200, authorized = true) {
   const body = await res.json().catch(() => ({}));
   check(res.status === code, path + ": HTTP " + res.status + " instead of " + code + " " + JSON.stringify(body));
   return body;
+}
+async function chunkedPreview(bytes, filename, verifyResume = false) {
+  const chunkSize = 512 * 1024;
+  const chunks = [];
+  for (let offset = 0; offset < bytes.length; offset += chunkSize)
+    chunks.push(bytes.subarray(offset, Math.min(bytes.length, offset + chunkSize)));
+  const chunkHashes = chunks.map(chunk => createHash("sha256").update(chunk).digest("hex"));
+  const metadata = {
+    filename, size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), chunkHashes,
+  };
+  let session = await request("/api/admin/restore/upload/init", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(metadata),
+  });
+  check(session.chunkCount === chunks.length, "Chunk count incorrect");
+  if (verifyResume) {
+    const firstHash = chunkHashes[0];
+    await request("/api/admin/restore/upload/chunk", {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream", "X-Upload-Id": session.uploadId,
+        "X-Chunk-Index": "0", "X-Chunk-SHA256": "0".repeat(64) },
+      body: chunks[0],
+    }, 400);
+    await request("/api/admin/restore/upload/chunk", {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream", "X-Upload-Id": session.uploadId,
+        "X-Chunk-Index": "0", "X-Chunk-SHA256": firstHash },
+      body: chunks[0],
+    });
+    session = await request("/api/admin/restore/upload/init", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(metadata),
+    });
+    check(session.resumed && session.receivedChunks.includes(0), "Interrupted upload did not resume from received chunk");
+  }
+  for (let index = 0; index < chunks.length; index++) {
+    if (session.receivedChunks.includes(index)) continue;
+    await request("/api/admin/restore/upload/chunk", {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream", "X-Upload-Id": session.uploadId,
+        "X-Chunk-Index": String(index), "X-Chunk-SHA256": chunkHashes[index] },
+      body: chunks[index],
+    });
+  }
+  return request("/api/admin/restore/upload/finalize", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uploadId: session.uploadId }),
+  });
 }
 async function waitReady() {
   for (let i = 0; i < 100; i++) {
@@ -122,19 +169,17 @@ async function run() {
     await request("/api/admin/restore/status", {}, 403, false);
     await request("/api/admin/restore/prepare", { method: "POST" }, 403, false);
     await request("/api/admin/restore/prepare", { method: "POST", headers: { Origin: "https://evil.example" } }, 403);
-    const form = new FormData();
-    form.append("backup", new Blob([await readFile(backup)], { type: "application/zip" }), "restore-test.zip");
-    const preview = await request("/api/admin/restore/prepare", { method: "POST", body: form });
+    await request("/api/admin/restore/upload/init", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }, 403, false);
+    await request("/api/admin/restore/upload/init", { method: "POST", headers: { Origin: "https://evil.example", "Content-Type": "application/json" }, body: "{}" }, 403);
+    const preview = await chunkedPreview(await readFile(backup), "restore-test.zip", true);
     check(preview.counts.places === 1 && preview.counts.destinations === 1 && preview.counts.users === 1,
       "Preview data counts incorrect");
-    check(preview.images.legacy === 2, "Restore archive photos missing");
+    check(preview.images.legacy === 2 && preview.images.uploads === 1, "Restore archive photos missing");
+    console.log("CHUNK_RESUME_PASS: upload interrupted after first chunk, server resumed remaining chunks");
     // Optional private compatibility check, enabled only by a locally supplied
     // file path. Never log, commit or upload real personal backup contents.
     if (process.env.PRIVATE_BACKUP_ZIP) {
-      const privateForm = new FormData();
-      privateForm.append("backup", new Blob([await readFile(process.env.PRIVATE_BACKUP_ZIP)],
-        { type: "application/zip" }), "private-backup.zip");
-      const privatePreview = await request("/api/admin/restore/prepare", { method: "POST", body: privateForm });
+      const privatePreview = await chunkedPreview(await readFile(process.env.PRIVATE_BACKUP_ZIP), "private-backup.zip");
       check(privatePreview.counts.places === 31 && privatePreview.counts.destinations === 14,
         "Private backup schema preview was not recognized");
       check(privatePreview.images.legacy >= 45, "Private backup media was not recognized");

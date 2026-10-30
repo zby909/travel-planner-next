@@ -25,7 +25,7 @@ export default async function RestorePage() {
     <section className="admin-panel">
       <h2>恢复如何生效？</h2>
       <p className="muted-copy">上传 → 数据库校验与预览 → 管理员确认 → 在 StackNest 重启 Docker 应用 → 自动恢复数据与图片。</p>
-      <p className="muted-copy">只接收本应用兼容的 SQLite 数据库；原有管理员账号会保留。恢复失败时会保留当前数据库并显示错误。</p>
+      <p className="muted-copy">只接收本应用兼容的 SQLite 数据库。恢复后会保留当前新站点管理员的用户名、显示名称和密码；备份中的用户账号会被停用，登录会话和 API Token 不会恢复。恢复失败时会保留当前数据库并显示错误。</p>
     </section>
   </main>;
 }
