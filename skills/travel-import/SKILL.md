@@ -9,16 +9,23 @@ The `travelctl` CLI connects this agent to the **user's own** Travel Planner web
 
 ## First-use onboarding
 
-1. Check `travelctl --help`. Recommended Windows install: download the official standalone `travelctl.exe` from the user's **管理后台 → AI 授权** page, save it in a permanent folder on PATH, and reopen the Agent terminal. The EXE bundles Node.js; end users do not need Node.js or npm. In a development environment with Node.js 22+, the same compiled CLI can also run with `node path/to/travelctl.mjs`.
-2. Run `travelctl auth status`. If authenticated, proceed without prompting. If the Token is expired/revoked or the server is unreachable, explain the reason.
-3. If not configured, ask the user to open their own website's **管理后台 → AI 授权** page and create a scoped API Token. They must enter it in their own local terminal:
+1. Resolve the CLI executable before doing any data work:
+   - First check whether `travelctl --help` works in the agent's local terminal. On Windows, `Get-Command travelctl -ErrorAction SilentlyContinue` or `where.exe travelctl` can confirm whether it is on PATH.
+   - If the command is not found, **ask the user for the full path to their downloaded official `travelctl.exe`** (for example, `C:\\Users\\<user>\\Downloads\\travelctl.exe`). Do not guess a path or scan the whole disk. Verify that the exact file exists and run its `--help` command. Keep that path for this session and invoke it with PowerShell's call operator, e.g. `& "C:\\path\\to\\travelctl.exe" auth status`; use the same full-path prefix for every subsequent command. Adding its folder to PATH is optional, not a prerequisite.
+   - The official standalone EXE should be downloaded from the user's **管理后台 → AI 授权** page or the project's official GitHub Releases. It bundles Node.js; Windows users do not need Node.js or npm. In a development environment with Node.js 22+, the compiled CLI can alternatively run as `node path/to/travelctl.mjs`.
+2. Run `travelctl auth status` (or the equivalent command using the resolved full EXE path). If authenticated, proceed without prompting. If the Token is expired/revoked or the server is unreachable, explain the reason.
+3. If not configured, ask the user to open their own website's **管理后台 → AI 授权** page and create a scoped API Token. Explain that the website address is the base URL of their own deployed Travel Planner instance. The user must complete first-time authorization in **their own interactive local terminal**, not in chat and not through a non-interactive agent shell:
    ```powershell
    travelctl auth login
    ```
-   The CLI asks for the website URL and then the Token using hidden input. To skip the URL prompt, they can use `travelctl auth login --server https://their-real-domain`.
+   If the EXE is not on PATH, show the same command with its full path:
+   ```powershell
+   & "C:\\path\\to\\travelctl.exe" auth login
+   ```
+   The CLI interactively asks for the website URL and then the API Token using hidden input. The user enters both directly in that terminal; the agent must not ask for the Token in chat or try to capture it. If the user has already provided the non-secret website URL in chat, the command may use `travelctl auth login --server https://their-real-domain` (or the full EXE path equivalent), which skips the URL prompt but still requests the Token invisibly.
 4. The CLI validates the Token against `/api/v1/me` before saving it. Windows encrypts the Token using the current Windows user's DPAPI; the config file at `%APPDATA%\\travelctl\\config.json` contains ciphertext. Linux/macOS currently use a local config file with owner-only permissions where supported, at `$XDG_CONFIG_HOME/travelctl/config.json` or `~/.config/travelctl/config.json`. Never read, print, share or commit the local config. `travelctl auth logout` removes local authorization.
-5. Ask the user to return after successful login, then run `travelctl auth status` again. The user may share their site URL in chat (it is not a secret), but **NEVER ask them to paste their API Token into chat, a Skill, source code or a command-line argument**. Do not read the local credentials file with an agent tool or expose Tokens in tool logs.
-6. From then on, use the saved configuration automatically without requesting the URL or Token again.
+5. Ask the user to return after successful login, then run `travelctl auth status` again using the resolved executable. The user may share their site URL in chat (it is not a secret), but **NEVER ask them to paste their API Token into chat, a Skill, source code or a command-line argument**. Do not read the local credentials file with an agent tool or expose Tokens in tool logs.
+6. From then on, use the saved configuration automatically without requesting the EXE path again in the current session, or the URL/Token again after successful login. On a future session, if `travelctl` is still not on PATH and the executable path is not available in context, ask for its full path again.
 
 ## General workflow
 
