@@ -7,7 +7,8 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "requires visits:read" }, { status: 401 });
   const entries = await prisma.visitedPlace.findMany({
     orderBy: { sortOrder: "asc" },
-    select: { id: true, name: true, region: true, group: true, whenLabel: true, latitude: true, longitude: true, image: true },
+    select: { id: true, name: true, region: true, group: true, whenLabel: true, latitude: true, longitude: true,
+      country: true, province: true, city: true, mapNote: true, image: true, sortOrder: true },
   });
   return NextResponse.json({ items: entries });
 }

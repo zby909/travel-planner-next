@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { importPayloadSchema, type ImportPayload } from "@/lib/import-schema";
+import { commitRecordChange, prepareRecordChange } from "@/lib/record-change-service";
 
 export async function loadImportImage(imageId: string | undefined, ownerId: string) {
   if (!imageId) return null;
@@ -14,6 +15,9 @@ export async function loadImportImage(imageId: string | undefined, ownerId: stri
 
 export async function prepareImport(payload: unknown, ownerId: string) {
   const data = importPayloadSchema.parse(payload);
+  if (data.kind === "visits-update" || data.kind === "destinations-update" || data.kind === "timeline") {
+    return prepareRecordChange(data, ownerId);
+  }
   const warnings: string[] = [];
   const mediaIds = [...new Set(data.items.flatMap(item => item.imageId ? [item.imageId] : []))];
   for (const id of mediaIds) await loadImportImage(id, ownerId);
@@ -61,6 +65,9 @@ export async function commitImport(draftId: string, ownerId: string) {
     throw new Error("草稿不存在、已提交或已过期");
   }
   const data: ImportPayload = importPayloadSchema.parse(JSON.parse(draft.payloadJson));
+  if (data.kind === "visits-update" || data.kind === "destinations-update" || data.kind === "timeline") {
+    return commitRecordChange(draftId, data, ownerId);
+  }
   const mediaIds = [...new Set(data.items.flatMap(item => item.imageId ? [item.imageId] : []))];
   for (const id of mediaIds) await loadImportImage(id, ownerId);
 

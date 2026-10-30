@@ -4,8 +4,8 @@ import { useActionState } from "react";
 import { issueTokenAction } from "./actions";
 
 const choices = [
-  ["visits:read", "读取已有足迹"],
-  ["visits:write", "导入旅行足迹"],
+  ["visits:read", "读取已有足迹与时间轴"],
+  ["visits:write", "新增/更新旅行足迹与时间轴"],
   ["destinations:read", "读取未来目的地"],
   ["destinations:write", "导入未来想去"],
   ["media:write", "上传配图（经确认后公开）"],

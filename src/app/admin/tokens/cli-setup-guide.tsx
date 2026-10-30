@@ -42,14 +42,14 @@ export function CliSetupGuide() {
             <button className="admin-signout" type="button" onClick={copyCommand}>{copied ? "已复制" : "复制命令"}</button>
           </div>
           <p className="muted-copy">
-            CLI 将在本地隐藏输入 Token 并检查有效性；不会将 Token 添加到命令参数或 AI 对话中。也可以只执行 <code>travelctl auth login</code>，
-            由 CLI 询问网站地址。
+            CLI 将在本地隐藏输入 Token 并检查有效性；不会将 Token 添加到命令参数或 AI 对话中。Windows 会使用当前账户的 DPAPI 加密保存 Token。
+            也可以只执行 <code>travelctl auth login</code>，由 CLI 询问网站地址。
           </p>
         </div>
         <div>
           <strong>④ 后续使用</strong>
-          <p>AI 直接调用 <code>travelctl visits prepare</code> 或 <code>travelctl destinations prepare</code>，预览后由用户确认导入；有配图时可先上传。</p>
-          <p className="muted-copy">本机配置：Windows <code>%APPDATA%\\travelctl\\config.json</code>；Linux/macOS 通常是 <code>~/.config/travelctl/config.json</code>。当前为本地凭据文件，不是系统加密钥匙串，请勿分享或提交。</p>
+          <p>AI 可以查询足迹、未来目的地和时间轴；新增记录、更新已有足迹/目的地、编辑时间轴都先生成预览草稿，用户确认后再提交。有配图时可先上传。</p>
+          <p className="muted-copy">本机配置：Windows <code>%APPDATA%\\travelctl\\config.json</code>（Token 使用当前 Windows 用户 DPAPI 加密）；Linux/macOS 使用仅当前用户可读的本地配置文件。可运行 <code>travelctl auth logout</code> 删除本机授权。</p>
         </div>
       </div>
     </section>

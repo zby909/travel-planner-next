@@ -1,30 +1,48 @@
 # travelctl
 
-Standalone Windows executable (Node.js runtime bundled) for a self-hosted Next.js Travel Planner. npm is not required.
+Node.js CLI for a self-hosted Next.js Travel Planner. The command implementation has one TypeScript source at `src/travelctl.mts`; the same compiled JavaScript powers both the standalone executable and the npm package.
 
-Download `travelctl.exe` directly from the [GitHub Releases](https://github.com/zby909/travel-planner-next/releases) page. Keep it in a permanent folder and add that folder to your PATH, or call the executable by its absolute path. You do **not** need npm or a separate Node.js install.
+## Standalone executable
 
-For source development only:
+Download `travelctl.exe` from [GitHub Releases](https://github.com/zby909/travel-planner-next/releases). Keep it in a permanent folder and add that folder to PATH. The EXE bundles the Node.js runtime; end users do not need Node.js or npm.
 
-```bash
-npm install -g ./cli
-travelctl auth login
-# The CLI prompts for your website URL and hides your API Token input.
-# Or skip the URL prompt with:
-travelctl auth login --server https://your-travel-site.example
-travelctl auth status
-travelctl visits list
-travelctl destinations list
-travelctl media upload ./photo.jpg
-travelctl visits prepare ./visits.json
-travelctl import commit <draft-id> --confirm
-travelctl destinations prepare ./future.json
+## Node.js mode
+
+Node.js 22+ users can run the generated `bin/travelctl.mjs` directly, or install the local package from this repository:
+
+```powershell
+npm run cli:build
+npm install -g .\\cli
+travelctl --help
 ```
 
-The Token is generated in **Management → AI 授权**. After CLI validation, the website origin and Token are saved in the current user's local profile:
-- Windows: `%APPDATA%\travelctl\config.json`
-- Linux/macOS: `$XDG_CONFIG_HOME/travelctl/config.json` or `~/.config/travelctl/config.json`
+## Commands
 
-**Security:** This version stores a local credentials file, not an encrypted OS keychain. Protect your user account; never commit or share this file and never paste Tokens into AI chats, CLI arguments or Skill files. Once logged in, the Skill should check `travelctl auth status` and avoid asking for the URL or Token again unless expired/revoked or switching sites.
+```powershell
+travelctl auth login
+travelctl auth status
+travelctl auth logout
 
-Import requires an explicit two-step preview and commit, with `--confirm` reserved for after user authorization.
+travelctl visits list
+travelctl destinations list
+travelctl timeline list
+
+travelctl visits prepare .\\visits.json
+travelctl destinations prepare .\\future.json
+travelctl visits update prepare .\\visit-updates.json
+travelctl destinations update prepare .\\destination-updates.json
+travelctl timeline prepare .\\timeline-changes.json
+
+travelctl import commit <draft-id> --confirm
+travelctl import cancel <draft-id>
+travelctl media upload .\\photo.jpg
+```
+
+The Token is generated in **管理后台 → AI 授权**. Enter it only into the CLI's hidden local terminal prompt; never paste it into an AI conversation, command-line argument, Skill file or source code.
+
+- Windows stores the Token encrypted with the current Windows user's DPAPI. The configuration file is at `%APPDATA%\\travelctl\\config.json`; it contains the encrypted credential, not the plaintext Token.
+- Linux/macOS currently use a local config file with owner-only permissions where supported: `$XDG_CONFIG_HOME/travelctl/config.json` or `~/.config/travelctl/config.json`.
+- Previous plaintext Windows config files are migrated to DPAPI encryption the next time the CLI reads them.
+- Use `travelctl auth logout` to remove the local authorization.
+
+All create/update operations use the website's preview draft. The CLI never writes directly to SQLite. Review the current values, proposed changes and warnings, then obtain the user's explicit confirmation before `import commit --confirm`.

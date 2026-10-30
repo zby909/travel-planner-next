@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -48,6 +48,7 @@ async function handle(req, res) {
   if (path === "/api/v1/me") return send(200, { user: { username: "exe_test" } });
   if (path === "/api/v1/visits" && req.method === "GET") return send(200, { items: [] });
   if (path === "/api/v1/destinations" && req.method === "GET") return send(200, { items: [] });
+  if (path === "/api/v1/timeline" && req.method === "GET") return send(200, { items: [] });
   if (path === "/api/v1/media" && req.method === "POST") {
     assert(req.headers["content-type"]?.startsWith("multipart/form-data;"), "Image did not use multipart/form-data");
     assert(body.includes(Buffer.from("photo.jpg")), "Uploaded photo filename was missing");
@@ -56,7 +57,8 @@ async function handle(req, res) {
   }
   if (path === "/api/v1/imports/prepare" && req.method === "POST") {
     const parsed = JSON.parse(body.toString("utf8"));
-    assert(["visits", "destinations"].includes(parsed.kind) && parsed.items?.length === 1, "Import JSON invalid");
+    assert(["visits", "destinations", "visits-update", "destinations-update", "timeline"].includes(parsed.kind)
+      && parsed.items?.length === 1, "Import JSON invalid");
     const draftId = "draft" + String(nextDraft++).padStart(16, "0");
     drafts.set(draftId, parsed);
     actions.push("prepare-" + parsed.kind);
@@ -68,7 +70,10 @@ async function handle(req, res) {
     assert(draft, "Commit draft not previously prepared");
     actions.push("commit-" + draft.kind);
     drafts.delete(commit[1]);
-    return send(200, { kind: draft.kind, created: [{ id: "test-id", name: "test" }], skipped: [] });
+    const isUpdate = draft.kind.endsWith("-update") || (draft.kind === "timeline" && Boolean(draft.items[0].id));
+    return send(200, isUpdate
+      ? { kind: draft.kind, updated: [{ id: "test-id", name: "test" }], created: [], skipped: [] }
+      : { kind: draft.kind, created: [{ id: "test-id", name: "test" }], skipped: [] });
   }
   const cancel = path.match(/^\/api\/v1\/imports\/([^/]+)\/cancel$/);
   if (cancel && req.method === "POST") { actions.push("cancel"); return send(200, { canceled: true }); }
@@ -94,6 +99,11 @@ try {
 
   call = await invoke(["destinations", "list"]);
   assert(call.code === 0 && call.stdout.includes('"items": []'), "EXE destinations list failed");
+  call = await invoke(["timeline", "list"]);
+  assert(call.code === 0 && call.stdout.includes('"items": []'), "EXE timeline list failed");
+  const migratedConfig = JSON.parse(await readFile(join(temp, "travelctl", "config.json"), "utf8"));
+  assert(migratedConfig.credential?.provider === "windows-dpapi" && !migratedConfig.token,
+    "EXE did not migrate plaintext config to Windows DPAPI");
 
   const photo = join(temp, "photo.jpg");
   await writeFile(photo, Buffer.alloc(512, 0x42));
@@ -118,12 +128,32 @@ try {
   call = await invoke(["import", "commit", futureDraft, "--confirm"]);
   assert(call.code === 0 && JSON.parse(call.stdout).created.length === 1, "EXE destination commit failed: " + call.stderr);
 
+  const updateFile = join(temp, "visit-update.json");
+  await writeFile(updateFile, JSON.stringify({ items: [{ id: "existing-visit-id", note: "updated by EXE" }] }));
+  call = await invoke(["visits", "update", "prepare", updateFile]);
+  assert(call.code === 0, "EXE visit update prepare failed: " + call.stderr);
+  const updateDraft = JSON.parse(call.stdout).draftId;
+  call = await invoke(["import", "commit", updateDraft, "--confirm"]);
+  assert(call.code === 0 && JSON.parse(call.stdout).updated.length === 1, "EXE visit update commit failed");
+
+  const timelineFile = join(temp, "timeline.json");
+  await writeFile(timelineFile, JSON.stringify({ items: [{
+    year: 2025, date: "2025.05", group: "both", title: "Timeline from EXE", placeIds: ["existing-visit-id"],
+  }] }));
+  call = await invoke(["timeline", "prepare", timelineFile]);
+  assert(call.code === 0, "EXE timeline prepare failed: " + call.stderr);
+  const timelineDraft = JSON.parse(call.stdout).draftId;
+  call = await invoke(["import", "commit", timelineDraft, "--confirm"]);
+  assert(call.code === 0 && JSON.parse(call.stdout).created.length === 1, "EXE timeline commit failed");
+
   revoked = true;
   call = await invoke(["auth", "status"]);
   assert(call.code !== 0 && call.stderr.includes("401"), "Revoked Token not rejected");
+  call = await invoke(["auth", "logout"]);
+  assert(call.code === 0 && !existsSync(join(temp, "travelctl", "config.json")), "EXE auth logout failed");
 
-  assert(actions.join(",") === "media-upload,prepare-visits,commit-visits,prepare-destinations,commit-destinations", "Unexpected server calls: " + actions);
-  console.log("EXE_SMOKE_PASS: real Windows binary, auth, visit/destination import, photo upload, confirmation, revoked token");
+  assert(actions.join(",") === "media-upload,prepare-visits,commit-visits,prepare-destinations,commit-destinations,prepare-visits-update,commit-visits-update,prepare-timeline,commit-timeline", "Unexpected server calls: " + actions);
+  console.log("EXE_SMOKE_PASS: DPAPI migration, auth, visit/destination/timeline APIs, photo upload, preview/commit, revocation, logout");
 } catch (error) {
   console.error("EXE_SMOKE_FAIL:", error instanceof Error ? error.message : String(error));
   process.exitCode = 1;

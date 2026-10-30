@@ -19,6 +19,7 @@ function run(label, args) {
 try {
   clean();
   run("Create ephemeral SQLite DB", ["node_modules/prisma/build/index.js", "migrate", "deploy"]);
+  run("Compile the TypeScript travelctl source", ["node_modules/typescript/bin/tsc", "-p", "cli/tsconfig.json"]);
   run("Create synthetic test fixtures", ["scripts/seed-test-fixtures.mjs"]);
   run("Run HTTP and CLI import E2E", ["scripts/test-import-e2e.mjs"]);
   console.log("IMPORT_TESTS_SUCCEEDED");

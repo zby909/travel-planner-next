@@ -18,6 +18,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "26"
+      - name: Install project dependencies
+        run: npm ci
+      - name: Compile the single TypeScript CLI source
+        run: npm run cli:build
       - name: Build Windows executable with Node SEA
         shell: pwsh
         run: |

@@ -32,8 +32,9 @@ export async function POST(request: NextRequest) {
   let raw: unknown;
   try { raw = JSON.parse(content); } catch { return NextResponse.json({ error: "invalid JSON" }, { status: 400 }); }
   const kind = raw && typeof raw === "object" && "kind" in raw ? raw.kind : null;
-  const scope = kind === "visits" ? "visits:write" : kind === "destinations" ? "destinations:write" : null;
-  if (!scope) return NextResponse.json({ error: "kind must be visits or destinations" }, { status: 400 });
+  const scope = kind === "visits" || kind === "visits-update" || kind === "timeline" ? "visits:write"
+    : kind === "destinations" || kind === "destinations-update" ? "destinations:write" : null;
+  if (!scope) return NextResponse.json({ error: "kind must be visits, destinations, visits-update, destinations-update or timeline" }, { status: 400 });
   const user = await authenticateApi(request, scope);
   if (!user) return NextResponse.json({ error: "not authorized" }, { status: 401 });
   try {

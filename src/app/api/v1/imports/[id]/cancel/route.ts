@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const draft = await prisma.importDraft.findUnique({ where: { id } });
-  const scope = draft?.kind === "visits" ? "visits:write" : draft?.kind === "destinations" ? "destinations:write" : null;
+  const scope = draft?.kind === "visits" || draft?.kind === "visits-update" || draft?.kind === "timeline" ? "visits:write"
+    : draft?.kind === "destinations" || draft?.kind === "destinations-update" ? "destinations:write" : null;
   if (!scope) return NextResponse.json({ error: "draft not found" }, { status: 404 });
   const user = await authenticateApi(request, scope);
   if (!user || draft?.ownerId !== user.userId) return NextResponse.json({ error: "not authorized" }, { status: 401 });
