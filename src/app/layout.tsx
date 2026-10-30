@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./homepage.css";
+import "./journal.css";
 export const metadata: Metadata = {
-  title: "旅行档案｜目的地、行程与足迹管理",
-  description: "管理旅行目的地、预算、行程、到访足迹和旅行记忆。",
+  title: "下一站｜两个人的旅行手记",
+  description: "记录去过的地方，也收藏未来想一起去的风景。",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

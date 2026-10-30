@@ -25,7 +25,7 @@ export default async function VisitedPage() {
   const years = [...new Set(timeline.map((event) => event.year))].sort((a, b) => b - a);
 
   return (
-    <main>
+    <main className="travel-visited">
       <SiteHeader brandName={settings.siteName} brandSubtitle={settings.siteSubtitle} />
       <section className="visited-hero">
         <Image src={heroImage} alt="已经留下的旅行风景" fill priority unoptimized sizes="100vw" />
