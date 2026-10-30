@@ -97,7 +97,7 @@ travelctl auth status
 
 4. 将仓库里的 [travel-import Skill](https://github.com/zby909/travel-planner-next/tree/main/skills/travel-import) 安装到支持本地命令执行的 Agent（如 Codex/Claude Code）。Skill 将检查已有登录状态，然后调用 EXE 执行导入与配图上传；**真正写入数据库前必须用户确认**。
 
-`auth login` 验证成功后会自动保存站点 URL 和 Token；以后不需要再次输入。Windows 配置位于 `%APPDATA%\\travelctl\\config.json`，当前是本地明文凭据文件而非 Windows 加密凭据库，请勿向 AI、聊天窗口或他人泄露或提交。建议令牌 90 天过期，丢失后在网页中撤销。EXE 是命令行工具，不是双击就能使用的桌面图形软件。Windows 未签名的初始版本可能触发 SmartScreen 提示，请只从官方 GitHub Releases 下载。
+`auth login` 验证成功后会自动保存站点 URL 和 Token；以后不需要再次输入。Windows 配置位于 `%APPDATA%\\travelctl\\config.json`，Token 使用当前 Windows 用户的 DPAPI 加密保存，配置文件中不包含明文 Token；Linux/macOS 当前使用本地配置文件，并在支持的平台上限制文件权限。请勿向 AI、聊天窗口或他人泄露 Token。建议令牌 90 天过期，丢失后在网页中撤销。EXE 是命令行工具，不是双击就能使用的桌面图形软件。Windows 未签名的初始版本可能触发 SmartScreen 提示，请只从官方 GitHub Releases 下载。
 
 ### 源码开发（可选）
 

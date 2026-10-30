@@ -1,6 +1,6 @@
 {
   "name": "@zby909/travelctl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLI and AI-agent workflows for self-hosted travel planner",
   "type": "module",
   "bin": {
