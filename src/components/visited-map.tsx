@@ -46,11 +46,7 @@ const groupColors: Record<string, string> = {
   mine: "#398b7f",
 };
 
-const groupNames: Record<string, string> = {
-  both: "两位成员都去过",
-  her: "成员 B 到访",
-  mine: "成员 A 到访",
-};
+const DEFAULT_GROUP_NAMES = { both: "我们一起去过", her: "TA单独去过", mine: "我单独去过" };
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "").replace(/[&<>"']/g, char => ({
@@ -78,7 +74,8 @@ function loadScript(src: string, isReady: () => boolean): Promise<void> {
   });
 }
 
-export function VisitedMap({ places }: { places: MapPlace[] }) {
+// 展示可按成员筛选的地图，并将数据库分组映射为站点自定义名称。
+export function VisitedMap({ places, groupLabels = DEFAULT_GROUP_NAMES }: { places: MapPlace[]; groupLabels?: { both: string; her: string; mine: string } }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<EChartsInstance | null>(null);
   const [ready, setReady] = useState(false);
@@ -155,7 +152,7 @@ export function VisitedMap({ places }: { places: MapPlace[] }) {
         name: place.name,
         value: [place.longitude, place.latitude],
         itemStyle: { color: groupColors[place.group] ?? groupColors.both },
-        placeGroup: groupNames[place.group] ?? "已到访",
+        placeGroup: groupLabels[place.group as keyof typeof groupLabels] ?? "已到访",
         note: place.mapNote ?? "区域高亮表示有到访记录，不代表游遍整个区域。",
       }));
 
@@ -195,7 +192,7 @@ export function VisitedMap({ places }: { places: MapPlace[] }) {
         },
       ],
     }, true);
-  }, [ready, mode, group, places]);
+  }, [ready, mode, group, places, groupLabels]);
 
   return (
     <section className="map-card" aria-label="互动旅行足迹地图">
@@ -214,9 +211,9 @@ export function VisitedMap({ places }: { places: MapPlace[] }) {
           </div>
           <select aria-label="筛选到访人" value={group} onChange={(event) => setGroup(event.target.value as typeof group)}>
             <option value="all">所有足迹</option>
-            <option value="both">我们都去过</option>
-            <option value="her">成员 B 到访</option>
-            <option value="mine">我单独去过</option>
+            <option value="both">{groupLabels.both}</option>
+            <option value="her">{groupLabels.her}</option>
+            <option value="mine">{groupLabels.mine}</option>
           </select>
         </div>
       </div>

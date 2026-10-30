@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireEditor } from "@/lib/auth";
-import { formatCny, formatDate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
+import { getSiteSettings } from "@/lib/site-settings";
 import { prisma } from "@/lib/prisma";
 import { FlightCreateForm } from "@/components/admin-forms";
 import { deleteFlightAction } from "@/app/admin/actions";
@@ -15,14 +16,15 @@ const labels: Record<string, string> = {
 
 export default async function AdminFlights({ searchParams }: { searchParams: Promise<{ added?: string }> }) {
   await requireEditor();
-  const [destinations, samples] = await Promise.all([
+  const [destinations, samples, settings] = await Promise.all([
     prisma.destination.findMany({ select: { id: true, title: true }, orderBy: { rank: "asc" } }),
     prisma.flightPriceSample.findMany({ include: { destination: { select: { title: true } } }, orderBy: { createdAt: "desc" }, take: 100 }),
+    getSiteSettings(),
   ]);
   return <main>
     <div className="admin-page-heading"><p className="eyebrow">FLIGHT EVIDENCE</p><h1>机票报价记录</h1><p>记录真实查到的机票价格、来源和条件，不用新数据覆盖旧样本。</p></div>
     {(await searchParams).added === "1" ? <p className="form-success" role="status">机票报价已保存。</p> : null}
-    <FlightCreateForm destinations={destinations} />
+    <FlightCreateForm destinations={destinations} currency={settings.currency} />
     <section className="admin-panel admin-records">
       <h2>历史样本（最近 {samples.length} 条）</h2>
       <div className="admin-list">
@@ -35,8 +37,8 @@ export default async function AdminFlights({ searchParams }: { searchParams: Pro
               {item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="source-link">查看原始报价来源 ↗</a> : null}
             </div>
             <div className="admin-record-right">
-              <b>{item.totalPrice === null ? "同行总价未填写" : formatCny(item.totalPrice)}</b>
-              <span>{item.pricePerPerson === null ? "人均价未填写" : `人均 ${formatCny(item.pricePerPerson)}`}</span>
+              <b>{item.totalPrice === null ? "总价未填写" : formatMoney(item.totalPrice, item.currency)}</b>
+              <span>{item.pricePerPerson === null ? "人均价未填写" : `人均 ${formatMoney(item.pricePerPerson, item.currency)}`}</span>
               <form action={deleteFlightAction}>
                 <input type="hidden" name="id" value={item.id} />
                 <DeleteFlightButton />

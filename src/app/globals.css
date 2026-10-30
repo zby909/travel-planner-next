@@ -25,6 +25,7 @@
 .admin-dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .admin-panel{padding:25px;margin-bottom:20px;background:#fffdf8;border:1px solid #e0e5dc}
 .admin-panel h2{margin:0 0 20px;font-size:19px;letter-spacing:-.04em}
+.admin-cover-preview{display:block;width:320px;max-width:100%;height:auto;aspect-ratio:5/3;object-fit:cover;border-radius:12px}
 .admin-links{display:grid;gap:10px;margin-bottom:20px}
 .admin-links a{display:block;padding:12px 14px;border:1px solid #e3e6dc;font-size:12px;font-weight:750}
 .admin-links a:hover{background:#f2eee5}

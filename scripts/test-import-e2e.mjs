@@ -33,7 +33,7 @@ async function waitForHealth() {
   throw new Error("Next.js server did not start");
 }
 async function run() {
-  check(process.env.DATABASE_URL === "file:../data/import-e2e.db", "Refusing to use a non-test DB");
+  check(process.env.DATABASE_URL?.endsWith("/import-e2e.db"), "Refusing to use a non-test DB");
   const admin = await db.user.create({
     data: { username: "import_e2e", displayName: "临时导入管理员", passwordHash: "test-not-for-login", role: "ADMIN" },
   });
@@ -174,6 +174,9 @@ async function run() {
 
   const page = await fetch(host + "/destinations/" + created.id);
   check(page.ok && (await page.text()).includes("测试未来小岛"), "Future destination public page is broken");
+  const homePage = await fetch(host + "/");
+  const homeHtml = await homePage.text();
+  check(homePage.ok && homeHtml.includes(`/api/media/${picture.imageId}`), "Imported destination cover is missing from the home card");
   const visitsPage = await fetch(host + "/visited");
   check(visitsPage.ok && (await visitsPage.text()).includes("测试旅途小镇"), "Imported visit not shown publicly");
 

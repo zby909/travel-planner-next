@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { randomBytes, scrypt as scryptCallback } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { chromium } from "playwright-core";
+import sharp from "sharp";
 
 const host = "http://127.0.0.1:3014";
 const prisma = new PrismaClient();
@@ -68,12 +69,13 @@ async function run() {
   assert(page.url().endsWith("/login"), "Anonymous admin request was not redirected");
 
 
-  await page.locator('input[name="username"]').fill("e2e_owner");
-  await page.locator('input[name="password"]').fill("wrong-password");
-  await page.getByRole("button", { name: "登录私人后台" }).click();
-  await page.waitForURL("**/login?error=1");
-  await page.locator(".form-error").waitFor();
-  assert(page.url().includes("/login"), "Invalid credentials unexpectedly logged in");
+  const invalidCredentials = await page.request.post(host + "/api/auth/login", {
+    headers: { Origin: host, "Content-Type": "application/x-www-form-urlencoded" },
+    data: "username=e2e_owner&password=wrong-password",
+    maxRedirects: 0,
+  });
+  assert(invalidCredentials.status() === 303 && (invalidCredentials.headers().location ?? "").includes("error=1"),
+    "Invalid credentials were not rejected with the expected login redirect");
 
   await page.locator('input[name="username"]').fill("e2e_owner");
   await page.locator('input[name="password"]').fill(pass);
@@ -102,6 +104,68 @@ async function run() {
   await page.goto(host + "/admin/restore");
   await page.getByText("站点已有旅行记录").waitFor();
   assert(await page.locator('input[type="file"]').count() === 0, "Backup upload must be disabled on nonempty site");
+
+  await page.goto(host + "/admin/settings");
+  await page.locator('input[name="siteName"]').fill("自动化旅行档案");
+  await page.locator('input[name="siteSubtitle"]').fill("AUTOMATED TRAVEL JOURNAL");
+  await page.locator('input[name="primaryMemberName"]').fill("旅行者甲");
+  await page.locator('input[name="secondaryMemberName"]').fill("旅行者乙");
+  await page.locator('input[name="togetherLabel"]').fill("共同旅行");
+  await page.locator('select[name="currency"]').selectOption("SGD");
+  await page.getByRole("button", { name: "保存站点设置" }).click();
+  await page.waitForURL("**/admin/settings?saved=1");
+  await page.goto(host + "/");
+  assert((await page.locator("header .brand-name").innerText()).includes("自动化旅行档案"), "Site brand setting was not applied");
+
+  await page.goto(host + "/admin/destinations/new");
+  await page.locator('input[name="title"]').fill("新增目的地·端到端测试");
+  await page.locator('input[name="subtitle"]').fill("自动化测试地区");
+  await page.locator('input[name="kind"]').fill("城市");
+  await page.locator('input[name="types"]').fill("城市，美食");
+  await page.locator('input[name="seasons"]').fill("春，秋");
+  await page.locator('input[name="months"]').fill("4—5 月");
+  await page.locator('input[name="days"]').fill("3 天");
+  await page.locator('input[name="spots"]').fill("测试老街，测试博物馆");
+  await page.getByRole("button", { name: "创建目的地" }).click();
+  await page.waitForURL(url => url.pathname.startsWith("/admin/destinations/") && url.searchParams.get("created") === "1");
+  const createdDestinationId = new URL(page.url()).pathname.split("/").at(-1);
+  const homeResponse = await page.goto(host + "/");
+  assert(homeResponse?.status() === 200 && (await page.locator("body").innerText()).includes("新增目的地·端到端测试"), "Manually created destination was not shown on home page");
+  await page.locator(".filter-scroll").getByRole("button", { name: "美食" }).waitFor();
+  await page.goto(host + `/admin/destinations/${createdDestinationId}`);
+  assert((await page.locator("body").innerText()).includes("两人旅行总预算（SGD）"), "Configured currency was not applied to destination editor");
+  const photoBuffer = await sharp({ create: { width: 64, height: 64, channels: 3, background: "#628c91" } }).png().toBuffer();
+  await page.locator('input[name="image"]').setInputFiles({ name: "journey.png", mimeType: "image/png", buffer: photoBuffer });
+  await page.getByRole("button", { name: "保存封面照片" }).click();
+  await page.waitForURL(url => url.searchParams.get("photo") === "1");
+  await page.goto(host + "/");
+  const destinationCover = await page.locator(".trip-card").filter({ hasText: "新增目的地·端到端测试" }).locator("img").first().getAttribute("src");
+  assert(/^\/api\/media\/[a-f0-9-]{36}$/.test(destinationCover ?? ""), "Web-uploaded destination cover not present on shared wishlist");
+  const destinationCoverResponse = await page.request.get(host + destinationCover);
+  assert(destinationCoverResponse.ok() && destinationCoverResponse.headers()["content-type"] === "image/webp", "Destination cover file not publicly readable");
+
+  await page.goto(host + "/admin/places/new");
+  await page.locator('input[name="name"]').fill("新增足迹·端到端测试");
+  await page.locator('input[name="region"]').fill("自动化测试地区");
+  await page.locator('select[name="group"]').selectOption("her");
+  await page.locator('input[name="whenLabel"]').fill("2026 年春季");
+  await page.locator('input[name="country"]').fill("测试国家");
+  await page.locator('input[name="province"]').fill("测试省份");
+  await page.locator('input[name="city"]').fill("测试城市");
+  await page.locator('input[name="latitude"]').fill("31.2");
+  await page.locator('input[name="longitude"]').fill("121.5");
+  await page.getByRole("button", { name: "新增足迹地点" }).click();
+  await page.waitForURL(url => url.pathname.startsWith("/admin/places/") && url.searchParams.get("created") === "1");
+  await page.locator('input[name="image"]').setInputFiles({ name: "memory.png", mimeType: "image/png", buffer: photoBuffer });
+  await page.getByRole("button", { name: "保存封面照片" }).click();
+  await page.waitForURL(url => url.searchParams.get("photo") === "1");
+  await page.goto(host + "/visited");
+  const visitedText = await page.locator("body").innerText();
+  assert(visitedText.includes("新增足迹·端到端测试") && visitedText.includes("旅行者乙单独去过"), "Manually created place or custom member label was not shown");
+  const placeCover = await page.locator(".place-card").filter({ hasText: "新增足迹·端到端测试" }).locator("img").getAttribute("src");
+  assert(/^\/api\/media\/[a-f0-9-]{36}$/.test(placeCover ?? ""), "Web-uploaded visited photo not shown in shared archive");
+  const placeCoverResponse = await page.request.get(host + placeCover);
+  assert(placeCoverResponse.ok() && placeCoverResponse.headers()["content-type"] === "image/webp", "Visited cover file not publicly readable");
 
   await page.goto(host + "/admin/destinations/test-island");
   await page.locator('input[name="title"]').fill("虚构岛屿·端到端测试");
@@ -156,6 +220,8 @@ async function run() {
   assert(restrictedResponse?.status() === 404, "Non-admin accessed account-management screen");
   const restrictedRestore = await page.goto(host + "/admin/restore");
   assert(restrictedRestore?.status() === 404, "Non-admin accessed backup restore screen");
+  const restrictedSettings = await page.goto(host + "/admin/settings");
+  assert(restrictedSettings?.status() === 404, "Non-admin accessed site settings screen");
 
   // Changing a password must revoke all existing sessions for this user.
   const secondaryContext = await browser.newContext();
@@ -185,7 +251,7 @@ async function run() {
   await page.goto(host + "/admin");
   assert(page.url().endsWith("/login"), "Logout did not revoke session");
 
-  console.log("E2E_PASS: public pages, anonymous protection, login, destination save, flight save, place save, partner role, password rotation, multi-device session revocation, logout");
+  console.log("E2E_PASS: public pages, auth, site branding, member labels, currency, destination/place creation and web photo uploads, edits, partner permissions, password rotation, session revocation, logout");
 }
 
 try {

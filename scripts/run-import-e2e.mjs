@@ -5,7 +5,8 @@ import { rmSync } from "node:fs";
 
 const db = join(process.cwd(), "data", "import-e2e.db");
 const images = join(process.cwd(), "data", "import-e2e-uploads");
-const env = { ...process.env, DATABASE_URL: "file:../data/import-e2e.db", UPLOAD_DIR: images };
+const databaseUrl = "file:" + db.replace(/\\/g, "/");
+const env = { ...process.env, DATABASE_URL: databaseUrl, UPLOAD_DIR: images };
 const node = process.execPath;
 function clean() {
   for (const ext of ["", "-wal", "-shm", "-journal"]) { if (existsSync(db + ext)) unlinkSync(db + ext); }

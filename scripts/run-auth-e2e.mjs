@@ -4,7 +4,8 @@ import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
 const dbFile = resolve(root, "data", "auth-e2e.db");
-const env = { ...process.env, DATABASE_URL: "file:../data/auth-e2e.db" };
+const databaseUrl = "file:" + dbFile.replace(/\\/g, "/");
+const env = { ...process.env, DATABASE_URL: databaseUrl };
 const node = process.execPath;
 
 function clean() {

@@ -2,7 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
-import { formatCny, formatDate, parseJsonArray } from "@/lib/format";
+import { formatDate, formatMoney, parseJsonArray } from "@/lib/format";
+import { getSiteSettings } from "@/lib/site-settings";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -11,14 +12,17 @@ type PageProps = { params: Promise<{ id: string }> };
 
 export default async function DestinationPage({ params }: PageProps) {
   const { id } = await params;
-  const destination = await prisma.destination.findUnique({
-    where: { id },
-    include: {
-      flightPricing: true,
-      guide: { include: { days: { orderBy: { sortOrder: "asc" } } } },
-      priceSamples: { orderBy: { createdAt: "desc" } },
-    },
-  });
+  const [destination, settings] = await Promise.all([
+    prisma.destination.findUnique({
+      where: { id },
+      include: {
+        flightPricing: true,
+        guide: { include: { days: { orderBy: { sortOrder: "asc" } } } },
+        priceSamples: { orderBy: { createdAt: "desc" } },
+      },
+    }),
+    getSiteSettings(),
+  ]);
   if (!destination) notFound();
 
   const budget = [
@@ -37,7 +41,7 @@ export default async function DestinationPage({ params }: PageProps) {
 
   return (
     <main>
-      <SiteHeader />
+      <SiteHeader brandName={settings.siteName} brandSubtitle={settings.siteSubtitle} />
       <section className="detail-hero">
         <Image unoptimized={!destination.imagePath || destination.imagePath.startsWith("/api/")} src={destination.imagePath ?? `/api/legacy-media/images/${destination.id}-0.jpg`} alt={destination.title} fill priority sizes="100vw" />
         <div className="hero-shade" />
@@ -83,11 +87,11 @@ export default async function DestinationPage({ params }: PageProps) {
 
         <aside className="detail-aside">
           <section className="budget-panel">
-            <p className="eyebrow">TOTAL TRAVEL BUDGET</p>
-            <h2>{destination.pickBudget ? formatCny(destination.pickBudget) : "预算待估算"}</h2>
-            <p className="muted-copy">旅行预算 · 总区间 {formatCny(destination.minBudget)}–{formatCny(destination.maxBudget)}</p>
+            <p className="eyebrow">BUDGET FOR TWO</p>
+            <h2>{destination.pickBudget ? formatMoney(destination.pickBudget, settings.currency) : "预算待估算"}</h2>
+            <p className="muted-copy">两人旅行总预算 · 区间 {formatMoney(destination.minBudget, settings.currency)}–{formatMoney(destination.maxBudget, settings.currency)}</p>
             <div className="budget-breakdown">
-              {budget.map(([label, value]) => <div key={label}><span>{label}</span><strong>{formatCny(value)}</strong></div>)}
+              {budget.map(([label, value]) => <div key={label}><span>{label}</span><strong>{formatMoney(value, settings.currency)}</strong></div>)}
             </div>
             <p className="budget-warning">预算是规划参考，不是已锁定报价。出发前请重新核对机票、酒店和景区票价。</p>
           </section>
@@ -96,9 +100,9 @@ export default async function DestinationPage({ params }: PageProps) {
             <section className="flight-panel">
               <p className="eyebrow">FLIGHT PRICE RANGE</p>
               <h3>{destination.flightPricing.route}</h3>
-              <div className="flight-range"><span>普通日期 · 往返总额</span><strong>{formatCny(destination.flightPricing.normalMin)}–{formatCny(destination.flightPricing.normalMax)}</strong></div>
+              <div className="flight-range"><span>普通日期 · 两人往返总额</span><strong>{formatMoney(destination.flightPricing.normalMin, settings.currency)}–{formatMoney(destination.flightPricing.normalMax, settings.currency)}</strong></div>
               <p>{destination.flightPricing.normalSample}</p>
-              <div className="flight-range"><span>节假日 · 往返总额</span><strong>{formatCny(destination.flightPricing.holidayMin)}–{formatCny(destination.flightPricing.holidayMax)}</strong></div>
+              <div className="flight-range"><span>节假日 · 两人往返总额</span><strong>{formatMoney(destination.flightPricing.holidayMin, settings.currency)}–{formatMoney(destination.flightPricing.holidayMax, settings.currency)}</strong></div>
               <p>{destination.flightPricing.holidaySample}</p>
               <p className="muted-copy">{destination.flightNote}</p>
               {destination.flightSource && <a className="source-link" href={destination.flightSource} target="_blank" rel="noreferrer">查看参考来源 ↗</a>}
@@ -110,7 +114,7 @@ export default async function DestinationPage({ params }: PageProps) {
               <h3>已保存的机票价格样本</h3>
               {destination.priceSamples.map(item => (
                 <div className="saved-flight-entry" key={item.id}>
-                  <strong>{item.totalPrice == null ? formatCny(item.pricePerPerson) + "/人" : formatCny(item.totalPrice) + "/总价"}</strong>
+                  <strong>{item.totalPrice == null ? formatMoney(item.pricePerPerson, item.currency) + "/人" : formatMoney(item.totalPrice, item.currency) + "/两人总价"}</strong>
                   <span>{item.sourceType === "PLANNING_ESTIMATE" ? "规划估算（非报价）" : item.sourceType === "USER_REPORTED" ? "用户实际查询" : item.sourceType === "HISTORICAL" ? "历史样本" : "公开价格参考"}</span>
                   <small>{formatDate(item.departureDate)}—{formatDate(item.returnDate)}</small>
                   <p>{item.notes || "此价格的行李政策、航司及购买条件应再次核实。"}</p>
@@ -127,7 +131,7 @@ export default async function DestinationPage({ params }: PageProps) {
           </section>
         </aside>
       </section>
-      <footer className="site-footer page-width"><Link className="text-link" href="/#destinations">← 回到所有目的地</Link><p>下一站，和你去看世界。</p></footer>
+      <footer className="site-footer page-width"><Link className="text-link" href="/#destinations">← 回到所有目的地</Link><p>{settings.siteName} · 旅行档案</p></footer>
     </main>
   );
 }

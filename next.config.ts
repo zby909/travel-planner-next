@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: { serverActions: { bodySizeLimit: "9mb" } },
   // The app reads SQLite dynamically; avoid stale budget and flight records.
   async headers() {
     return [{

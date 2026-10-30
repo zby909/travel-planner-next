@@ -48,6 +48,7 @@ legacy/
 next-env.d.ts
 
 # SQLite database and user uploads are persistent runtime data.
+/data/legacy-images/
 /data/*.db
 /data/*.db-journal
 /data/*.db-shm

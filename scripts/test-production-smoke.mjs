@@ -1,13 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 
-const file = join(process.cwd(), "data", "production-smoke.db");
+const file = resolve(process.cwd(), "data", "production-smoke.db");
 const uploads = join(process.cwd(), "data", "production-smoke-uploads");
-const databaseUrl = "file:../data/production-smoke.db";
+const databaseUrl = "file:" + file.replace(/\\/g, "/");
 const password = randomBytes(32).toString("base64url");
 const env = {
   ...process.env,
@@ -105,7 +105,7 @@ try {
     check(admin && admin.role === "ADMIN" && admin.passwordHash.startsWith("scrypt-v1:"), "Admin did not auto-bootstrap on first start");
     check(visits === 0 && destinations === 0 && !seed, "Generic first deployment unexpectedly contains personal travel data");
     const home = await fetch(app.origin + "/");
-    check(home.ok && (await home.text()).includes("还没有未来目的地"), "Generic empty home unavailable in production");
+    check(home.ok && (await home.text()).includes("我们的心愿清单还空着"), "Empty shared wishlist unavailable in production");
     const visitedPage = await fetch(app.origin + "/visited");
     check(visitedPage.ok, "Visited page unavailable in production");
     const tokenPage = await fetch(app.origin + "/admin/tokens", { redirect: "manual" });
