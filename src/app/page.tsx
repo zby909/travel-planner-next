@@ -9,12 +9,13 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+// 将数据库里的旅行心愿和足迹组织成一份真正由照片驱动的双人旅行杂志。
 export default async function HomePage() {
   const [settings, destinations, visitedCount, visitedPreview, timelineCount] = await Promise.all([
     getSiteSettings(),
     prisma.destination.findMany({ orderBy: { rank: "asc" }, include: { flightPricing: true } }),
     prisma.visitedPlace.count(),
-    prisma.visitedPlace.findMany({ orderBy: { sortOrder: "asc" }, take: 3 }),
+    prisma.visitedPlace.findMany({ orderBy: { sortOrder: "asc" }, take: 4 }),
     prisma.timelineEntry.count(),
   ]);
 
@@ -46,97 +47,87 @@ export default async function HomePage() {
     } : null,
   }));
 
-  const leadDestination = destinations.find(destination => destination.imagePath) ?? destinations[0];
-  const heroImage = leadDestination
-    ? leadDestination.imagePath ?? `/api/legacy-media/images/${leadDestination.id}-0.jpg`
-    : visitedPreview[0] ? getPlaceImageUrl(visitedPreview[0].image) : "/images/destination-placeholder.svg";
-  const heroCaption = leadDestination?.title ?? visitedPreview[0]?.name ?? "我们的下一站";
-  const postcards = destinations.filter(destination => destination.id !== leadDestination?.id)
-    .slice(0, 2).map(destination => ({
-      id: destination.id,
-      name: destination.title,
-      image: destination.imagePath ?? `/api/legacy-media/images/${destination.id}-0.jpg`,
-    }));
-  const memoryImage = visitedPreview[0] ? getPlaceImageUrl(visitedPreview[0].image) : "/images/place-placeholder.svg";
-  const memoryTitle = visitedPreview[0]?.name;
+  const coverPlace = visitedPreview[2] ?? visitedPreview[0];
+  const coverImage = coverPlace ? getPlaceImageUrl(coverPlace.image)
+    : destinations[0] ? destinations[0].imagePath ?? `/api/legacy-media/images/${destinations[0].id}-0.jpg`
+    : "/images/destination-placeholder.svg";
+  const coverTitle = coverPlace?.name ?? destinations[0]?.title ?? "下一站，未完待续";
+  const firstMemory = visitedPreview[0];
+  const secondMemory = visitedPreview[1] ?? visitedPreview[0];
 
   return (
-    <main className="home-page travel-home">
+    <main className="travel-home">
       <SiteHeader brandName={settings.siteName} brandSubtitle={settings.siteSubtitle} />
-
-      <section className="journal-hero" aria-labelledby="journal-hero-title">
-        <div className="journal-hero-inner page-width">
-          <div className="journal-hero-copy">
-            <p className="journal-kicker"><span /> A TRAVEL JOURNAL FOR TWO <span /></p>
-            <h1 id="journal-hero-title">下一站，<br /><em>和你去看世界。</em></h1>
-            <p className="journal-hero-description">有些地方已经留下脚印，<br />有些风景还在心愿里。<br />把每一次期待和出发，都写进我们的旅行故事。</p>
-            <div className="journal-hero-actions">
-              <Link className="journal-primary-link" href="#destinations">看看下一站 <span aria-hidden="true">↗</span></Link>
-              <Link className="journal-quiet-link" href="/visited">翻看我们的足迹 <span aria-hidden="true">↗</span></Link>
-            </div>
-            <p className="journal-hero-signature"><span>✳</span> 两个人的旅行手记 · 慢慢更新中</p>
+      <section className="editorial-cover" aria-labelledby="cover-title">
+        <div className="editorial-cover-copy">
+          <div className="editorial-cover-top"><span>THE NEXT JOURNEY</span><span>ISSUE NO. 001 / FOR TWO</span></div>
+          <div className="editorial-cover-center">
+            <p className="editorial-overline">A VISUAL DIARY OF US</p>
+            <h1 id="cover-title">世界那么大，<br /><em>我们慢慢走。</em></h1>
+            <div className="editorial-cover-rule" />
+            <p>把见过的山海，和还没抵达的远方，<br />留在一本属于两个人的旅行杂志里。</p>
+            <Link href="#destinations" className="editorial-arrow-link">翻开下一页 <span aria-hidden="true">↗</span></Link>
           </div>
-          <div className="journal-collage" aria-label="旅行照片与心愿明信片">
-            <figure className="journal-cover-photo">
-              <Image src={heroImage} alt={`${heroCaption}旅行封面`} fill priority unoptimized sizes="(max-width: 900px) 90vw, 43vw" />
-              <figcaption><span>POSTCARD NO. 01</span><strong>{heroCaption}</strong></figcaption>
-            </figure>
-            {postcards.length > 0 && (
-              <figure className="journal-small-photo">
-                <Image src={postcards[0].image} alt={`${postcards[0].name}旅行风景`} fill unoptimized sizes="(max-width: 900px) 38vw, 16vw" />
-                <figcaption>{postcards[0].name}</figcaption>
-              </figure>
-            )}
-            <div className="journal-round-stamp" aria-hidden="true">JUST<br />US TWO<br /><span>✳</span></div>
-            <div className="journal-photo-note">THE PLACES WE DREAM OF <span>— 001</span></div>
-          </div>
+          <div className="editorial-cover-bottom"><span>TRAVEL / PHOTOGRAPHY / MEMORIES</span><span>01 — 04</span></div>
         </div>
-        <div className="journal-hero-bottom page-width"><span>OUR LITTLE TRAVEL STORY</span><a href="#journal-story">继续往下看 <span aria-hidden="true">↓</span></a></div>
+        <figure className="editorial-cover-visual">
+          <Image src={coverImage} alt={`${coverTitle}的旅行照片`} fill priority unoptimized sizes="(max-width: 800px) 100vw, 60vw" />
+          <figcaption><span>ON THE ROAD · FRAME 001</span><span>{coverTitle} <b>↗</b></span></figcaption>
+          <span className="editorial-cover-vertical" aria-hidden="true">COLLECTING MOMENTS, NOT MILES</span>
+        </figure>
       </section>
 
-      <section className="journal-ledger page-width" id="journal-story" aria-label="我们的旅行记录概览">
-        <div className="journal-ledger-heading"><span className="journal-chapter">01 / OUR STORY</span><p>一路的风景，<br />慢慢变成故事。</p></div>
-        <div className="journal-stat"><strong>{visitedCount}</strong><span>个到访足迹</span></div>
-        <div className="journal-stat"><strong>{destinations.length}</strong><span>个想去的地方</span></div>
-        <div className="journal-stat"><strong>{timelineCount}</strong><span>条旅途记录</span></div>
-      </section>
+      <div className="editorial-marquee" aria-hidden="true">
+        <span>PLACES WE HAVE BEEN</span><span className="editorial-sparkle">✳</span>
+        <span>PLACES WE DREAM OF</span><span className="editorial-sparkle">✳</span>
+        <span>ALL THE MOMENTS IN BETWEEN</span>
+      </div>
 
-      <section className="journal-memory" aria-labelledby="journal-memory-title">
-        <div className="journal-memory-inner page-width">
-          <div className="journal-memory-copy">
-            <p className="journal-chapter">02 / THE PLACES WE&apos;VE BEEN</p>
-            <h2 id="journal-memory-title">去过的地方，<br /><em>都有它的故事。</em></h2>
-            <p>不只是标记地图上的一个点。那天的天气、路上的风景，和谁一起走过的，都值得被好好收藏。</p>
-            <Link href="/visited" className="journal-outline-link">打开足迹相册 <span aria-hidden="true">↗</span></Link>
-            <span className="journal-memory-foot">OUR MEMORIES, ONE PLACE AT A TIME.</span>
-          </div>
-          <div className="journal-memory-gallery">
-            <div className="journal-memory-photo">
-              <Image src={memoryImage} alt={memoryTitle ? `${memoryTitle}到访照片` : "足迹相册等待记录"} fill unoptimized sizes="(max-width: 900px) 90vw, 44vw" />
-            </div>
-            <div className="journal-memory-caption"><span>{memoryTitle ?? "尚待写下第一站"}</span><span>TRAVEL ARCHIVE <b>↗</b></span></div>
+      <section className="editorial-intro page-width" aria-labelledby="intro-title">
+        <div><p className="editorial-overline">EDITOR&apos;S LETTER / 001</p><h2 id="intro-title">旅行不是抵达，<br /><em>是一起经历。</em></h2></div>
+        <div className="editorial-intro-right">
+          <p>我们不急着集齐多少座城市。喜欢的照片、某个地方的风、沿途的细碎时刻，都值得认真保存。未来也有很多想去的地方，可以慢慢商量，慢慢启程。</p>
+          <div className="editorial-counts">
+            <div><strong>{visitedCount}</strong><span>VISITED PLACES / 足迹</span></div>
+            <div><strong>{destinations.length}</strong><span>ON OUR LIST / 心愿</span></div>
+            <div><strong>{timelineCount}</strong><span>STORIES / 记录</span></div>
           </div>
         </div>
       </section>
 
-      <section className="journal-wishlist page-width" id="destinations" aria-labelledby="journal-wishlist-title">
-        <div className="journal-wishlist-heading">
-          <div><p className="journal-chapter">03 / OUR WISHLIST</p><h2 id="journal-wishlist-title">把下一站，<br /><em>留给心动。</em></h2></div>
-          <p>从想去的一处风景开始，慢慢计划我们的下一次出发。<br />日期不必着急决定，先把喜欢的地方记下来。</p>
+      <section className="editorial-moments" aria-labelledby="moments-title">
+        <div className="editorial-moments-inner page-width">
+          <div className="editorial-moments-photo editorial-moments-photo-large">
+            <Image src={firstMemory ? getPlaceImageUrl(firstMemory.image) : "/images/place-placeholder.svg"} alt={firstMemory ? `${firstMemory.name}到访照片` : "旅行相册空白页"} fill unoptimized sizes="(max-width: 760px) 90vw, 34vw" />
+            <span>FIG. 01 / {firstMemory?.name ?? "OUR FIRST FRAME"}</span>
+          </div>
+          <div className="editorial-moments-copy">
+            <p className="editorial-overline">02 / THE PHOTO ESSAY</p>
+            <h2 id="moments-title">走过的路，<br /><em>都有光。</em></h2>
+            <p>每一张照片背后，都有一次出发的理由。一页页翻下去，就是属于我们的旅行纪事。</p>
+            <Link href="/visited" className="editorial-arrow-link">进入足迹相册 <span aria-hidden="true">↗</span></Link>
+            <div className="editorial-moments-photo editorial-moments-photo-small">
+              <Image src={secondMemory ? getPlaceImageUrl(secondMemory.image) : "/images/place-placeholder.svg"} alt={secondMemory ? `${secondMemory.name}的旅途` : "尚待记录的旅途"} fill unoptimized sizes="(max-width: 760px) 60vw, 23vw" />
+              <span>FIG. 02 / {secondMemory?.name ?? "TO BE CONTINUED"}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="editorial-wishlist page-width" id="destinations" aria-labelledby="wishlist-title">
+        <div className="editorial-section-head">
+          <div><p className="editorial-overline">03 / THE WISHLIST · DESTINATION INDEX</p><h2 id="wishlist-title">下一站，<em>去哪里？</em></h2></div>
+          <p>尚未发生的旅程，也值得拥有自己的篇章。<br />从一张照片开始，挑一处心动的远方。</p>
         </div>
         <DestinationExplorer destinations={explorerDestinations} currency={settings.currency} />
       </section>
 
-      <section className="journal-closing" aria-label="旅行手记尾声">
-        <span>TO ALL THE PLACES WE HAVEN&apos;T BEEN</span>
-        <h2>路还很长，<em>我们慢慢走。</em></h2>
-        <Link href="/visited">去看看走过的路 <span aria-hidden="true">↗</span></Link>
+      <section className="editorial-last-page">
+        <span>THE LAST PAGE IS NEVER REALLY THE END</span>
+        <h2>故事未完，<em>下一站见。</em></h2>
+        <Link href="/visited" className="editorial-arrow-link">读一读我们的旅行故事 <span aria-hidden="true">↗</span></Link>
       </section>
-      <footer className="journal-footer page-width">
-        <Link href="/" className="journal-footer-brand"><span>✳</span> {settings.siteName}</Link>
-        <p>记录去过的地方，也收藏下一次出发的期待。</p>
-        <span>{settings.siteSubtitle}</span>
-      </footer>
+      <footer className="editorial-footer page-width"><Link href="/">{settings.siteName} <small>✳</small></Link><span>AN ONGOING JOURNEY, JUST THE TWO OF US.</span><span>{settings.siteSubtitle}</span></footer>
     </main>
   );
 }

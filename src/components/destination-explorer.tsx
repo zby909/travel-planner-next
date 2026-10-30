@@ -32,39 +32,39 @@ export type DestinationExplorerItem = {
   } | null;
 };
 
-// 将预算数字格式化为站点配置的币种。
+// 将预算格式化为站点配置的币种。
 function money(value: number, currency: string): string {
   return new Intl.NumberFormat("zh-CN", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
 }
 
-// 提取行程天数用于排序，未填写的行程排在后面。
+// 从天数描述中提取排序值，无法识别的项排在末尾。
 function durationInDays(value: string): number {
   const match = value.match(/\d+/);
   return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
 }
 
-// 以旅行明信片展示真实目的地数据，筛选条件保留在本地，不改写数据库。
+// 按杂志目录样式展示目的地；筛选与排序都只影响当前页面。
 export function DestinationExplorer({ destinations, currency = "CNY" }: { destinations: DestinationExplorerItem[]; currency?: string }) {
   const [kind, setKind] = useState("全部");
   const [season, setSeason] = useState("全部");
   const [budget, setBudget] = useState(0);
   const [sort, setSort] = useState("recommend");
   const kindFilters = useMemo(() => [
-    { label: "全部目的地", value: "全部" },
-    ...[...new Set(destinations.flatMap(destination => destination.types.length ? destination.types : [destination.kind]).filter(Boolean))].sort().map(value => ({ label: value, value })),
+    { label: "全部旅程", value: "全部" },
+    ...[...new Set(destinations.flatMap(item => item.types.length ? item.types : [item.kind]).filter(Boolean))].sort().map(value => ({ label: value, value })),
   ], [destinations]);
-  const seasonFilters = useMemo(() => [...new Set(destinations.flatMap(destination => destination.seasons))].sort(), [destinations]);
+  const seasonFilters = useMemo(() => [...new Set(destinations.flatMap(item => item.seasons))].sort(), [destinations]);
   const budgetOptions = useMemo(() => {
-    const values = destinations.map(destination => destination.pickBudget).filter(value => value > 0).sort((a, b) => a - b);
+    const values = destinations.map(item => item.pickBudget).filter(value => value > 0).sort((a, b) => a - b);
     if (values.length === 0) return [];
     return [...new Set([0.25, 0.5, 0.75, 1].map(ratio => values[Math.min(values.length - 1, Math.ceil(values.length * ratio) - 1)]))];
   }, [destinations]);
 
   const visibleDestinations = useMemo(() => {
-    const filtered = destinations.filter(destination =>
-      (kind === "全部" || (destination.types.length ? destination.types : [destination.kind]).includes(kind)) &&
-      (season === "全部" || destination.seasons.includes(season)) &&
-      (budget === 0 || (destination.pickBudget > 0 && destination.pickBudget <= budget))
+    const filtered = destinations.filter(item =>
+      (kind === "全部" || (item.types.length ? item.types : [item.kind]).includes(kind)) &&
+      (season === "全部" || item.seasons.includes(season)) &&
+      (budget === 0 || (item.pickBudget > 0 && item.pickBudget <= budget))
     );
     filtered.sort((a, b) => {
       if (sort === "cheap") return (a.pickBudget || Number.MAX_SAFE_INTEGER) - (b.pickBudget || Number.MAX_SAFE_INTEGER);
@@ -74,7 +74,7 @@ export function DestinationExplorer({ destinations, currency = "CNY" }: { destin
     return filtered;
   }, [destinations, kind, season, budget, sort]);
 
-  // 清除筛选条件，恢复数据库的展示顺序。
+  // 清空用户筛选并恢复数据库的原始顺序。
   function resetFilters() {
     setKind("全部");
     setSeason("全部");
@@ -83,83 +83,45 @@ export function DestinationExplorer({ destinations, currency = "CNY" }: { destin
   }
 
   return (
-    <div className="destination-explorer journal-explorer">
-      <div className="journal-filter-bar">
-        <div className="journal-filter-types" role="group" aria-label="按旅行类型筛选">
+    <div className="editorial-explorer">
+      <div className="editorial-filter">
+        <div className="editorial-filter-types" role="group" aria-label="按旅行类型筛选">
           {kindFilters.map(option => (
-            <button
-              key={option.value}
-              className={`journal-filter-chip${kind === option.value ? " is-active" : ""}`}
-              type="button"
-              aria-pressed={kind === option.value}
-              onClick={() => setKind(option.value)}
-            >{option.label}</button>
+            <button key={option.value} type="button" className={kind === option.value ? "is-active" : ""} aria-pressed={kind === option.value} onClick={() => setKind(option.value)}>{option.label}</button>
           ))}
         </div>
-        <div className="journal-filter-selects">
-          <label><span className="sr-only">按季节筛选</span>
-            <select value={season} onChange={event => setSeason(event.target.value)}>
-              <option value="全部">全部季节</option>
-              {seasonFilters.map(value => <option key={value} value={value}>{value.endsWith("季") ? value : `${value}季`}</option>)}
-            </select>
-          </label>
-          <label><span className="sr-only">按预算筛选</span>
-            <select value={budget} onChange={event => setBudget(Number(event.target.value))}>
-              <option value={0}>预算不限</option>
-              {budgetOptions.map(value => <option key={value} value={value}>≤ {money(value, currency)}</option>)}
-            </select>
-          </label>
-          <label><span className="sr-only">排序方式</span>
-            <select value={sort} onChange={event => setSort(event.target.value)}>
-              <option value="recommend">默认顺序</option>
-              <option value="cheap">预算从低到高</option>
-              <option value="short">天数从少到多</option>
-            </select>
-          </label>
+        <div className="editorial-filter-options">
+          <label><span className="sr-only">按季节筛选</span><select value={season} onChange={event => setSeason(event.target.value)}><option value="全部">所有季节</option>{seasonFilters.map(value => <option value={value} key={value}>{value.endsWith("季") ? value : `${value}季`}</option>)}</select></label>
+          <label><span className="sr-only">按预算筛选</span><select value={budget} onChange={event => setBudget(Number(event.target.value))}><option value={0}>预算不限</option>{budgetOptions.map(value => <option value={value} key={value}>≤ {money(value, currency)}</option>)}</select></label>
+          <label><span className="sr-only">排序方式</span><select value={sort} onChange={event => setSort(event.target.value)}><option value="recommend">默认排序</option><option value="cheap">预算由低到高</option><option value="short">天数由少到多</option></select></label>
         </div>
       </div>
-      <div className="journal-results">
-        <span>{String(visibleDestinations.length).padStart(2, "0")} PLACES TO DREAM ABOUT</span>
-        <button type="button" onClick={resetFilters}>清除筛选 ↺</button>
-      </div>
-
+      <div className="editorial-index-meta"><span>INDEX / {String(visibleDestinations.length).padStart(2, "0")} DESTINATIONS</span><button type="button" onClick={resetFilters}>重置条件 ↺</button></div>
       {visibleDestinations.length > 0 ? (
-        <div className="journal-card-grid" aria-live="polite">
-          {visibleDestinations.map((destination, index) => (
-            <article className="journal-destination-card" key={destination.id}>
-              <Link className="journal-card-image" href={`/destinations/${destination.id}`} aria-label={`查看${destination.title}旅行详情`}>
-                <Image
-                  src={destination.imagePath ?? `/api/legacy-media/images/${destination.id}-0.jpg`}
-                  alt={`${destination.title}目的地封面`}
-                  fill
-                  unoptimized
-                  sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 33vw"
-                />
-                <span className="journal-card-index">{String(index + 1).padStart(2, "0")} / {String(visibleDestinations.length).padStart(2, "0")}</span>
-                <span className="journal-card-open" aria-hidden="true">↗</span>
-                <span className="journal-card-image-title">{destination.months || "想去看看"}</span>
+        <div className="editorial-destination-grid" aria-live="polite">
+          {visibleDestinations.map((item, index) => (
+            <article className={`editorial-destination${index === 0 ? " is-feature" : ""}`} key={item.id}>
+              <Link className="editorial-destination-photo" href={`/destinations/${item.id}`} aria-label={`查看${item.title}的旅行计划`}>
+                <Image src={item.imagePath ?? `/api/legacy-media/images/${item.id}-0.jpg`} alt={`${item.title}的风景照片`} fill unoptimized sizes={index === 0 ? "(max-width: 760px) 100vw, 60vw" : "(max-width: 760px) 100vw, 45vw"} />
+                <span className="editorial-photo-label">TRAVEL FRAME / {String(index + 1).padStart(2, "0")}</span>
               </Link>
-              <div className="journal-card-content">
-                <p className="journal-card-overline">{destination.flag} {destination.kind} <span>{destination.badge || destination.style || "TRAVEL NOTES"}</span></p>
-                <div className="journal-card-title-row">
-                  <div><h3><Link href={`/destinations/${destination.id}`}>{destination.title}</Link></h3><p>{destination.subtitle}</p></div>
-                  {destination.pickBudget > 0 && <span className="journal-card-budget">{money(destination.pickBudget, currency)}<small>两人参考预算</small></span>}
-                </div>
-                {destination.vibe && <p className="journal-card-vibe">{destination.vibe}</p>}
-                <div className="journal-card-bottom">
-                  <span>{[destination.months, destination.days].filter(Boolean).join(" · ") || "待规划"}</span>
-                  <Link href={`/destinations/${destination.id}`}>查看这段旅程 <span aria-hidden="true">↗</span></Link>
-                </div>
+              <div className="editorial-destination-copy">
+                <div className="editorial-destination-kicker"><span>NO. {String(index + 1).padStart(2, "0")}</span><span>{item.flag} {item.kind}</span></div>
+                <h3><Link href={`/destinations/${item.id}`}>{item.title}</Link></h3>
+                <p className="editorial-destination-subtitle">{item.subtitle}</p>
+                {item.vibe && <p className="editorial-destination-vibe">{item.vibe}</p>}
+                <div className="editorial-destination-bottom"><span>{[item.months, item.days].filter(Boolean).join(" / ") || "等待计划"}</span><Link href={`/destinations/${item.id}`}>阅读旅程 <b aria-hidden="true">↗</b></Link></div>
+                {item.pickBudget > 0 && <div className="editorial-destination-budget"><span>EST. FOR TWO</span><strong>{money(item.pickBudget, currency)}</strong></div>}
               </div>
             </article>
           ))}
         </div>
       ) : (
-        <div className="journal-empty-state" data-testid="empty-destinations">
-          <span aria-hidden="true">✳</span>
-          <h3>{destinations.length === 0 ? "我们的心愿清单，还等着第一站。" : "暂时没有符合条件的目的地。"}</h3>
-          <p>{destinations.length === 0 ? "从一个想去的地方开始，慢慢把它写满吧。" : "换一个季节或预算，也许会遇见新的心动。"}</p>
-          {destinations.length === 0 ? <Link href="/login">去添加一个目的地 ↗</Link> : <button type="button" onClick={resetFilters}>查看全部目的地 ↗</button>}
+        <div className="editorial-empty" data-testid="empty-destinations">
+          <span>AN UNWRITTEN PAGE / 000</span>
+          <h3>{destinations.length === 0 ? "我们的心愿清单，还等着第一站。" : "这一页，暂时没有符合条件的旅程。"}</h3>
+          <p>{destinations.length === 0 ? "先记下一个想去的地方，再慢慢开始。" : "试着换个季节、预算或旅行类型。"}</p>
+          {destinations.length === 0 ? <Link href="/login">开始写下第一站 ↗</Link> : <button type="button" onClick={resetFilters}>查看全部目的地 ↗</button>}
         </div>
       )}
     </div>

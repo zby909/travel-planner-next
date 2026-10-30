@@ -40,24 +40,30 @@ export default async function DestinationPage({ params }: PageProps) {
   const seasons = parseJsonArray<string>(destination.seasonsJson);
 
   return (
-    <main>
+    <main className="travel-detail">
       <SiteHeader brandName={settings.siteName} brandSubtitle={settings.siteSubtitle} />
-      <section className="detail-hero">
-        <Image unoptimized={!destination.imagePath || destination.imagePath.startsWith("/api/")} src={destination.imagePath ?? `/api/legacy-media/images/${destination.id}-0.jpg`} alt={destination.title} fill priority sizes="100vw" />
-        <div className="hero-shade" />
-        <div className="detail-hero-content page-width">
-          <Link className="back-link" href="/#destinations">← 返回目的地</Link>
-          <p className="eyebrow eyebrow-light">DESTINATION / {String(destination.rank).padStart(2, "0")}</p>
-          <h1>{destination.title}</h1>
-          <p>{destination.subtitle}</p>
-          <div className="tag-row">{types.map((type) => <span className="tag tag-light" key={type}>{type}</span>)}</div>
+      <section className="story-cover page-width" aria-labelledby="story-cover-title">
+        <div className="story-cover-top"><Link href="/#destinations">← BACK TO THE INDEX</Link><span>THE NEXT JOURNEY / FIELD NOTES</span><span>VOL. {String(destination.rank).padStart(2, "0")}</span></div>
+        <div className="story-cover-heading">
+          <div><p className="editorial-overline">A PLACE WE DREAM OF VISITING</p><h1 id="story-cover-title">{destination.title}</h1><p>{destination.subtitle}</p></div>
+          <div className="story-cover-intro"><span>DESTINATION / {String(destination.rank).padStart(2, "0")}</span><p>{destination.vibe || "一场等待出发的旅程。"}</p></div>
         </div>
       </section>
+      <figure className="story-cover-photo page-width">
+        <Image unoptimized src={destination.imagePath ?? `/api/legacy-media/images/${destination.id}-0.jpg`} alt={`${destination.title}旅行风景`} fill priority sizes="(max-width: 760px) 100vw, 92vw" />
+        <figcaption><span>PHOTOGRAPHIC JOURNAL / {destination.title}</span><span>01 / THE STORY BEGINS</span></figcaption>
+      </figure>
+      <div className="story-keyfacts page-width">
+        <div><span>IDEAL SEASON</span><strong>{destination.months || "待确定"}</strong></div>
+        <div><span>TIME TO SPEND</span><strong>{destination.days || "待规划"}</strong></div>
+        <div><span>TRAVEL STYLE</span><strong>{types.join(" · ") || destination.kind}</strong></div>
+        <div><span>FOR TWO / ESTIMATE</span><strong>{destination.pickBudget ? formatMoney(destination.pickBudget, settings.currency) : "预算待估算"}</strong></div>
+      </div>
 
       <section className="detail-layout page-width">
         <div className="detail-main">
           <p className="eyebrow">WHY THIS JOURNEY</p>
-          <h2>{destination.vibe}</h2>
+          <h2>去往远方的<em>一个理由。</em></h2>
           <p className="lead-copy">{destination.reason}</p>
           {destination.guide && (
             <section className="guide-section">
@@ -131,7 +137,7 @@ export default async function DestinationPage({ params }: PageProps) {
           </section>
         </aside>
       </section>
-      <footer className="site-footer page-width"><Link className="text-link" href="/#destinations">← 回到所有目的地</Link><p>{settings.siteName} · 旅行档案</p></footer>
+      <footer className="editorial-footer page-width"><Link href="/#destinations">← 回到目的地目录</Link><span>THE NEXT JOURNEY / END OF CHAPTER</span><span>{settings.siteName}</span></footer>
     </main>
   );
 }
