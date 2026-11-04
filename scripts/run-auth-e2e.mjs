@@ -1,11 +1,13 @@
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync, rmSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
 const dbFile = resolve(root, "data", "auth-e2e.db");
+const uploadDir = resolve(root, "data", "auth-e2e-uploads");
+const testBuildDir = resolve(root, ".next-auth-e2e");
 const databaseUrl = "file:" + dbFile.replace(/\\/g, "/");
-const env = { ...process.env, DATABASE_URL: databaseUrl };
+const env = { ...process.env, DATABASE_URL: databaseUrl, UPLOAD_DIR: uploadDir };
 const node = process.execPath;
 
 function clean() {
@@ -13,6 +15,8 @@ function clean() {
     const file = dbFile + suffix;
     if (existsSync(file)) unlinkSync(file);
   }
+  rmSync(testBuildDir, { recursive: true, force: true });
+  rmSync(uploadDir, { recursive: true, force: true });
 }
 function run(label, args) {
   console.log(label);

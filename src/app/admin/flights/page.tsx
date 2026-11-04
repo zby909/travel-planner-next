@@ -14,8 +14,9 @@ const labels: Record<string, string> = {
   PLANNING_ESTIMATE: "规划估算",
 };
 
-export default async function AdminFlights({ searchParams }: { searchParams: Promise<{ added?: string }> }) {
+export default async function AdminFlights({ searchParams }: { searchParams: Promise<{ added?: string; new?: string }> }) {
   await requireEditor();
+  const query = await searchParams;
   const [destinations, samples, settings] = await Promise.all([
     prisma.destination.findMany({ select: { id: true, title: true }, orderBy: { rank: "asc" } }),
     prisma.flightPriceSample.findMany({ include: { destination: { select: { title: true } } }, orderBy: { createdAt: "desc" }, take: 100 }),
@@ -23,8 +24,11 @@ export default async function AdminFlights({ searchParams }: { searchParams: Pro
   ]);
   return <main>
     <div className="admin-page-heading"><p className="eyebrow">FLIGHT EVIDENCE</p><h1>机票报价记录</h1><p>记录真实查到的机票价格、来源和条件，不用新数据覆盖旧样本。</p></div>
-    {(await searchParams).added === "1" ? <p className="form-success" role="status">机票报价已保存。</p> : null}
-    <FlightCreateForm destinations={destinations} currency={settings.currency} />
+    {query.added === "1" ? <p className="form-success" role="status">机票报价已保存。</p> : null}
+    <details className="admin-disclosure admin-create-disclosure" open={query.new === "1"}>
+        <summary>＋ 新增一条机票价格样本</summary>
+        <FlightCreateForm destinations={destinations} currency={settings.currency} />
+      </details>
     <section className="admin-panel admin-records">
       <h2>历史样本（最近 {samples.length} 条）</h2>
       <div className="admin-list">

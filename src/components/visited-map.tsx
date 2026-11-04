@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 
 type EChartsParams = {
   name?: string;
-  data?: { name?: string; value?: unknown; placeGroup?: string; note?: string };
+  data?: { name?: string; value?: unknown; placeId?: string; placeGroup?: string; note?: string };
 };
 type EChartsInstance = {
   setOption: (option: Record<string, unknown>, notMerge?: boolean) => void;
   resize: () => void;
   dispose: () => void;
+  on: (event: string, handler: (params: EChartsParams) => void) => void;
+  off: (event: string, handler: (params: EChartsParams) => void) => void;
 };
 type EChartsGlobal = {
   init: (element: HTMLElement, theme?: string, options?: { renderer?: string }) => EChartsInstance;
@@ -59,17 +61,38 @@ function loadScript(src: string, isReady: () => boolean): Promise<void> {
   return new Promise((resolve, reject) => {
     const selector = `script[data-map-src="${src}"]`;
     const existing = document.querySelector<HTMLScriptElement>(selector);
-    if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error(`加载失败：${src}`)), { once: true });
+    if (existing?.dataset.loaded === "true") existing.remove();
+    else if (existing) {
+      existing.addEventListener("load", () => {
+        if (isReady()) resolve();
+        else {
+          existing.remove();
+          reject(new Error(`地图资源未正确初始化：${src}`));
+        }
+      }, { once: true });
+      existing.addEventListener("error", () => {
+        existing.remove();
+        reject(new Error(`加载失败：${src}`));
+      }, { once: true });
       return;
     }
     const script = document.createElement("script");
     script.src = src;
     script.async = true;
     script.dataset.mapSrc = src;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`加载失败：${src}`));
+    script.onload = () => {
+      if (!isReady()) {
+        script.remove();
+        reject(new Error(`地图资源未正确初始化：${src}`));
+        return;
+      }
+      script.dataset.loaded = "true";
+      resolve();
+    };
+    script.onerror = () => {
+      script.remove();
+      reject(new Error(`加载失败：${src}`));
+    };
     document.body.appendChild(script);
   });
 }
@@ -103,8 +126,11 @@ export function VisitedMap({ places, groupLabels = DEFAULT_GROUP_NAMES }: { plac
     const chart = window.echarts.init(containerRef.current, undefined, { renderer: "canvas" });
     chartRef.current = chart;
     const resize = () => chart.resize();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(resize);
+    observer?.observe(containerRef.current);
     window.addEventListener("resize", resize);
     return () => {
+      observer?.disconnect();
       window.removeEventListener("resize", resize);
       chart.dispose();
       chartRef.current = null;
@@ -150,11 +176,24 @@ export function VisitedMap({ places, groupLabels = DEFAULT_GROUP_NAMES }: { plac
       .filter((place) => place.longitude !== null && place.latitude !== null)
       .map((place) => ({
         name: place.name,
+        placeId: place.id,
         value: [place.longitude, place.latitude],
         itemStyle: { color: groupColors[place.group] ?? groupColors.both },
         placeGroup: groupLabels[place.group as keyof typeof groupLabels] ?? "已到访",
         note: place.mapNote ?? "区域高亮表示有到访记录，不代表游遍整个区域。",
       }));
+
+    // 点击地图上的地点后，滚动并聚焦到下方对应的照片卡片。
+    const handlePointClick = (params: EChartsParams) => {
+      const placeId = params.data?.placeId;
+      if (!placeId) return;
+      const target = document.getElementById("place-" + placeId);
+      if (!target) return;
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
+      target.focus({ preventScroll: true });
+    };
+    chart.on("click", handlePointClick);
 
     chart.setOption({
       animationDuration: 350,
@@ -164,7 +203,7 @@ export function VisitedMap({ places, groupLabels = DEFAULT_GROUP_NAMES }: { plac
           const params = rawParams as EChartsParams;
           const item = params.data;
           if (item?.value) {
-            return `<strong>${escapeHtml(item.name ?? params.name)}</strong><br/>${escapeHtml(item.placeGroup ?? "已到访")}<br/><small>${escapeHtml(item.note)}</small>`;
+            return `<strong>${escapeHtml(item.name ?? params.name)}</strong><br/>${escapeHtml(item.placeGroup ?? "已到访")}<br/><small>${escapeHtml(item.note)}</small><br/><small>点击地图点，查看对应照片记录</small>`;
           }
           const name = String(params.name ?? "");
           const matched = groupedRegions.get(name) ?? [];
@@ -192,6 +231,7 @@ export function VisitedMap({ places, groupLabels = DEFAULT_GROUP_NAMES }: { plac
         },
       ],
     }, true);
+    return () => chart.off("click", handlePointClick);
   }, [ready, mode, group, places, groupLabels]);
 
   return (

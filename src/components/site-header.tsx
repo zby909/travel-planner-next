@@ -25,6 +25,7 @@ export function SiteHeader({ brandName = "下一站", brandSubtitle = "THE NEXT 
       <nav className="top-nav" aria-label="主要导航">
         <Link className={pathname === "/" ? "is-current" : ""} href="/#destinations">未来的旅程</Link>
         <Link className={pathname === "/visited" ? "is-current" : ""} href="/visited">去过的地方</Link>
+        <Link className={pathname === "/memories" ? "is-current" : ""} href="/memories">旅行日记</Link>
         <Link className="topbar-admin-link" href="/admin">编辑室 <span aria-hidden="true">↗</span></Link>
       </nav>
     </header>

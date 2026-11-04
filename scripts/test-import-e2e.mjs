@@ -43,7 +43,7 @@ async function run() {
       expiresAt: new Date(Date.now() + 3600_000) },
   });
   server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-p", "3016", "--hostname", "127.0.0.1"], {
-    cwd: process.cwd(), env: { ...process.env, NODE_ENV: "development" }, stdio: ["ignore", "pipe", "pipe"],
+    cwd: process.cwd(), env: { ...process.env, NODE_ENV: "development", NEXT_DIST_DIR: ".next-import-e2e" }, stdio: ["ignore", "pipe", "pipe"],
   });
   server.stdout.on("data", () => {});
   let errors = "";
@@ -52,6 +52,15 @@ async function run() {
 
   check((await api("/api/v1/visits")).items.length === 1, "Legacy visits not present");
   check((await api("/api/v1/destinations")).items.length === 1, "Legacy future destinations not present");
+  const storedToken = await db.apiToken.findUnique({ where: { tokenHash: createHash("sha256").update(token).digest("hex") } });
+  const lastUsedAt = storedToken?.lastUsedAt?.getTime();
+  await api("/api/v1/visits");
+  const tokenAfterRead = await db.apiToken.findUnique({ where: { tokenHash: createHash("sha256").update(token).digest("hex") } });
+  check(tokenAfterRead?.lastUsedAt?.getTime() === lastUsedAt, "Read-only API calls wrote lastUsedAt more than once within five minutes");
+  const privateRead = await fetch(host + "/api/v1/visits", { headers: requestHeaders });
+  check(privateRead.headers.get("cache-control") === "no-store", "Private visits API response is cacheable");
+  const meResponse = await fetch(host + "/api/v1/me", { headers: requestHeaders });
+  check(meResponse.headers.get("cache-control") === "no-store", "Private token identity response is cacheable");
   const anon = await fetch(host + "/api/v1/visits");
   check(anon.status === 401, "Anonymous read was allowed");
 
@@ -61,6 +70,14 @@ async function run() {
   const picture = await api("/api/v1/media", { method: "POST", body: upload }, 201);
   check(picture.imageId && picture.status === "STAGED", "Image upload did not create staged asset");
   check((await fetch(host + "/api/media/" + picture.imageId)).status === 404, "Staged photo is publicly readable");
+
+  const unsafeMediaId = randomBytes(16).toString("hex");
+  await db.mediaAsset.create({
+    data: { id: unsafeMediaId, ownerId: admin.id, fileName: "../import-e2e.db", mimeType: "image/webp", byteSize: 100, status: "PUBLIC" },
+  });
+  const unsafeMediaResponse = await fetch(host + "/api/media/" + unsafeMediaId);
+  check(unsafeMediaResponse.status === 404, "Media endpoint accepted a path-traversal filename from restored database metadata");
+  await db.mediaAsset.delete({ where: { id: unsafeMediaId } });
 
   const invalid = new FormData();
   invalid.append("image", new Blob([Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'></svg>")], { type: "image/svg+xml" }), "bad.svg");
@@ -126,6 +143,7 @@ async function run() {
 
   const imageResponse = await fetch(host + "/api/media/" + picture.imageId);
   check(imageResponse.ok && imageResponse.headers.get("content-type") === "image/webp", "Committed photo not public");
+  check(imageResponse.headers.get("cache-control") === "public, max-age=0, must-revalidate", "Public media must revalidate to respect visibility changes");
   const stored = await sharp(Buffer.from(await imageResponse.arrayBuffer())).metadata();
   check(!stored.exif && stored.format === "webp", "Uploaded image did not get privacy-preserving metadata stripping");
 

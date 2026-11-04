@@ -46,3 +46,7 @@ The Token is generated in **管理后台 → AI 授权**. Enter it only into the
 - Use `travelctl auth logout` to remove the local authorization.
 
 All create/update operations use the website's preview draft. The CLI never writes directly to SQLite. Review the current values, proposed changes and warnings, then obtain the user's explicit confirmation before `import commit --confirm`.
+
+## License
+
+The original travelctl CLI source code is licensed under the [MIT License](LICENSE). Third-party dependencies retain their own licenses.

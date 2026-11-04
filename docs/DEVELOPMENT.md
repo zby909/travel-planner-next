@@ -1,0 +1,88 @@
+# Development Guide
+
+## Requirements
+
+- Node.js 22+
+- npm (the repository uses package-lock.json)
+- Google Chrome for the browser-based authentication E2E suite
+
+## Local setup
+
+From the repository root:
+
+~~~powershell
+npm ci
+Copy-Item .env.example .env
+npm run db:deploy
+npm run user:create -- owner "管理员" ADMIN
+npm run dev
+~~~
+
+The default SQLite URL in .env.example points to data/travel.db. Prisma resolves this path relative to prisma/schema.prisma. The upload directory defaults to data/uploads/; set UPLOAD_DIR only when a different persistent directory is required.
+
+## Main source layout
+
+~~~text
+src/
+  app/
+    admin/       Authenticated editorial workspace and Server Actions
+    api/         Authentication, media, health and scoped CLI APIs
+    destinations/ Destination detail pages
+    memories/    Public travel diary archive
+    visited/     Visited-place map, gallery and timeline
+  components/    Shared UI components
+  lib/           Authentication, access control, formatting and storage helpers
+prisma/
+  schema.prisma
+  migrations/
+cli/              travelctl TypeScript source and packaging
+skills/           Agent Skills
+scripts/          Database, test and release helpers
+docs/             User, deployment and contributor documentation
+~~~
+
+## Data model notes
+
+- SQLite is the source of truth for travel content, accounts, settings, audit records and media metadata.
+- Original image files are stored outside the public directory under the persistent upload directory.
+- Public image access goes through /api/media/[id], which checks site visibility and the media record.
+- Travel diaries belong to a trip plan, can optionally reference one visited place, and can contain multiple managed photo assets.
+- Expense amounts are stored in the currency's minor unit to avoid floating-point accumulation errors.
+
+## Database migrations
+
+When changing the Prisma schema, create a new migration and regenerate Prisma Client:
+
+~~~powershell
+npx prisma migrate dev --name describe_the_change
+npx prisma generate
+~~~
+
+Do not edit an already-applied migration. Before changing existing data, consider how the migration behaves on a populated SQLite database. The repository's automated tests use disposable databases; do not point them at a real data/travel.db.
+
+## Quality checks
+
+~~~powershell
+npm run lint
+npm run typecheck
+npm run build
+~~~
+
+Additional integration tests:
+
+| Command | Purpose |
+| --- | --- |
+| npm run test:auth:e2e | Browser login, two-member permissions, trip plans, expenses, diaries, photo upload/deletion, public/private access |
+| npm run test:import:e2e | Scoped API tokens, import drafts, CLI and media processing |
+| npm run test:production:smoke | Blank database initialization and persistence after restart |
+| npm run test:backup:restore | Backup upload, integrity checks and restore flow |
+
+test:auth:e2e requires Google Chrome. It uses data/auth-e2e.db, data/auth-e2e-uploads/ and a dedicated Next.js build directory, then cleans them up. The other integration tests also use disposable databases and temporary storage.
+
+## Code conventions
+
+- Add a short Chinese comment above new functions and methods.
+- Prefer small, focused components and modules; keep changed source files below 1,000 lines.
+- Validate all Server Action inputs on the server, even when the browser already validates them.
+- Keep database writes behind authenticated Server Actions or explicitly scoped API tokens.
+- Never add real travel records, credentials, personal photos or private deployment settings to fixtures or documentation.

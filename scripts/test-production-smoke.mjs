@@ -88,7 +88,8 @@ async function stop(child) {
 let db;
 try {
   check(process.env.NODE_ENV !== "production" || process.env.DATABASE_URL !== databaseUrl, "Do not run inside the production container");
-  check(existsSync(join(process.cwd(), ".next", "BUILD_ID")), "Run npm run build before production smoke test");
+  const buildDir = process.env.NEXT_DIST_DIR || ".next";
+  check(existsSync(join(process.cwd(), buildDir, "BUILD_ID")), "Run npm run build before production smoke test");
   cleanFiles();
   mkdirSync(join(process.cwd(), "data"), { recursive: true });
   runMigrate();
@@ -96,14 +97,16 @@ try {
   const port = await freePort();
   let app = await launch(port);
   try {
-    const [admin, visits, destinations, seed] = await Promise.all([
+    const [admin, visits, destinations, seed, visibility] = await Promise.all([
       db.user.findUnique({ where: { username: "smoke_admin" } }),
       db.visitedPlace.count(),
       db.destination.count(),
       db.appSetting.findUnique({ where: { key: "legacy_seed_v1" } }),
+      db.appSetting.findUnique({ where: { key: "visibility" } }),
     ]);
     check(admin && admin.role === "ADMIN" && admin.passwordHash.startsWith("scrypt-v1:"), "Admin did not auto-bootstrap on first start");
     check(visits === 0 && destinations === 0 && !seed, "Generic first deployment unexpectedly contains personal travel data");
+    check(!visibility || visibility.value === "PUBLIC", "A new installation must default to public visibility");
     const home = await fetch(app.origin + "/");
     check(home.ok && (await home.text()).includes('data-testid="empty-destinations"'), "Empty shared wishlist unavailable in production");
     const visitedPage = await fetch(app.origin + "/visited");

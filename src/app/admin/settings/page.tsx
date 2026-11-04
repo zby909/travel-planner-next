@@ -8,8 +8,8 @@ export default async function SiteSettingsPage({ searchParams }: { searchParams:
   if (user.role !== "ADMIN") notFound();
   const settings = await getSiteSettings();
   return <main>
-    <div className="admin-page-heading"><p className="eyebrow">SITE CONFIGURATION</p><h1>站点设置</h1><p>设置你们的站点名称、两位成员显示名，以及两人旅行预算使用的币种。</p></div>
-    {(await searchParams).saved === "1" ? <p className="form-success" role="status">站点设置已保存，公开页面已更新。</p> : null}
+    <div className="admin-page-heading"><p className="eyebrow">SITE CONFIGURATION</p><h1>站点设置</h1><p>管理情侣空间名称、成员显示名、公开范围和旅行预算使用的币种。</p></div>
+    {(await searchParams).saved === "1" ? <p className="form-success" role="status">站点设置已保存，访问权限和展示配置已更新。</p> : null}
     <SiteSettingsForm settings={settings} />
   </main>;
 }

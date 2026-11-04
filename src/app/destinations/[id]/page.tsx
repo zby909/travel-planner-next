@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { TravelMotion } from "@/components/travel-motion";
 import { formatDate, formatMoney, parseJsonArray } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site-settings";
+import { requireSiteContentAccess } from "@/lib/site-access";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ type PageProps = { params: Promise<{ id: string }> };
 
 export default async function DestinationPage({ params }: PageProps) {
   const { id } = await params;
+  await requireSiteContentAccess(`/destinations/${encodeURIComponent(id)}`);
   const [destination, settings] = await Promise.all([
     prisma.destination.findUnique({
       where: { id },

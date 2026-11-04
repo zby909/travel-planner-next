@@ -29,7 +29,7 @@
 .admin-page-heading .eyebrow{color:#ac795a;font:10px Georgia,serif;letter-spacing:.18em;}
 .admin-page-heading h1{margin:13px 0 12px;font:400 clamp(34px,3.7vw,57px)/1.42 var(--studio-serif);letter-spacing:-.055em;}
 .admin-page-heading>p:last-child{max-width:680px;color:#788176;font-size:13px;line-height:1.9;}
-.admin-stats{gap:0;margin-bottom:42px;border-block:1px solid #d7d7cb;}
+.admin-stats{grid-template-columns:repeat(5,minmax(0,1fr));gap:0;margin-bottom:42px;border-block:1px solid #d7d7cb;}
 .admin-stats>a,.admin-stats>div{min-height:128px;padding:28px 20px 25px;background:transparent;border:0;border-right:1px solid #d7d7cb;}
 .admin-stats>a:first-child{padding-left:0;}
 .admin-stats>div:last-child{border-right:0;}
@@ -66,7 +66,7 @@ a.admin-list-item:hover{border-color:#c9c4b5;transform:none;background:#eeece3;}
 
 /* Editorial login spread */
 .editorial-auth{display:grid;grid-template-columns:minmax(0,1fr) minmax(400px,.9fr);align-items:stretch;gap:0;min-height:100svh;padding:0;background:#f7f5ef;}
-.editorial-auth-story{display:flex;flex-direction:column;justify-content:space-between;min-height:100svh;padding:45px clamp(30px,6vw,100px) 36px;background:linear-gradient(180deg,rgba(20,43,35,.64),rgba(16,31,23,.5) 45%,rgba(17,32,25,.8)),url("/api/legacy-media/images/qinggan-0.jpg") center/cover,#345447;color:#fff;}
+.editorial-auth-story{display:flex;flex-direction:column;justify-content:space-between;min-height:100svh;padding:45px clamp(30px,6vw,100px) 36px;background:linear-gradient(180deg,rgba(20,43,35,.64),rgba(16,31,23,.5) 45%,rgba(17,32,25,.8)),#345447;color:#fff;}
 .editorial-auth-story .brand-name{color:#fff;font:500 27px var(--studio-serif);}
 .editorial-auth-story .brand-name small{margin-top:4px;color:#d9e2d5;font:9px Georgia,serif;letter-spacing:.14em;}
 .editorial-auth-story .brand-mark{font-size:23px;color:#dfbb9b;}
@@ -132,4 +132,189 @@ a.admin-list-item:hover{border-color:#c9c4b5;transform:none;background:#eeece3;}
  .editorial-auth-story{min-height:230px;}
  .editorial-auth-quote h2{font-size:32px;}
  .editorial-auth .auth-card h1{font-size:37px;}
+}
+
+.admin-nav a{gap:0;}
+.destination-admin-status{color:#a17656!important;}
+.admin-disclosure{margin-bottom:20px;border:1px solid #e3e0d6;background:#fdfbf6;}
+.admin-disclosure>summary{position:relative;cursor:pointer;list-style:none;padding:19px 24px;color:#405848;font-size:13px;font-weight:650;}
+.admin-disclosure>summary::-webkit-details-marker{display:none;}
+.admin-disclosure>summary::after{content:"＋";position:absolute;right:24px;color:#a97658;font-size:17px;}
+.admin-disclosure[open]>summary{border-bottom:1px solid #e3e0d6;}
+.admin-disclosure[open]>summary::after{content:"−";}
+.admin-disclosure>.admin-panel{margin:0;border:0;background:transparent;}
+.admin-inline-action,.admin-text-action{border:0;background:transparent;color:#956b4e;cursor:pointer;font:inherit;font-size:11px;}
+.admin-inline-action{padding:7px 0;font-weight:700;}
+.admin-text-action{justify-self:start;padding:4px 0;}
+.guide-day-editor{margin-top:25px;padding-top:20px;border-top:1px solid #e3e0d6;}
+.guide-day-editor-heading,.timeline-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.guide-day-editor-heading h3{margin:0;font:400 19px var(--studio-serif);}
+.guide-day-row{display:grid;grid-template-columns:minmax(100px,.65fr) minmax(150px,1fr) minmax(220px,2fr) auto;align-items:end;gap:12px;margin-top:15px;padding:15px;background:#f3f0e8;border:1px solid #e3e0d6;}
+.guide-day-row label{margin:0!important;}
+.guide-day-row .guide-day-detail{grid-column:auto;}
+.admin-panel-count{display:inline-grid;place-items:center;min-width:25px;height:25px;margin-left:7px;padding:0 7px;border:1px solid #d7d7cb;border-radius:50%;font:12px Georgia,serif;color:#986b50;vertical-align:middle;}
+.admin-attention-list{margin:0;padding:0;list-style:none;}
+.admin-attention-list li{border-top:1px solid #e5e3d9;}
+.admin-attention-list a{display:flex;justify-content:space-between;gap:16px;padding:14px 0;color:#52665a;font-size:12px;}
+.admin-attention-list a:hover{color:#986b50;}
+.admin-attention-list strong{flex:0 0 auto;color:#986b50;font-weight:600;}
+.admin-history-panel{grid-column:1/-1;}
+.timeline-editor-heading{margin-bottom:18px;}
+.timeline-editor-heading h2{margin:0;}
+.timeline-editor-heading p{margin:5px 0 0;}
+.timeline-place-picker{min-width:0;margin:0;padding:17px;border:1px solid #deddd2;}
+.timeline-place-picker legend{padding:0 7px;color:#53665a;font-size:12px;font-weight:700;}
+.timeline-place-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:270px;overflow:auto;margin-top:12px;}
+.timeline-place-options label{display:flex;flex-direction:row;align-items:center;gap:10px;margin:0;padding:10px;border:1px solid #e3e0d6;background:#fffdf8;cursor:pointer;}
+.timeline-place-options input{flex:0 0 auto;width:auto;margin:0;accent-color:#526b55;}
+.timeline-place-options span{display:grid;gap:3px;min-width:0;}
+.timeline-place-options strong{font-size:12px;font-weight:600;}
+.timeline-place-options small{color:#7b8579;font-size:10px;}
+.timeline-admin-item>div:first-child{min-width:0;flex:1;}
+.timeline-admin-actions{display:flex;align-items:center;gap:13px;flex:0 0 auto;}
+.timeline-admin-actions>a{color:#986b50;font-size:11px;font-weight:700;}
+.timeline-admin-actions form{margin:0;}
+@media(max-width:900px){
+ .guide-day-row{grid-template-columns:1fr 1fr;}
+ .guide-day-row .guide-day-detail{grid-column:1/-1;}
+ .guide-day-row .admin-text-action{grid-column:1/-1;}
+}
+@media(max-width:540px){
+ .admin-disclosure>summary{padding:16px 18px;}
+ .guide-day-row{grid-template-columns:1fr;}
+ .guide-day-row .guide-day-detail,.guide-day-row .admin-text-action{grid-column:auto;}
+ .timeline-place-options{grid-template-columns:1fr;}
+ .timeline-editor-heading{align-items:flex-start;}
+ .timeline-admin-actions{align-self:flex-end;}
+ .admin-history-panel{grid-column:auto;}
+}
+/* Private journey plans and externally hosted HTML guides */
+.plan-list{display:grid;gap:14px;}
+.plan-card{display:block;padding:25px 28px;background:#fdfbf6;border:1px solid #e3e0d6;color:#34483a;transition:background .2s,border-color .2s;}
+.plan-card:hover{background:#f1efe7;border-color:#cfc9b9;}
+.plan-card-top,.plan-card-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.plan-card-top .eyebrow,.plan-guide-copy>.eyebrow{margin:0;color:#9b765c;font:10px Georgia,serif;letter-spacing:.12em;}
+.plan-status{flex:0 0 auto;padding:5px 9px;border:1px solid #d9d7cc;color:#657467;font-size:10px;}
+.plan-status-booked{border-color:#b9c6b6;color:#3f634a;}
+.plan-status-completed{border-color:#d6c4b0;color:#946d4d;}
+.plan-status-cancelled{color:#9b7770;}
+.plan-card h2{margin:17px 0 7px;font:400 27px/1.4 var(--studio-serif);letter-spacing:-.035em;}
+.plan-card>p{margin:0;color:#788176;font-size:12px;line-height:1.8;}
+.plan-card-footer{margin-top:22px;padding-top:15px;border-top:1px solid #e3e0d6;color:#7b8579;font-size:11px;}
+.plan-card-footer strong{color:#425747;font:500 14px Georgia,serif;}
+.plan-card-footer strong span{margin-left:12px;color:#9b765c;font:600 11px sans-serif;}
+.plan-guides-section{margin-top:32px;}
+.plan-memories-section{margin-top:32px;}
+.memory-visibility-notice{margin:16px 0;padding:12px 15px;border-left:2px solid #b98c69;background:#f4f0e7;color:#777b70;font-size:11px;line-height:1.8;}
+.memory-visibility-private{border-left-color:#718b77;background:#eef1e9;}
+.memory-form-heading{display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px;}
+.memory-form-heading h3{margin:0;font:400 19px var(--studio-serif);}
+.memory-form{gap:15px;padding:20px;background:#f5f2e9;border:1px solid #e3e0d6;}
+.memory-form-grid{grid-template-columns:1.2fr .8fr 1.2fr;gap:13px;}
+.memory-form label{min-width:0;margin:0!important;}
+.memory-form small{display:block;margin-top:6px;color:#879083;font-size:10px;font-weight:400;line-height:1.7;}
+.memory-form .admin-save-row{padding:0;}
+.memory-admin-list{display:grid;gap:16px;margin-top:25px;}
+.memory-admin-card{padding:20px;background:#f5f2e9;border:1px solid #e3e0d6;}
+.memory-admin-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;}
+.memory-admin-heading .eyebrow{margin:0;color:#9b765c;font:10px Georgia,serif;letter-spacing:.12em;}
+.memory-admin-heading h3{margin:8px 0 4px;color:#405544;font:400 21px/1.4 var(--studio-serif);}
+.memory-admin-heading p{margin:0;color:#879083;font-size:11px;}
+.memory-admin-actions{display:flex;align-items:center;gap:13px;flex:0 0 auto;}
+.memory-admin-actions>a{color:#986b50;font-size:11px;}
+.memory-admin-actions form{margin:0;}
+.memory-admin-photos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px;}
+.memory-admin-photo{position:relative;aspect-ratio:1.2;overflow:hidden;background:#e2dfd4;}
+.memory-admin-photo img{object-fit:cover;}
+.memory-admin-photo form{position:absolute;right:7px;bottom:7px;margin:0;}
+.memory-photo-delete{padding:6px 9px;border:1px solid rgba(255,255,255,.75);background:rgba(37,51,43,.76);color:white;font-size:9px;backdrop-filter:blur(8px);}
+.memory-no-photos,.memory-empty{margin:17px 0 0;padding:15px;background:#eeebe2;color:#7d8578;font-size:11px;line-height:1.8;}
+.memory-empty{margin-top:20px;}
+.plan-expenses-section{margin-top:32px;}
+.expense-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:20px 0 18px;border-block:1px solid #e3e0d6;}
+.expense-overview>div{display:grid;align-content:center;gap:7px;min-width:0;padding:17px 18px;border-right:1px solid #e3e0d6;}
+.expense-overview>div:first-child{padding-left:0;}
+.expense-overview>div:last-child{border-right:0;}
+.expense-overview span,.expense-category-card>span{color:#7b8579;font-size:10px;}
+.expense-overview strong{color:#405744;font:500 19px Georgia,serif;overflow-wrap:anywhere;}
+.expense-overview-total strong{font-size:25px;}
+.expense-overview .expense-overrun{color:#a45f50;}
+.expense-category-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:27px;}
+.expense-category-card{display:grid;gap:8px;min-width:0;padding:14px 15px;background:#f2efe7;border:1px solid #e7e3d8;}
+.expense-category-card strong{color:#465b49;font:500 15px Georgia,serif;overflow-wrap:anywhere;}
+.expense-add-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 12px;}
+.expense-add-heading h3{margin:0;color:#405544;font:400 18px var(--studio-serif);}
+.expense-add-heading>span{color:#8b8d80;font-size:10px;}
+.expense-form{gap:12px;padding:18px;background:#f5f2e9;border:1px solid #e3e0d6;}
+.expense-form-grid{display:grid;grid-template-columns:.8fr 1fr 1fr 1.4fr;gap:12px;}
+.expense-form-grid label{min-width:0;margin:0!important;}
+.expense-form .admin-save-row{padding:0;}
+.expense-records{margin-top:26px;padding-top:17px;border-top:1px solid #e3e0d6;}
+.expense-record-list{display:grid;}
+.expense-record{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 0;border-bottom:1px solid #e8e5dc;}
+.expense-record-main{display:grid;gap:4px;min-width:0;}
+.expense-record-main strong{color:#425747;font-size:13px;font-weight:650;}
+.expense-record-main>span{color:#879083;font-size:10px;}
+.expense-record-main p{margin:2px 0 0;color:#788176;font-size:11px;overflow-wrap:anywhere;}
+.expense-record-side{display:flex;align-items:center;gap:16px;flex:0 0 auto;}
+.expense-record-side>b{color:#405744;font:500 15px Georgia,serif;}
+.expense-record-side form{margin:0;}
+.expense-record-side .admin-text-action{font-size:11px;}
+.expense-empty{margin:0;padding:18px;background:#f5f2e9;color:#788176;font-size:11px;line-height:1.8;}
+.plan-guide-form small{display:block;margin-top:5px;color:#879083;font-size:10px;font-weight:400;line-height:1.6;}
+.plan-guide-url{grid-column:1/-1;}
+.plan-guide-form-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:15px 0;}
+.plan-guide-form-heading h3{margin:0;font:400 20px var(--studio-serif);}
+.plan-guide-list{display:grid;gap:13px;margin-top:22px;}
+.plan-guide-card{display:grid;grid-template-columns:180px minmax(0,1fr);gap:22px;padding:17px;background:#f5f2e9;border:1px solid #e3e0d6;}
+.plan-guide-cover{display:block;width:100%;height:132px;object-fit:cover;background:#e8e4d9;}
+.plan-guide-cover-empty{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:7px;background:linear-gradient(145deg,#e9e4d7,#d9dfd2);color:#536b57;}
+.plan-guide-cover-empty span{font:400 28px Georgia,serif;letter-spacing:.08em;}
+.plan-guide-cover-empty small{font:9px Georgia,serif;letter-spacing:.16em;}
+.plan-guide-copy{display:flex;min-width:0;flex-direction:column;align-items:flex-start;}
+.plan-guide-copy h3{margin:8px 0 5px;font:400 21px/1.4 var(--studio-serif);}
+.plan-guide-copy p{margin:0 0 8px;color:#788176;font-size:12px;line-height:1.7;}
+.plan-guide-host{max-width:100%;overflow-wrap:anywhere;color:#8b8d80;font:10px Georgia,serif;}
+.plan-guide-actions{display:flex;align-items:center;flex-wrap:wrap;gap:15px;margin-top:auto;padding-top:14px;}
+.plan-guide-actions>a:first-child{color:#4d674f;font-size:11px;font-weight:700;}
+.plan-guide-actions>a:not(:first-child){color:#986b50;font-size:11px;}
+.plan-guide-actions form{margin:0;}
+.plan-guide-actions .admin-text-action{font-size:11px;}
+.admin-danger-zone{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:28px;padding:20px 22px;border:1px solid #e1d4ca;background:#fbf7f2;}
+.admin-danger-zone strong{color:#8f5d4e;font-size:13px;}
+.admin-danger-zone p{margin:5px 0 0;color:#877c72;font-size:11px;line-height:1.7;}
+.admin-danger-zone form{margin:0;flex:0 0 auto;}
+@media(max-width:700px){
+ .memory-form-grid{grid-template-columns:1fr 1fr;}
+ .memory-form-grid label:first-child{grid-column:1/-1;}
+ .memory-admin-photos{grid-template-columns:repeat(3,minmax(0,1fr));}
+ .memory-admin-heading{flex-direction:column;}
+ .memory-admin-actions{align-self:flex-end;}
+}
+@media(max-width:540px){
+ .memory-form-grid{grid-template-columns:1fr;}
+ .memory-form-grid label:first-child{grid-column:auto;}
+ .memory-admin-photos{grid-template-columns:repeat(2,minmax(0,1fr));}
+ .memory-admin-card{padding:15px;}
+}
+@media(max-width:700px){
+ .expense-overview>div{padding:13px 9px;}
+ .expense-overview strong{font-size:15px;}
+ .expense-overview-total strong{font-size:19px;}
+ .expense-category-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+ .expense-form-grid{grid-template-columns:1fr 1fr;}
+ .expense-record-side{gap:9px;}
+ .plan-card{padding:20px;}
+ .expense-overview{grid-template-columns:1fr 1fr;}
+ .expense-overview>div:first-child{grid-column:1/-1;padding-left:0;border-right:0;border-bottom:1px solid #e3e0d6;}
+ .expense-overview>div:nth-child(2){padding-left:0;}
+ .expense-form-grid{grid-template-columns:1fr;}
+ .expense-record{align-items:flex-start;}
+ .expense-record-side{align-items:flex-end;flex-direction:column;gap:4px;}
+ .plan-card h2{font-size:23px;}
+ .plan-card-footer{align-items:flex-start;flex-direction:column;gap:8px;}
+ .plan-guide-card{grid-template-columns:1fr;gap:13px;}
+ .plan-guide-cover{height:170px;}
+ .plan-guide-actions{gap:12px;}
+ .admin-danger-zone{align-items:flex-start;flex-direction:column;}
 }

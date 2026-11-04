@@ -98,7 +98,8 @@ model MediaAsset {
   byteSize  Int
   status    String   @default("STAGED")
   createdAt DateTime @default(now())
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner     User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  travelPhoto TravelPhoto?
 
   @@index([ownerId, status])
 }
@@ -223,6 +224,7 @@ model VisitedPlace {
   city      String?
   mapNote   String?
   timeline  TimelinePlace[]
+  memories  TravelMemory[]
 
   @@index([group, sortOrder])
 }
@@ -252,23 +254,24 @@ model TimelinePlace {
 }
 
 model TravelPlan {
-  id            String          @id @default(cuid())
+  id            String            @id @default(cuid())
   title         String
   destinationId String?
   startDate     DateTime?
   endDate       DateTime?
-  status        String          @default("PLANNED")
+  status        String            @default("PLANNED")
   plannedBudget Int?
   actualBudget  Int?
-  currency      String          @default("CNY")
+  currency      String            @default("CNY")
   notes         String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  destination   Destination?    @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  destination   Destination?      @relation(fields: [destinationId], references: [id], onDelete: SetNull)
   days          TravelPlanDay[]
+  guides        TravelGuideLink[]
   expenses      Expense[]
   memories      TravelMemory[]
-  photos        TravelPhoto[]   @relation("PlanPhotos")
+  photos        TravelPhoto[]     @relation("PlanPhotos")
 
   @@index([status, startDate])
 }
@@ -285,11 +288,27 @@ model TravelPlanDay {
   @@unique([planId, dayNumber])
 }
 
+model TravelGuideLink {
+  id          String     @id @default(cuid())
+  planId      String
+  dayDate     DateTime?
+  title       String
+  url         String
+  coverImage  String?
+  description String?
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  plan        TravelPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, dayDate, sortOrder])
+}
+
 model Expense {
   id          String     @id @default(cuid())
   planId      String
   category    String
-  amountFen   Int
+  amountMinor Int
   description String
   spentAt     DateTime?
   paidBy      String?
@@ -307,22 +326,29 @@ model TravelMemory {
   title      String
   content    String
   happenedAt DateTime?
+  placeId    String?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   plan       TravelPlan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+  place      VisitedPlace? @relation(fields: [placeId], references: [id], onDelete: SetNull)
   photos     TravelPhoto[] @relation("MemoryPhotos")
+
+  @@index([planId, happenedAt])
+  @@index([placeId])
 }
 
 model TravelPhoto {
   id        String        @id @default(cuid())
   planId    String?
   memoryId  String?
-  filePath  String
-  altText   String?
-  sortOrder Int           @default(0)
-  createdAt DateTime      @default(now())
-  plan      TravelPlan?   @relation("PlanPhotos", fields: [planId], references: [id], onDelete: SetNull)
-  memory    TravelMemory? @relation("MemoryPhotos", fields: [memoryId], references: [id], onDelete: SetNull)
+  filePath     String
+  mediaAssetId String?       @unique
+  altText      String?
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  plan         TravelPlan?   @relation("PlanPhotos", fields: [planId], references: [id], onDelete: SetNull)
+  memory       TravelMemory? @relation("MemoryPhotos", fields: [memoryId], references: [id], onDelete: SetNull)
+  mediaAsset   MediaAsset?   @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
 
   @@index([planId, sortOrder])
   @@index([memoryId, sortOrder])

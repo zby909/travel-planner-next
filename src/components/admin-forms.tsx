@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { FormState } from "@/app/admin/actions";
 import { createDestinationAction, createFlightAction, createPlaceAction, saveDestinationAction, savePlaceAction, saveSiteSettingsAction } from "@/app/admin/actions";
 import type { GroupLabels, SiteSettings } from "@/lib/site-settings";
@@ -10,6 +10,8 @@ const INITIAL: FormState = { error: "" };
 function Feedback({ error, pending, submitText }: { error: string; pending: boolean; submitText: string }) {
   return <div className="admin-save-row">{error ? <p role="alert" className="form-error">{error}</p> : null}<button className="button button-dark" type="submit" disabled={pending}>{pending ? "保存中…" : submitText}</button></div>;
 }
+
+type GuideDayInput = { day: string; title: string; detail: string };
 
 type DestinationData = {
   id: string;
@@ -25,6 +27,9 @@ type DestinationData = {
   groupText: string;
   flightNote: string;
   flightSource: string | null;
+  route: string[];
+  spots: string[];
+  guide: null | { intro: string; pace: string; stay: string; transport: string; days: GuideDayInput[] };
   minBudget: number;
   maxBudget: number;
   budgetFlight: number;
@@ -49,7 +54,41 @@ function Field({ name, label, value, required, type, min, max, placeholder, step
   return <label>{label}<input name={name} type={type ?? "text"} defaultValue={value ?? ""} required={required} min={min} max={max} step={step} placeholder={placeholder} /></label>;
 }
 
-// 编辑目的地基础资料、筛选标签、预算和机票参考。
+// 管理每日攻略的增删与字段编辑。
+function GuideDayEditor({ days }: { days: GuideDayInput[] }) {
+  const [items, setItems] = useState(days);
+
+  // 更新指定行的攻略内容。
+  function updateDay(index: number, key: keyof GuideDayInput, value: string) {
+    setItems(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item));
+  }
+
+  // 在攻略末尾增加一天。
+  function addDay() {
+    setItems(current => [...current, { day: `第${current.length + 1}天`, title: "", detail: "" }]);
+  }
+
+  // 删除指定的攻略日程。
+  function removeDay(index: number) {
+    setItems(current => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  return (
+    <section className="guide-day-editor">
+      <div className="guide-day-editor-heading"><h3>每日安排</h3><button type="button" className="admin-inline-action" onClick={addDay}>＋ 添加一天</button></div>
+      {items.length === 0 ? <p className="muted-copy">还没有每日安排，可以按需要添加。</p> : items.map((item, index) => (
+        <div className="guide-day-row" key={index}>
+          <label>日期 / 天数<input name="guideDayLabel" value={item.day} onChange={event => updateDay(index, "day", event.target.value)} /></label>
+          <label>当天标题<input name="guideDayTitle" value={item.title} onChange={event => updateDay(index, "title", event.target.value)} /></label>
+          <label className="guide-day-detail">行程说明<textarea name="guideDayDetail" rows={2} value={item.detail} onChange={event => updateDay(index, "detail", event.target.value)} /></label>
+          <button type="button" className="admin-text-action" onClick={() => removeDay(index)}>移除这一天</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+// 编辑目的地资料与攻略；预算和机票等低频内容默认收起。
 export function DestinationEditForm({ data, currency }: { data: DestinationData; currency: string }) {
   const [state, action, pending] = useActionState(saveDestinationAction, INITIAL);
   return (
@@ -71,27 +110,47 @@ export function DestinationEditForm({ data, currency }: { data: DestinationData;
         <label>当地拼团及住宿备注<textarea name="groupText" rows={3} defaultValue={data.groupText} /></label>
       </section>
       <section className="admin-panel">
-        <h2>两人旅行总预算（{currency}）</h2>
-        <p className="muted-copy">基准预算由下方七项自动合计，避免数字不一致；最低与最高预算请手动填写。</p>
+        <h2>路线与每日攻略</h2>
+        <p className="muted-copy">每行填写一个路线节点或重点景点；每日安排可以自由增删，保存后同步到公开目的地详情。</p>
         <div className="admin-form-grid">
-          <Field name="minBudget" label="预算下限" type="number" value={data.minBudget} min={0} required />
-          <Field name="maxBudget" label="预算上限" type="number" value={data.maxBudget} min={0} required />
-          {BUDGET_FIELDS.map(([name, label]) => <Field key={name} name={name} label={label} type="number" min={0} value={data[name]} required />)}
+          <label>路线节点（每行一个）<textarea name="routeItems" rows={5} defaultValue={data.route.join("\n")} placeholder="例如：大阪 → 京都\n京都 → 奈良" /></label>
+          <label>重点景点（每行一个）<textarea name="spotItems" rows={5} defaultValue={data.spots.join("\n")} placeholder="例如：清水寺\n伏见稻荷大社" /></label>
         </div>
-      </section>
-      <section className="admin-panel">
-        <h2>机票规划依据</h2>
+        <label>攻略简介<textarea name="guideIntro" rows={3} defaultValue={data.guide?.intro ?? ""} placeholder="介绍这趟旅行的整体安排" /></label>
         <div className="admin-form-grid">
-          <Field name="route" label="往返航线（可选）" value={data.flightPricing?.route ?? ""} />
-          <Field name="flightSource" label="参考来源链接" value={data.flightSource} type="url" />
-          {([
-            ["normalMin", "平日最低"], ["normalMax", "平日最高"], ["holidayMin", "节假日最低"], ["holidayMax", "节假日最高"],
-          ] as const).map(([name, label]) => <Field key={name} name={name} label={label} type="number" min={0} value={data.flightPricing?.[name] ?? 0} required />)}
+          <label>节奏建议<textarea name="guidePace" rows={3} defaultValue={data.guide?.pace ?? ""} /></label>
+          <label>住宿建议<textarea name="guideStay" rows={3} defaultValue={data.guide?.stay ?? ""} /></label>
+          <label>交通建议<textarea name="guideTransport" rows={3} defaultValue={data.guide?.transport ?? ""} /></label>
         </div>
-        <label>普通日期报价依据<textarea name="normalSample" rows={3} defaultValue={data.flightPricing?.normalSample} /></label>
-        <label>节假日报价依据<textarea name="holidaySample" rows={3} defaultValue={data.flightPricing?.holidaySample} /></label>
-        <label>机票注意事项<textarea name="flightNote" rows={3} defaultValue={data.flightNote} /></label>
+        <GuideDayEditor days={data.guide?.days ?? []} />
       </section>
+      <details className="admin-disclosure">
+        <summary>预算设置 · {currency}</summary>
+        <section className="admin-panel">
+          <h2>两人旅行总预算（{currency}）</h2>
+          <p className="muted-copy">基准预算由下方七项自动合计；最低与最高预算请手动填写。</p>
+          <div className="admin-form-grid">
+            <Field name="minBudget" label="预算下限" type="number" value={data.minBudget} min={0} required />
+            <Field name="maxBudget" label="预算上限" type="number" value={data.maxBudget} min={0} required />
+            {BUDGET_FIELDS.map(([name, label]) => <Field key={name} name={name} label={label} type="number" min={0} value={data[name]} required />)}
+          </div>
+        </section>
+      </details>
+      <details className="admin-disclosure">
+        <summary>机票规划依据</summary>
+        <section className="admin-panel">
+          <div className="admin-form-grid">
+            <Field name="flightRoute" label="往返航线（可选）" value={data.flightPricing?.route ?? ""} />
+            <Field name="flightSource" label="参考来源链接" value={data.flightSource} type="url" />
+            {([
+              ["normalMin", "平日最低"], ["normalMax", "平日最高"], ["holidayMin", "节假日最低"], ["holidayMax", "节假日最高"],
+            ] as const).map(([name, label]) => <Field key={name} name={name} label={label} type="number" min={0} value={data.flightPricing?.[name] ?? 0} required />)}
+          </div>
+          <label>普通日期报价依据<textarea name="normalSample" rows={3} defaultValue={data.flightPricing?.normalSample ?? ""} /></label>
+          <label>节假日报价依据<textarea name="holidaySample" rows={3} defaultValue={data.flightPricing?.holidaySample ?? ""} /></label>
+          <label>机票注意事项<textarea name="flightNote" rows={3} defaultValue={data.flightNote} /></label>
+        </section>
+      </details>
       <Feedback error={state.error} pending={pending} submitText="保存目的地修改" />
     </form>
   );
@@ -146,7 +205,7 @@ export function PlaceEditForm({ data, groupLabels }: { data: { id: string; name:
         <Field name="longitude" label="经度（可选）" type="number" step="any" value={data.longitude} />
       </div>
       <label>地图说明<textarea name="mapNote" rows={3} defaultValue={data.mapNote ?? ""} /></label>
-      <p className="muted-copy">这里更新地点卡片内容。时间轴事件和行政区坐标暂不在此编辑，以免造成地点关联丢失。</p>
+      <p className="muted-copy">本页维护地点自身信息与地图坐标；时间轴事件请到「旅行时间轴」单独管理，地点关联不会在这里被改动。</p>
       <Feedback error={state.error} pending={pending} submitText="保存足迹修改" />
     </form>
   );
@@ -167,8 +226,9 @@ export function DestinationCreateForm() {
         <Field name="seasons" label="适合季节（春、夏、秋、冬）" placeholder="春，秋" />
         <Field name="months" label="推荐出行月份" placeholder="例如：4—6 月、9—10 月" />
         <Field name="days" label="建议天数" placeholder="例如：5—7 天" />
-        <Field name="spots" label="重点景点（逗号分隔）" />
       </div>
+      <label>重点景点（每行一个）<textarea name="spotItems" rows={3} placeholder="例如：清水寺\n伏见稻荷大社" /></label>
+      <label>路线节点（每行一个）<textarea name="routeItems" rows={3} placeholder="例如：大阪 → 京都\n京都 → 奈良" /></label>
       <label>一句话亮点<textarea name="vibe" rows={2} /></label>
       <label>目的地介绍<textarea name="reason" rows={4} /></label>
       <p className="muted-copy">新目的地会先使用通用占位封面，预算默认留空。创建后可以继续编辑预算、机票、路线和攻略，也可以通过 AI 导入照片。</p>
@@ -208,6 +268,14 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
         <Field name="siteName" label="站点名称" value={settings.siteName} required />
         <Field name="siteSubtitle" label="英文副标题" value={settings.siteSubtitle} />
       </div>
+    </section>
+    <section className="admin-panel">
+      <h2>站点访问权限</h2>
+      <label>公开方式<select name="visibility" defaultValue={settings.visibility}>
+        <option value="PUBLIC">公开展示 · 任何人都可以浏览</option>
+        <option value="PRIVATE">仅情侣成员可见 · 需要登录</option>
+      </select></label>
+      <p className="muted-copy">公开模式适合分享旅行故事；私密模式会同时保护页面和旅行图片。切换为私密前请注意，已经被他人下载或被搜索引擎收录的内容无法撤回。</p>
     </section>
     <section className="admin-panel">
       <h2>你们两个人</h2>

@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSession } from "@/lib/auth";
+import { createSession, SESSION_COOKIE_NAME } from "@/lib/auth";
 import { verifyPassword } from "@/lib/security";
 import { prisma } from "@/lib/prisma";
+import { safeInternalPath } from "@/lib/safe-redirect";
 
 export const dynamic = "force-dynamic";
 
-function loginError(request: NextRequest, code: string) {
+// 登录失败时保留站内返回地址，避免访客需要重新寻找原页面。
+function loginError(request: NextRequest, code: string, nextPath: string) {
   // Origin was validated by the POST handler. Use it as the public host,
   // not request.url, which may be the internal Next.js server address.
   const url = new URL("/login", request.headers.get("origin") || request.url);
   url.searchParams.set("error", code);
+  if (nextPath !== "/admin") url.searchParams.set("next", nextPath);
   return NextResponse.redirect(url, { status: 303 });
 }
 
@@ -44,12 +47,13 @@ export async function POST(request: NextRequest) {
   const rawPassword = form.get("password");
   const username = typeof rawName === "string" ? rawName.trim().toLowerCase() : "";
   const password = typeof rawPassword === "string" ? rawPassword : "";
+  const nextPath = safeInternalPath(form.get("next"));
   if (!/^[a-z0-9._-]{3,40}$/.test(username) || password.length < 1 || password.length > 128) {
-    return loginError(request, "1");
+    return loginError(request, "1", nextPath);
   }
   const now = new Date();
   const throttle = await prisma.loginThrottle.findUnique({ where: { username } });
-  if (throttle?.lockedUntil && throttle.lockedUntil > now) return loginError(request, "locked");
+  if (throttle?.lockedUntil && throttle.lockedUntil > now) return loginError(request, "locked", nextPath);
 
   const user = await prisma.user.findUnique({ where: { username } });
   const matched = await verifyPassword(password, user?.passwordHash ?? null);
@@ -61,9 +65,17 @@ export async function POST(request: NextRequest) {
       create: { username, failures, lockedUntil: failures >= 5 ? new Date(now.getTime() + 900000) : null },
       update: { failures, lockedUntil: failures >= 5 ? new Date(now.getTime() + 900000) : null },
     });
-    return loginError(request, "1");
+    return loginError(request, "1", nextPath);
   }
   await prisma.loginThrottle.deleteMany({ where: { username } });
-  await createSession(user.id);
-  return NextResponse.redirect(new URL("/admin", origin || request.url), { status: 303 });
+  const session = await createSession(user.id);
+  const response = NextResponse.redirect(new URL(nextPath, origin || request.url), { status: 303 });
+  response.cookies.set(SESSION_COOKIE_NAME, session.token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    expires: session.expiresAt,
+  });
+  return response;
 }

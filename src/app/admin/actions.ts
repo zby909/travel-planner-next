@@ -53,6 +53,16 @@ function listField(form: FormData, key: string, maxItems: number, maxLength: num
   return [...new Set(values)];
 }
 
+// 解析逐行填写的路线或景点，并限制条目数量和长度。
+function lineListField(form: FormData, key: string, maxItems: number, maxLength: number): string[] {
+  const raw = stringField(form, key, maxItems * (maxLength + 2));
+  const values = raw.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+  if (values.length > maxItems || values.some(value => value.length > maxLength)) {
+    throw new Error(`请检查字段「${key}」的数量或长度`);
+  }
+  return [...new Set(values)];
+}
+
 // 解析可选经纬度并校验地理范围。
 function optionalCoordinate(form: FormData, key: string, min: number, max: number): number | null {
   const raw = stringField(form, key, 40);
@@ -89,7 +99,7 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
     if (pickBudget < minBudget || pickBudget > maxBudget) throw new Error("预算分项合计必须落在预算区间内");
 
     const flight = {
-      route: stringField(form, "route", 140),
+      route: stringField(form, "flightRoute", 140),
       normalMin: amount(form, "normalMin"),
       normalMax: amount(form, "normalMax"),
       holidayMin: amount(form, "holidayMin"),
@@ -107,6 +117,25 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
     const kind = stringField(form, "kind", 80);
     const types = listField(form, "types", 12, 40);
     const seasons = listField(form, "seasons", 4, 10);
+    const route = lineListField(form, "routeItems", 60, 160);
+    const spots = lineListField(form, "spotItems", 60, 100);
+    const guideIntro = stringField(form, "guideIntro", 4000);
+    const guidePace = stringField(form, "guidePace", 2000);
+    const guideStay = stringField(form, "guideStay", 2000);
+    const guideTransport = stringField(form, "guideTransport", 2000);
+    const dayLabels = form.getAll("guideDayLabel").map(value => String(value).trim());
+    const dayTitles = form.getAll("guideDayTitle").map(value => String(value).trim());
+    const dayDetails = form.getAll("guideDayDetail").map(value => String(value).trim());
+    if (dayLabels.length > 30 || dayTitles.length !== dayLabels.length || dayDetails.length !== dayLabels.length) {
+      throw new Error("每日攻略最多 30 天，请检查行程字段");
+    }
+    if (dayLabels.some(day => day.length > 40)) throw new Error("每日攻略的天数标签不能超过 40 个字符");
+    const guideDays = dayLabels.map((day, index) => ({ day, title: dayTitles[index], detail: dayDetails[index] }))
+      .filter(item => item.title || item.detail);
+    if (guideDays.some(item => !item.day || !item.title || !item.detail || item.title.length > 160 || item.detail.length > 3000)) {
+      throw new Error("每日攻略需要填写天数、标题和行程说明，且不能超过长度限制");
+    }
+    const hasGuide = Boolean(guideIntro || guidePace || guideStay || guideTransport || guideDays.length);
     const data = {
       title,
       subtitle: stringField(form, "subtitle", 160, true),
@@ -120,6 +149,8 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
       groupText: stringField(form, "groupText", 1500),
       flightNote: stringField(form, "flightNote", 3000),
       flightSource: externalUrl(form, "flightSource"),
+      spotsJson: JSON.stringify(spots),
+      routeJson: JSON.stringify(route),
       minBudget,
       maxBudget,
       pickBudget,
@@ -135,6 +166,19 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
         });
       } else {
         await tx.flightPricing.deleteMany({ where: { destinationId: id } });
+      }
+      if (hasGuide) {
+        await tx.destinationGuide.upsert({
+          where: { destinationId: id },
+          update: { intro: guideIntro, pace: guidePace, stay: guideStay, transport: guideTransport },
+          create: { destinationId: id, intro: guideIntro, pace: guidePace, stay: guideStay, transport: guideTransport },
+        });
+        await tx.guideDay.deleteMany({ where: { guideId: id } });
+        for (const [index, day] of guideDays.entries()) {
+          await tx.guideDay.create({ data: { id: randomUUID(), guideId: id, day: day.day, title: day.title, detail: day.detail, sortOrder: index } });
+        }
+      } else {
+        await tx.destinationGuide.deleteMany({ where: { destinationId: id } });
       }
       await tx.auditLog.create({ data: { actorId: actor.id, action: "更新", entity: "目的地", entityId: id, summary: data.title } });
     });
@@ -158,7 +202,8 @@ export async function createDestinationAction(_state: FormState, form: FormData)
     const kind = stringField(form, "kind", 80) || "其他";
     const types = listField(form, "types", 12, 40);
     const seasons = listField(form, "seasons", 4, 10);
-    const spots = listField(form, "spots", 40, 80);
+    const spots = lineListField(form, "spotItems", 40, 80);
+    const route = lineListField(form, "routeItems", 60, 160);
     const latest = await prisma.destination.aggregate({ _max: { rank: true } });
     id = randomUUID();
     const data = {
@@ -189,7 +234,7 @@ export async function createDestinationAction(_state: FormState, form: FormData)
       vibe: stringField(form, "vibe", 220),
       reason: stringField(form, "reason", 3000),
       spotsJson: JSON.stringify(spots),
-      routeJson: "[]",
+      routeJson: JSON.stringify(route),
     };
     await prisma.$transaction(async tx => {
       await tx.destination.create({ data });
@@ -253,8 +298,10 @@ export async function saveSiteSettingsAction(_state: FormState, form: FormData):
   if (actor.role !== "ADMIN") return { error: "只有管理员可以修改站点设置" };
   try {
     const currency = stringField(form, "currency", 3, true);
+    const visibility = stringField(form, "visibility", 10) || "PUBLIC";
     const supportedCurrencies = ["CNY", "USD", "EUR", "GBP", "SGD", "JPY", "AUD", "CAD", "HKD", "TWD", "KRW", "THB", "MYR", "IDR", "VND", "PHP", "INR", "NZD", "CHF"];
     if (!supportedCurrencies.includes(currency)) throw new Error("暂不支持该币种");
+    if (visibility !== "PUBLIC" && visibility !== "PRIVATE") throw new Error("站点访问模式无效");
     const settings = [
       ["siteName", stringField(form, "siteName", 40, true)],
       ["siteSubtitle", stringField(form, "siteSubtitle", 60)],
@@ -262,6 +309,7 @@ export async function saveSiteSettingsAction(_state: FormState, form: FormData):
       ["secondaryMemberName", stringField(form, "secondaryMemberName", 30, true)],
       ["togetherLabel", stringField(form, "togetherLabel", 40, true)],
       ["currency", currency],
+      ["visibility", visibility],
     ] as const;
     await prisma.$transaction(async tx => {
       for (const [key, value] of settings) {
@@ -269,10 +317,11 @@ export async function saveSiteSettingsAction(_state: FormState, form: FormData):
       }
       await tx.auditLog.create({ data: { actorId: actor.id, action: "更新", entity: "站点设置", entityId: "site", summary: settings.map(([key, value]) => `${key}=${value}`).join("; ").slice(0, 500) } });
     });
-    revalidatePath("/");
+    revalidatePath("/", "layout");
     revalidatePath("/visited");
     revalidatePath("/admin");
     revalidatePath("/admin/settings");
+    revalidatePath("/login");
   } catch (error) {
     return errorState(error);
   }

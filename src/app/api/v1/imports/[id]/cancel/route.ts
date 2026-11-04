@@ -10,5 +10,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const user = await authenticateApi(request, scope);
   if (!user || draft?.ownerId !== user.userId) return NextResponse.json({ error: "not authorized" }, { status: 401 });
   const changed = await prisma.importDraft.updateMany({ where: { id, ownerId: user.userId, status: "PREPARED" }, data: { status: "CANCELED" } });
-  return NextResponse.json({ canceled: changed.count === 1 });
+  return NextResponse.json({ canceled: changed.count === 1 }, { headers: { "Cache-Control": "no-store" } });
 }

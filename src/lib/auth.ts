@@ -4,12 +4,12 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { hashSessionToken, newSessionToken } from "@/lib/security";
 
-const COOKIE_NAME = "travel_session";
+export const SESSION_COOKIE_NAME = "travel_session";
 const SESSION_DAYS = 7;
 export type Editor = { id: string; username: string; displayName: string; role: string };
 
 export async function getCurrentUser(): Promise<Editor | null> {
-  const token = (await cookies()).get(COOKIE_NAME)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const session = await prisma.authSession.findUnique({
     where: { tokenHash: hashSessionToken(token) },
@@ -26,26 +26,20 @@ export async function requireEditor(): Promise<Editor> {
   return user;
 }
 
-export async function createSession(userId: string): Promise<void> {
+export async function createSession(userId: string): Promise<{ token: string; expiresAt: Date }> {
   const token = newSessionToken();
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
   await prisma.authSession.create({
     data: { tokenHash: hashSessionToken(token), userId, expiresAt },
   });
-  (await cookies()).set(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    expires: expiresAt,
-  });
+  return { token, expiresAt };
 }
 
 export async function endSession(): Promise<void> {
   const store = await cookies();
-  const token = store.get(COOKIE_NAME)?.value;
+  const token = store.get(SESSION_COOKIE_NAME)?.value;
   if (token) {
     await prisma.authSession.deleteMany({ where: { tokenHash: hashSessionToken(token) } });
   }
-  store.delete(COOKIE_NAME);
+  store.delete(SESSION_COOKIE_NAME);
 }

@@ -5,12 +5,14 @@ import { SiteHeader } from "@/components/site-header";
 import { TravelMotion } from "@/components/travel-motion";
 import { getPlaceImageUrl } from "@/lib/media";
 import { getGroupLabels, getSiteSettings } from "@/lib/site-settings";
+import { requireSiteContentAccess } from "@/lib/site-access";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 // 将足迹地图、摄影图录和时间轴串联成可以翻阅的旅行特刊。
 export default async function VisitedPage() {
+  await requireSiteContentAccess("/visited");
   const [settings, places, timeline] = await Promise.all([
     getSiteSettings(),
     prisma.visitedPlace.findMany({ orderBy: { sortOrder: "asc" } }),
@@ -20,7 +22,7 @@ export default async function VisitedPage() {
     }),
   ]);
   const groupLabels = getGroupLabels(settings);
-  const heroPlace = places.find(place => place.id === "fuji") ?? places[0];
+  const heroPlace = places.find(place => !place.image.includes("placeholder")) ?? places[0];
   const heroImage = heroPlace ? getPlaceImageUrl(heroPlace.image) : "/images/place-placeholder.svg";
   const bothCount = places.filter(place => place.group === "both").length;
   const herCount = places.filter(place => place.group === "her").length;
@@ -57,12 +59,14 @@ export default async function VisitedPage() {
         </div>
       </section>
       <section className="cinematic-map-band"><div className="atlas-map-wrap page-width" data-motion="rise">
-        <VisitedMap places={places.map(place => ({
+        {places.length > 0 ? <VisitedMap places={places.map(place => ({
           id: place.id, name: place.name, group: place.group,
           longitude: place.longitude, latitude: place.latitude,
           country: place.country, province: place.province,
           city: place.city, mapNote: place.mapNote,
-        }))} groupLabels={groupLabels} />
+        }))} groupLabels={groupLabels} /> : (
+          <div className="map-card"><div className="map-fallback">地图还在等待第一枚足迹。添加到访地点并补充坐标后，这里就会亮起属于你们的旅行地图。</div></div>
+        )}
       </div></section>
 
       <section className="atlas-gallery page-width" id="place-atlas" aria-labelledby="atlas-gallery-title">
@@ -73,7 +77,7 @@ export default async function VisitedPage() {
         {places.length === 0 && <div className="editorial-empty"><h3>还没有到访记录</h3><p>登录管理后台，添加一个地点，开始你们的旅行图录。</p><Link href="/login">开始记录 ↗</Link></div>}
         <div className="atlas-photo-grid">
           {places.map((place, index) => (
-            <article className={`atlas-photo-entry${index === 0 ? " is-lead" : ""}`} id={`place-${place.id}`} data-motion="rise" key={place.id}>
+            <article className={`atlas-photo-entry${index === 0 ? " is-lead" : ""}`} id={`place-${place.id}`} data-motion="rise" tabIndex={-1} key={place.id}>
               <div className="atlas-photo-frame">
                 <Image unoptimized src={getPlaceImageUrl(place.image)} alt={place.image.endsWith(".svg") ? `${place.name}主题示意插画（非实景照片）` : `${place.name}代表性旅行照片`} fill sizes="(max-width: 680px) 100vw, (max-width: 1000px) 50vw, 33vw" />
                 <span>FRAME {String(index + 1).padStart(2, "0")}</span>
@@ -87,6 +91,7 @@ export default async function VisitedPage() {
         <div className="page-width">
           <div className="editorial-section-head" data-motion="rise"><div><p className="editorial-overline">03 / CHAPTERS IN TIME</p><h2 id="atlas-timeline-title">时间走过，<em>故事留下。</em></h2></div><p>只展示真实记录过的日期。<br />有些月份还没有写下，我们就保留空白。</p></div>
           <div className="atlas-timeline-list">
+            {timeline.length === 0 ? <div className="editorial-empty"><h3>故事还没有写进时间里。</h3><p>记录一次旅行事件，再把去过的地点关联进来，这里就会成为你们的共同时间轴。</p><Link href="/login">开始记录 ↗</Link></div> : null}
             {years.map(year => {
               const events = timeline.filter(event => event.year === year);
               return (
@@ -111,7 +116,7 @@ export default async function VisitedPage() {
           </div>
         </div>
       </section>
-      <footer className="editorial-footer page-width"><Link href="/">← 回到我们的旅行手记</Link><span>TO ALL THE PLACES WE CALL A MEMORY.</span><span>{settings.siteName}</span></footer>
+      <footer className="editorial-footer page-width"><Link href="/">← 回到我们的旅行手记</Link><Link href="/memories">继续翻阅旅行日记 ↗</Link><span>TO ALL THE PLACES WE CALL A MEMORY.</span><span>{settings.siteName}</span></footer>
     </main>
   );
 }

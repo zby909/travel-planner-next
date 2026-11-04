@@ -9,9 +9,10 @@
   "engines": {
     "node": ">=22"
   },
+  "license": "MIT",
   "files": [
     "bin/",
-    "README.md"
-  ],
-  "license": "MIT"
+    "README.md",
+    "LICENSE"
+  ]
 }

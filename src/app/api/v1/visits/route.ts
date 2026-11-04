@@ -10,5 +10,5 @@ export async function GET(request: NextRequest) {
     select: { id: true, name: true, region: true, group: true, whenLabel: true, latitude: true, longitude: true,
       country: true, province: true, city: true, mapNote: true, image: true, sortOrder: true },
   });
-  return NextResponse.json({ items: entries });
+  return NextResponse.json({ items: entries }, { headers: { "Cache-Control": "no-store" } });
 }

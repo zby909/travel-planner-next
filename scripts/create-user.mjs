@@ -45,6 +45,7 @@ async function main() {
   if (!["ADMIN", "EDITOR"].includes(role)) throw new Error("角色只能是 ADMIN 或 EDITOR");
   const exists = await prisma.user.findUnique({ where: { username } });
   if (exists) throw new Error("该账号已存在；不会自动覆盖现有密码");
+  if (await prisma.user.count() >= 2) throw new Error("私人旅行站点最多支持两位成员账号");
   const password = await readSecret("新密码（输入不可见，至少12位）：");
   const again = await readSecret("确认新密码：");
   if (password.length < 12 || password.length > 128 || password !== again) throw new Error("密码长度不足12位、超过128位或两次输入不一致");

@@ -6,12 +6,14 @@ import { TravelMotion } from "@/components/travel-motion";
 import { parseJsonArray } from "@/lib/format";
 import { getPlaceImageUrl } from "@/lib/media";
 import { getSiteSettings } from "@/lib/site-settings";
+import { requireSiteContentAccess } from "@/lib/site-access";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 // 将数据库里的旅行心愿和足迹组织成一份真正由照片驱动的双人旅行杂志。
 export default async function HomePage() {
+  await requireSiteContentAccess("/");
   const [settings, destinations, visitedCount, visitedPreview, timelineCount] = await Promise.all([
     getSiteSettings(),
     prisma.destination.findMany({ orderBy: { rank: "asc" }, include: { flightPricing: true } }),
@@ -48,19 +50,24 @@ export default async function HomePage() {
     } : null,
   }));
 
-  const scenicDestination = destinations.find(item => item.id === "altay") ?? destinations.find(item => item.imagePath) ?? destinations[0];
-  const scenicImage = scenicDestination
-    ? scenicDestination.imagePath ?? `/api/legacy-media/images/${scenicDestination.id}-0.jpg`
-    : visitedPreview[0] ? getPlaceImageUrl(visitedPreview[0].image) : "/images/destination-placeholder.svg";
-  const postcards = ["dongbei", "kansai", "qinggan"].map(id => destinations.find(item => item.id === id))
-    .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .map(item => ({ id: item.id, title: item.title, image: item.imagePath ?? `/api/legacy-media/images/${item.id}-0.jpg` }));
-  const seasonFeatures = [
-    { id: "dongbei", label: "WINTER", headline: "去看北国的雪" },
-    { id: "yili", label: "SUMMER", headline: "去追夏天的花" },
-    { id: "kansai", label: "AUTUMN", headline: "再走一次日本" },
-  ].map(feature => ({ ...feature, destination: destinations.find(item => item.id === feature.id) }))
-    .filter((feature): feature is typeof feature & { destination: NonNullable<typeof feature.destination> } => Boolean(feature.destination));
+  const scenicDestination = destinations.find(item => item.imagePath && !item.imagePath.includes("placeholder"));
+  const scenicImage = scenicDestination?.imagePath
+    ?? (visitedPreview[0] ? getPlaceImageUrl(visitedPreview[0].image)
+      : destinations[0] ? `/api/legacy-media/images/${destinations[0].id}-0.jpg` : "/images/destination-placeholder.svg");
+  const postcards = destinations.length
+    ? destinations.slice(0, 3).map(item => ({
+      id: item.id, title: item.title,
+      image: item.imagePath ?? `/api/legacy-media/images/${item.id}-0.jpg`,
+      href: `/destinations/${item.id}`,
+    }))
+    : visitedPreview.slice(0, 3).map(place => ({
+      id: place.id, title: place.name, image: getPlaceImageUrl(place.image),
+      href: `/visited#place-${place.id}`,
+    }));
+  const seasonFeatures = destinations.flatMap(destination => {
+    const season = parseJsonArray<string>(destination.seasonsJson)[0];
+    return season ? [{ destination, label: season.toUpperCase(), headline: destination.title }] : [];
+  }).slice(0, 3);
   const firstMemory = visitedPreview[0];
   const secondMemory = visitedPreview[1] ?? visitedPreview[0];
 
@@ -75,7 +82,7 @@ export default async function HomePage() {
           <div className="cinematic-copy">
             <p className="cinematic-kicker"><span /> A JOURNEY FOR TWO <span /> OUR TRAVEL DIARY</p>
             <h1 id="cover-title">下一站，<br /><em>和你去看</em><br />世界<span className="cinematic-period">。</span></h1>
-            <p className="cinematic-description">想和你在北国看雪，在海边吹风，<br />走过京都的小巷，也看看遥远的沙漠。<br />远方很多，我们慢慢来。</p>
+            <p className="cinematic-description">想和你去山野看日出，在海边吹风，<br />走进陌生城市的小巷，也看看遥远的风景。<br />远方很多，我们慢慢来。</p>
             <div className="cinematic-actions">
               <Link className="cinematic-main-cta" href="#destinations">一起挑选下一站 <span aria-hidden="true">↗</span></Link>
               <Link className="cinematic-secondary-cta" href="/visited">翻看走过的地方 ↗</Link>
@@ -84,7 +91,7 @@ export default async function HomePage() {
           </div>
           <div className="cinematic-stack" aria-label="未来想去的风景">
             {postcards.map((postcard, index) => (
-              <Link href={`/destinations/${postcard.id}`} className={`cinematic-postcard cinematic-postcard-${index + 1}`} key={postcard.id}>
+              <Link href={postcard.href} className={`cinematic-postcard cinematic-postcard-${index + 1}`} key={postcard.id}>
                 <span className="cinematic-postcard-image">
                   <Image src={postcard.image} alt={`${postcard.title}的代表性风景`} fill unoptimized sizes="(max-width: 700px) 32vw, 21vw" />
                 </span>
@@ -131,7 +138,10 @@ export default async function HomePage() {
             <p className="editorial-overline">02 / THE PHOTO ESSAY</p>
             <h2 id="moments-title">走过的路，<br /><em>都有光。</em></h2>
             <p>每一张照片背后，都有一次出发的理由。一页页翻下去，就是属于我们的旅行纪事。</p>
-            <Link href="/visited" className="editorial-arrow-link">进入足迹相册 <span aria-hidden="true">↗</span></Link>
+            <div className="editorial-memory-links">
+              <Link href="/visited" className="editorial-arrow-link">进入足迹相册 <span aria-hidden="true">↗</span></Link>
+              <Link href="/memories" className="editorial-arrow-link">翻阅旅行日记 <span aria-hidden="true">↗</span></Link>
+            </div>
             <div className="editorial-moments-photo editorial-moments-photo-small">
               <Image src={secondMemory ? getPlaceImageUrl(secondMemory.image) : "/images/place-placeholder.svg"} alt={secondMemory ? `${secondMemory.name}的旅途` : "尚待记录的旅途"} fill unoptimized sizes="(max-width: 760px) 60vw, 23vw" />
               <span>FIG. 02 / {secondMemory?.name ?? "TO BE CONTINUED"}</span>

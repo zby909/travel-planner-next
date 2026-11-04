@@ -15,7 +15,7 @@ const sourceUrl = "file:" + join(source, "travel.db").replace(/\\/g, "/");
 const host = "http://127.0.0.1:3018";
 const token = randomBytes(32).toString("base64url");
 const id = randomUUID();
-const env = { ...process.env, DATABASE_URL: targetUrl, RESTORE_DATA_DIR: target, NODE_ENV: "development" };
+const env = { ...process.env, DATABASE_URL: targetUrl, RESTORE_DATA_DIR: target, NODE_ENV: "development", NEXT_DIST_DIR: ".next-backup-e2e" };
 let web;
 
 function check(ok, message) { if (!ok) throw Error(message); }

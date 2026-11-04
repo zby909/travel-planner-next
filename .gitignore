@@ -15,6 +15,12 @@
 
 # next.js
 /.next/
+/.next-auth-e2e/
+/.next-import-e2e/
+/.next-backup-e2e/
+/.next-review-build/
+/.next-quality-review/
+/.next-plan-review/
 /out/
 
 # production
@@ -55,6 +61,7 @@ next-env.d.ts
 /data/*.db-wal
 /data/uploads/
 /data/*-e2e.db*
+/data/auth-e2e-uploads/
 /data/production-smoke.db*
 /data/production-smoke-uploads/
 /data/restore-e2e/

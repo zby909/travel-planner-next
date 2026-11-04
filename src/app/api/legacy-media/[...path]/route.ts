@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
+import { getSiteContentAccess } from "@/lib/site-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,6 +9,10 @@ export const dynamic = "force-dynamic";
 // Private-backup compatibility route: files are read ONLY from the mounted data folder.
 // Never serve arbitrary paths, and never depend on legacy files in the Docker image.
 export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
+  const access = await getSiteContentAccess();
+  if (!access.allowed) {
+    return new Response("Not found", { status: 404, headers: { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" } });
+  }
   const { path } = await params;
   if (!Array.isArray(path) || path.length < 2 || path.length > 4
     || path[0] !== "images" || path.some(part => !/^[a-zA-Z0-9._-]{1,120}$/.test(part) || part.startsWith("."))) {
@@ -25,7 +30,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
     const file = join(/* turbopackIgnore: true */ root, ...path);
     const bytes = await readFile(/* turbopackIgnore: true */ file);
     return new NextResponse(new Uint8Array(bytes), {
-      headers: { "Content-Type": mime, "Cache-Control": "public,max-age=3600", "X-Content-Type-Options": "nosniff", ...(mime === "image/svg+xml" ? { "Content-Security-Policy": "sandbox; default-src 'none'" } : {}) },
+      headers: {
+        "Content-Type": mime,
+        "Cache-Control": access.visibility === "PRIVATE" ? "private, no-store" : "public, max-age=0, must-revalidate",
+        "X-Content-Type-Options": "nosniff",
+        ...(access.visibility === "PRIVATE" ? { "X-Robots-Tag": "noindex" } : {}),
+        ...(mime === "image/svg+xml" ? { "Content-Security-Policy": "sandbox; default-src 'none'" } : {}),
+      },
     });
   } catch {
     // A restored DB without its old images should still show a valid placeholder.
