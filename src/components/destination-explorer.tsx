@@ -24,13 +24,6 @@ export type DestinationExplorerItem = {
   badge: string | null;
   vibe: string;
   spots: string[];
-  flightPricing: {
-    route: string;
-    normalMin: number;
-    normalMax: number;
-    holidayMin: number;
-    holidayMax: number;
-  } | null;
 };
 
 // 将预算格式化为站点配置的币种。

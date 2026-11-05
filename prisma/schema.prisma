@@ -119,43 +119,24 @@ model Destination {
   maxBudget       Int
   pickBudget      Int
   rank            Int
-  budgetFlight    Int
-  budgetHotel     Int
-  budgetGroup     Int
-  budgetFood      Int
-  budgetTickets   Int
-  budgetTransport Int
-  budgetOther     Int
-  groupText       String
-  flightNote      String
-  flightSource    String?
-  vibe            String
-  reason          String
-  spotsJson       String
-  routeJson       String
-  warning         String?
-  style           String?
-  badge           String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  flightPricing   FlightPricing?
-  guide           DestinationGuide?
-  priceSamples    FlightPriceSample[]
-  plans           TravelPlan[]
+  budgetAccommodation Int
+  budgetFood          Int
+  budgetTransport    Int
+  budgetOther        Int
+  groupText           String
+  vibe                String
+  reason              String
+  spotsJson           String
+  routeJson           String
+  warning             String?
+  style               String?
+  badge               String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  guide               DestinationGuide?
+  plans               TravelPlan[]
 
   @@index([rank])
-}
-
-model FlightPricing {
-  destinationId String      @id
-  route         String
-  normalMin     Int
-  normalMax     Int
-  holidayMin    Int
-  holidayMax    Int
-  normalSample  String
-  holidaySample String
-  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
 }
 
 model DestinationGuide {
@@ -178,35 +159,6 @@ model GuideDay {
   guide     DestinationGuide @relation(fields: [guideId], references: [destinationId], onDelete: Cascade)
 
   @@unique([guideId, sortOrder])
-}
-
-model FlightPriceSample {
-  id              String       @id
-  route           String
-  origin          String
-  destinationName String
-  departureDate   DateTime?
-  returnDate      DateTime?
-  tripNights      Int?
-  pricePerPerson  Int?
-  totalPrice      Int?
-  currency        String       @default("CNY")
-  sourceType      String
-  sourceName      String?
-  sourceUrl       String?
-  airline         String?
-  flightType      String?
-  baggageIncluded Boolean?
-  baggageDetails  String?
-  checkedAt       DateTime?
-  notes           String?
-  destinationId   String?
-  destination     Destination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
-  createdAt       DateTime     @default(now())
-
-  @@index([destinationId])
-  @@index([departureDate, returnDate])
-  @@index([sourceType])
 }
 
 model VisitedPlace {

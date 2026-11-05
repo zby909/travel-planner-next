@@ -7,12 +7,11 @@ import { getSiteSettings } from "@/lib/site-settings";
 // 汇总内容数量和待完善项，让工作台优先呈现下一步可执行的操作。
 export default async function AdminHome() {
   const user = await requireEditor();
-  const [destinations, flights, plans, places, placesWithoutCoordinates, timeline, history, siteNameSetting, memberCount, settings] = await Promise.all([
+  const [destinations, plans, places, placesWithoutCoordinates, timeline, history, siteNameSetting, memberCount, settings] = await Promise.all([
     prisma.destination.findMany({
       select: { id: true, title: true, imagePath: true, routeJson: true, guide: { select: { destinationId: true } } },
       orderBy: { rank: "asc" },
     }),
-    prisma.flightPriceSample.count(),
     prisma.travelPlan.count(),
     prisma.visitedPlace.count(),
     prisma.visitedPlace.findMany({
@@ -52,7 +51,6 @@ export default async function AdminHome() {
         <Link href="/admin/places"><strong>{places}</strong><span>已到访地点 →</span></Link>
         <Link href="/admin/timeline"><strong>{timeline}</strong><span>旅行时间记录 →</span></Link>
         <Link href="/admin/plans"><strong>{plans}</strong><span>旅行计划 →</span></Link>
-        <Link href="/admin/flights"><strong>{flights}</strong><span>机票价格样本 →</span></Link>
       </div>
       {onboardingProgress < onboardingItems.length ? (
         <section className="admin-panel">
@@ -77,7 +75,6 @@ export default async function AdminHome() {
             <Link href="/admin/timeline?new=1">＋ 写下一条旅行时间记录</Link>
             <Link href="/admin/plans/new">＋ 创建旅行计划</Link>
             <Link href="/admin/plans">＋ 管理旅行计划与日记</Link>
-            <Link href="/admin/flights?new=1">＋ 保存一条机票价格样本</Link>
           </div>
         </section>
         <section className="admin-panel">

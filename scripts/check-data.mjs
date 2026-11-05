@@ -7,8 +7,8 @@ try {
   ]);
   const errors = [];
   for (const destination of destinations) {
-    const sum = ["Flight", "Hotel", "Group", "Food", "Tickets", "Transport", "Other"]
-      .reduce((total, key) => total + destination["budget" + key], 0);
+    const sum = destination.budgetAccommodation + destination.budgetFood
+      + destination.budgetTransport + destination.budgetOther;
     if (sum !== destination.pickBudget) errors.push(`Budget mismatch: ${destination.id}`);
   }
   for (const place of places) {

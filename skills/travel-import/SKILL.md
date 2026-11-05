@@ -41,7 +41,7 @@ The `travelctl` CLI connects this agent to the **user's own** Travel Planner web
    ```json
    {"items":[{"title":"京都","subtitle":"日本·关西","months":"10-11月","days":"5天","route":["京都","宇治"],"spots":["伏见稻荷大社"],"reason":"红叶季","imageId":"<uploaded-id>"}]}
    ```
-   Optional `budget:{flight,hotel,group,food,tickets,transport,other}` is the CNY total, not per person. Missing budgets stay missing.
+   Optional `budget:{food,accommodation,transport,other}` is the CNY total for two people, not per person. Keep estimates broad; missing budgets stay missing.
 6. Create new records with `travelctl visits prepare file.json` or `travelctl destinations prepare file.json`. Review the returned preview and warnings, summarize additions, and obtain explicit user confirmation.
 7. Only after confirmation run `travelctl import commit DRAFT_ID --confirm`. Otherwise run `travelctl import cancel DRAFT_ID`. Never silently commit.
 
@@ -56,9 +56,7 @@ Use `travelctl visits update prepare visit-updates.json`. Each item must include
 
 ## Updating future destinations
 
-Use `travelctl destinations update prepare destination-updates.json`. Each item must include its existing `id`. Supported fields include title/subtitle, months/days, vibe/reason, groupText/flightNote/flightSource, route/spots, partial CNY budget breakdown, min/max budget, flight pricing, guide days and cover image.
-
-- `flightPricing` is a complete object with route, normalMin/normalMax, holidayMin/holidayMax, normalSample and holidaySample. Use `flightPricing: null` to remove it.
+Use `travelctl destinations update prepare destination-updates.json`. Each item must include its existing `id`. Supported fields include title/subtitle, months/days, vibe/reason, groupText, route/spots, partial four-category CNY budget breakdown, min/max budget, guide days and cover image.
 - `guideDays`, when supplied, replaces the existing guide-day list.
 - Use `imageId: null` to clear the cover.
 - When budget amounts or bounds change, the updated breakdown total must remain within the budget range.

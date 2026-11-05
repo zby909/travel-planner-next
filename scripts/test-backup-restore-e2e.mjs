@@ -153,9 +153,8 @@ async function run() {
         id: "test-island", title: "测试岛屿", subtitle: "虚构目的地", flag: "🏝️", kind: "旅行计划",
         typesJson: "[]", months: "8月", seasonsJson: "[]", days: "3天",
         minBudget: 1000, maxBudget: 1300, pickBudget: 1100, rank: 1,
-        budgetFlight: 300, budgetHotel: 300, budgetGroup: 0, budgetFood: 250,
-        budgetTickets: 100, budgetTransport: 100, budgetOther: 50,
-        groupText: "", flightNote: "", vibe: "", reason: "", spotsJson: "[]", routeJson: "[]",
+        budgetFood: 250, budgetAccommodation: 300, budgetTransport: 400, budgetOther: 150,
+        groupText: "", vibe: "", reason: "", spotsJson: "[]", routeJson: "[]",
       },
     });
     await sourceDb.visitedPlace.create({

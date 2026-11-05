@@ -26,16 +26,12 @@ function parseArray(value: string): unknown[] {
 }
 
 function destinationBudget(existing: {
-  budgetFlight: number; budgetHotel: number; budgetGroup: number; budgetFood: number;
-  budgetTickets: number; budgetTransport: number; budgetOther: number;
+  budgetFood: number; budgetAccommodation: number; budgetTransport: number; budgetOther: number;
   minBudget: number; maxBudget: number;
 }, patch: Extract<ImportPayload, { kind: "destinations-update" }>["items"][number]) {
   const next = {
-    budgetFlight: patch.budget?.flight ?? existing.budgetFlight,
-    budgetHotel: patch.budget?.hotel ?? existing.budgetHotel,
-    budgetGroup: patch.budget?.group ?? existing.budgetGroup,
     budgetFood: patch.budget?.food ?? existing.budgetFood,
-    budgetTickets: patch.budget?.tickets ?? existing.budgetTickets,
+    budgetAccommodation: patch.budget?.accommodation ?? existing.budgetAccommodation,
     budgetTransport: patch.budget?.transport ?? existing.budgetTransport,
     budgetOther: patch.budget?.other ?? existing.budgetOther,
   };
@@ -75,7 +71,7 @@ export async function prepareRecordChange(payload: ChangePayload, ownerId: strin
       seen.add(item.id);
       const existing = await prisma.destination.findUnique({
         where: { id: item.id },
-        include: { flightPricing: true, guide: { include: { days: { orderBy: { sortOrder: "asc" } } } } },
+        include: { guide: { include: { days: { orderBy: { sortOrder: "asc" } } } } },
       });
       if (!existing) throw new Error(`未来目的地不存在：${item.id}`);
       const nextTitle = item.title ?? existing.title;
@@ -87,12 +83,11 @@ export async function prepareRecordChange(payload: ChangePayload, ownerId: strin
       before.push({ id: item.id, current: {
         id: existing.id, title: existing.title, subtitle: existing.subtitle, months: existing.months, days: existing.days,
         minBudget: existing.minBudget, maxBudget: existing.maxBudget, pickBudget: existing.pickBudget,
-        budget: { flight: existing.budgetFlight, hotel: existing.budgetHotel, group: existing.budgetGroup,
-          food: existing.budgetFood, tickets: existing.budgetTickets, transport: existing.budgetTransport, other: existing.budgetOther },
+        budget: { food: existing.budgetFood, accommodation: existing.budgetAccommodation,
+          transport: existing.budgetTransport, other: existing.budgetOther },
         vibe: existing.vibe, reason: existing.reason, imagePath: existing.imagePath,
-        groupText: existing.groupText, flightNote: existing.flightNote, flightSource: existing.flightSource,
+        groupText: existing.groupText,
         route: parseArray(existing.routeJson), spots: parseArray(existing.spotsJson),
-        flightPricing: existing.flightPricing,
         guideDays: existing.guide?.days.map(day => ({ title: day.title, detail: day.detail })) ?? [],
       }, changes: item });
     }
@@ -178,27 +173,17 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
           ...(item.vibe !== undefined ? { vibe: item.vibe } : {}),
           ...(item.reason !== undefined ? { reason: item.reason } : {}),
           ...(item.groupText !== undefined ? { groupText: item.groupText } : {}),
-          ...(item.flightNote !== undefined ? { flightNote: item.flightNote } : {}),
-          ...(item.flightSource !== undefined ? { flightSource: item.flightSource } : {}),
           ...(item.route !== undefined ? { routeJson: JSON.stringify(item.route) } : {}),
           ...(item.spots !== undefined ? { spotsJson: JSON.stringify(item.spots) } : {}),
           ...(item.minBudget !== undefined ? { minBudget: budget.minBudget } : {}),
           ...(item.maxBudget !== undefined ? { maxBudget: budget.maxBudget } : {}),
           ...(budget.pickBudget !== undefined ? { pickBudget: budget.pickBudget } : {}),
-          ...(item.budget?.flight !== undefined ? { budgetFlight: budget.budgetFlight } : {}),
-          ...(item.budget?.hotel !== undefined ? { budgetHotel: budget.budgetHotel } : {}),
-          ...(item.budget?.group !== undefined ? { budgetGroup: budget.budgetGroup } : {}),
           ...(item.budget?.food !== undefined ? { budgetFood: budget.budgetFood } : {}),
-          ...(item.budget?.tickets !== undefined ? { budgetTickets: budget.budgetTickets } : {}),
+          ...(item.budget?.accommodation !== undefined ? { budgetAccommodation: budget.budgetAccommodation } : {}),
           ...(item.budget?.transport !== undefined ? { budgetTransport: budget.budgetTransport } : {}),
           ...(item.budget?.other !== undefined ? { budgetOther: budget.budgetOther } : {}),
           ...(item.imageId !== undefined ? { imagePath: item.imageId ? `/api/media/${item.imageId}` : "/images/destination-placeholder.svg" } : {}),
         } });
-        if (item.flightPricing !== undefined) {
-          if (item.flightPricing === null) await tx.flightPricing.deleteMany({ where: { destinationId: item.id } });
-          else await tx.flightPricing.upsert({ where: { destinationId: item.id },
-            update: item.flightPricing, create: { destinationId: item.id, ...item.flightPricing } });
-        }
         if (item.guideDays !== undefined) {
           const days = item.guideDays.map((day, index) => ({ id: randomUUID(), day: `D${index + 1}`, title: day.title, detail: day.detail, sortOrder: index }));
           const guide = await tx.destinationGuide.findUnique({ where: { destinationId: item.id }, select: { destinationId: true } });

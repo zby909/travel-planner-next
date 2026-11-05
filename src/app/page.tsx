@@ -16,7 +16,7 @@ export default async function HomePage() {
   await requireSiteContentAccess("/");
   const [settings, destinations, visitedCount, visitedPreview, timelineCount] = await Promise.all([
     getSiteSettings(),
-    prisma.destination.findMany({ orderBy: { rank: "asc" }, include: { flightPricing: true } }),
+    prisma.destination.findMany({ orderBy: { rank: "asc" } }),
     prisma.visitedPlace.count(),
     prisma.visitedPlace.findMany({ orderBy: { sortOrder: "asc" }, take: 4 }),
     prisma.timelineEntry.count(),
@@ -41,13 +41,6 @@ export default async function HomePage() {
     badge: destination.badge,
     vibe: destination.vibe,
     spots: parseJsonArray<string>(destination.spotsJson),
-    flightPricing: destination.flightPricing ? {
-      route: destination.flightPricing.route,
-      normalMin: destination.flightPricing.normalMin,
-      normalMax: destination.flightPricing.normalMax,
-      holidayMin: destination.flightPricing.holidayMin,
-      holidayMax: destination.flightPricing.holidayMax,
-    } : null,
   }));
 
   const scenicDestination = destinations.find(item => item.imagePath && !item.imagePath.includes("placeholder"));

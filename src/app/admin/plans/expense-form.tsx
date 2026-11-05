@@ -7,7 +7,7 @@ import { EXPENSE_CATEGORIES } from "@/lib/expenses";
 
 const INITIAL_STATE: ExpenseFormState = { error: "" };
 
-// 为当前旅行快速新增一笔四类费用之一。
+// 为当前旅行快速新增一笔四类花费之一。
 export function ExpenseForm({ planId, currency }: { planId: string; currency: string }) {
   const [state, action, pending] = useActionState(addTravelExpenseAction, INITIAL_STATE);
   const fractionDigits = currencyFractionDigits(currency);
@@ -17,7 +17,7 @@ export function ExpenseForm({ planId, currency }: { planId: string; currency: st
     <input type="hidden" name="planId" value={planId} />
     <div className="expense-form-grid">
       <label>费用分类
-        <select name="category" defaultValue="FLIGHT">
+        <select name="category" defaultValue="FOOD">
           {EXPENSE_CATEGORIES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
       </label>
@@ -28,7 +28,7 @@ export function ExpenseForm({ planId, currency }: { planId: string; currency: st
         <input name="spentAt" type="date" />
       </label>
       <label>备注（可选）
-        <input name="description" maxLength={160} placeholder="例如：两人往返机票" />
+        <input name="description" maxLength={160} placeholder="例如：晚餐 / 市内打车" />
       </label>
     </div>
     {state.error ? <p className="form-error" role="alert">{state.error}</p> : null}

@@ -205,8 +205,8 @@
 .travel-detail .budget-panel>.eyebrow{color:#a36f54;}
 .travel-detail .budget-panel h2{font:400 40px Georgia,serif;}
 .travel-detail .budget-breakdown>div{border-color:#d0d0c3;}
-.travel-detail .flight-panel,.travel-detail .season-panel{background:transparent;border:1px solid #d7d7cc;padding:28px;}
-.travel-detail .flight-panel h3,.travel-detail .season-panel h3{font:400 23px var(--ed-serif);}
+.travel-detail .season-panel{background:transparent;border:1px solid #d7d7cc;padding:28px;}
+.travel-detail .season-panel h3{font:400 23px var(--ed-serif);}
 .travel-detail .tag{border-radius:0;}
 
 /* narrow screens */

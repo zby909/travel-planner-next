@@ -49,13 +49,12 @@ async function apply() {
   try {
     currentAdmin = await currentDb.user.findUnique({ where: { id: pending.ownerId } });
     if (!currentAdmin?.isActive || currentAdmin.role !== "ADMIN") throw Error("启动前的管理员身份已失效");
-    const [places, destinations, timeline, media, plans, photos, flights] = await Promise.all([
+    const [places, destinations, timeline, media, plans, photos] = await Promise.all([
       currentDb.visitedPlace.count(), currentDb.destination.count(),
       currentDb.timelineEntry.count(), currentDb.mediaAsset.count(),
       currentDb.travelPlan.count(), currentDb.travelPhoto.count(),
-      currentDb.flightPriceSample.count(),
     ]);
-    if (places || destinations || timeline || media || plans || photos || flights)
+    if (places || destinations || timeline || media || plans || photos)
       throw Error("当前站点已新增旅行数据，取消自动覆盖并保留原数据库");
     await currentDb.$queryRawUnsafe("PRAGMA wal_checkpoint(TRUNCATE)");
   } finally { await currentDb.$disconnect(); }

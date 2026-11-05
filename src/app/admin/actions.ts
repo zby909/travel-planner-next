@@ -20,29 +20,6 @@ function amount(form: FormData, key: string, max = 10_000_000): number {
   if (!Number.isSafeInteger(number) || number > max) throw new Error(`${key} 超出允许范围`);
   return number;
 }
-function optionalAmount(form: FormData, key: string): number | null {
-  return String(form.get(key) ?? "").trim() === "" ? null : amount(form, key);
-}
-function optionalDate(form: FormData, key: string): Date | null {
-  const text = String(form.get(key) ?? "").trim();
-  if (!text) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error(`${key} 日期格式错误`);
-  const date = new Date(text + "T12:00:00.000Z");
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text) throw new Error(`${key} 不是有效日期`);
-  return date;
-}
-function externalUrl(form: FormData, key: string): string | null {
-  const raw = stringField(form, key, 1000);
-  if (!raw) return null;
-  try {
-    const url = new URL(raw);
-    if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error();
-    return url.toString();
-  } catch {
-    throw new Error(`${key} 必须是 HTTP 或 HTTPS 地址`);
-  }
-}
-
 // 解析逗号分隔的分类字段，去重并限制每项长度。
 function listField(form: FormData, key: string, maxItems: number, maxLength: number): string[] {
   const raw = stringField(form, key, maxItems * (maxLength + 2));
@@ -84,11 +61,8 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
     if (!existing) throw new Error("目的地不存在");
 
     const budget = {
-      budgetFlight: amount(form, "budgetFlight"),
-      budgetHotel: amount(form, "budgetHotel"),
-      budgetGroup: amount(form, "budgetGroup"),
       budgetFood: amount(form, "budgetFood"),
-      budgetTickets: amount(form, "budgetTickets"),
+      budgetAccommodation: amount(form, "budgetAccommodation"),
       budgetTransport: amount(form, "budgetTransport"),
       budgetOther: amount(form, "budgetOther"),
     };
@@ -97,18 +71,6 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
     const maxBudget = amount(form, "maxBudget");
     if (maxBudget < minBudget) throw new Error("预算上限不能低于下限");
     if (pickBudget < minBudget || pickBudget > maxBudget) throw new Error("预算分项合计必须落在预算区间内");
-
-    const flight = {
-      route: stringField(form, "flightRoute", 140),
-      normalMin: amount(form, "normalMin"),
-      normalMax: amount(form, "normalMax"),
-      holidayMin: amount(form, "holidayMin"),
-      holidayMax: amount(form, "holidayMax"),
-      normalSample: stringField(form, "normalSample", 4000),
-      holidaySample: stringField(form, "holidaySample", 4000),
-    };
-    if (flight.normalMin > flight.normalMax || flight.holidayMin > flight.holidayMax) throw new Error("机票价格区间的下限不能超过上限");
-    if (!flight.route && [flight.normalMin, flight.normalMax, flight.holidayMin, flight.holidayMax].some(value => value > 0)) throw new Error("填写机票价格时需要同时填写航线");
 
     const title = stringField(form, "title", 100, true);
     if (title !== existing.title && await prisma.destination.findFirst({ where: { id: { not: id }, title }, select: { id: true } })) {
@@ -147,8 +109,6 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
       vibe: stringField(form, "vibe", 220),
       reason: stringField(form, "reason", 3000),
       groupText: stringField(form, "groupText", 1500),
-      flightNote: stringField(form, "flightNote", 3000),
-      flightSource: externalUrl(form, "flightSource"),
       spotsJson: JSON.stringify(spots),
       routeJson: JSON.stringify(route),
       minBudget,
@@ -158,15 +118,6 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
     };
     await prisma.$transaction(async (tx) => {
       await tx.destination.update({ where: { id }, data });
-      if (flight.route) {
-        await tx.flightPricing.upsert({
-          where: { destinationId: id },
-          update: flight,
-          create: { destinationId: id, ...flight },
-        });
-      } else {
-        await tx.flightPricing.deleteMany({ where: { destinationId: id } });
-      }
       if (hasGuide) {
         await tx.destinationGuide.upsert({
           where: { destinationId: id },
@@ -221,16 +172,11 @@ export async function createDestinationAction(_state: FormState, form: FormData)
       maxBudget: 0,
       pickBudget: 0,
       rank: (latest._max.rank ?? -1) + 1,
-      budgetFlight: 0,
-      budgetHotel: 0,
-      budgetGroup: 0,
       budgetFood: 0,
-      budgetTickets: 0,
+      budgetAccommodation: 0,
       budgetTransport: 0,
       budgetOther: 0,
       groupText: "",
-      flightNote: "",
-      flightSource: null,
       vibe: stringField(form, "vibe", 220),
       reason: stringField(form, "reason", 3000),
       spotsJson: JSON.stringify(spots),
@@ -326,78 +272,6 @@ export async function saveSiteSettingsAction(_state: FormState, form: FormData):
     return errorState(error);
   }
   redirect("/admin/settings?saved=1");
-}
-
-const SOURCE_TYPES = ["USER_REPORTED", "PUBLIC_REFERENCE", "HISTORICAL", "PLANNING_ESTIMATE"] as const;
-
-export async function createFlightAction(_state: FormState, form: FormData): Promise<FormState> {
-  const actor = await requireEditor();
-  try {
-    const type = stringField(form, "sourceType", 40, true);
-    if (!SOURCE_TYPES.includes(type as typeof SOURCE_TYPES[number])) throw new Error("未知的价格证据类型");
-    const destinationId = stringField(form, "destinationId", 64);
-    if (destinationId && !(await prisma.destination.findUnique({ where: { id: destinationId }, select: { id: true } }))) {
-      throw new Error("选择的关联目的地不存在");
-    }
-    const departureDate = optionalDate(form, "departureDate");
-    const returnDate = optionalDate(form, "returnDate");
-    if (departureDate && returnDate && returnDate < departureDate) throw new Error("回程日期不能早于去程日期");
-    const totalPrice = optionalAmount(form, "totalPrice");
-    const pricePerPerson = optionalAmount(form, "pricePerPerson");
-    if (totalPrice === null && pricePerPerson === null) throw new Error("请至少填写同行总价或每人价格");
-    const bag = stringField(form, "baggageIncluded", 8);
-    if (!["", "unknown", "yes", "no"].includes(bag)) throw new Error("行李政策参数无效");
-    const flightType = stringField(form, "flightType", 20);
-    if (!["", "DIRECT", "TRANSFER", "UNKNOWN"].includes(flightType)) throw new Error("航班类型无效");
-    const data = {
-      id: randomUUID(),
-      route: stringField(form, "route", 200, true),
-      origin: stringField(form, "origin", 100, true),
-      destinationName: stringField(form, "destinationName", 100, true),
-      sourceType: type,
-      departureDate,
-      returnDate,
-      pricePerPerson,
-      totalPrice,
-      currency: (await prisma.appSetting.findUnique({ where: { key: "currency" }, select: { value: true } }))?.value ?? "CNY",
-      sourceName: stringField(form, "sourceName", 120),
-      sourceUrl: externalUrl(form, "sourceUrl"),
-      checkedAt: optionalDate(form, "checkedAt"),
-      airline: stringField(form, "airline", 100),
-      flightType: flightType || null,
-      baggageIncluded: bag === "unknown" || !bag ? null : bag === "yes",
-      baggageDetails: stringField(form, "baggageDetails", 200),
-      notes: stringField(form, "notes", 2000),
-      destinationId: destinationId || null,
-    };
-    await prisma.$transaction(async (tx) => {
-      const saved = await tx.flightPriceSample.create({ data });
-      await tx.auditLog.create({ data: { actorId: actor.id, action: "新增", entity: "机票报价", entityId: saved.id, summary: data.route } });
-    });
-    revalidatePath("/admin/flights");
-    revalidatePath("/admin");
-    revalidatePath("/");
-    if (destinationId) revalidatePath(`/destinations/${destinationId}`);
-  } catch (error) {
-    return errorState(error);
-  }
-  redirect("/admin/flights?added=1");
-}
-
-export async function deleteFlightAction(form: FormData): Promise<void> {
-  const actor = await requireEditor();
-  const id = String(form.get("id") ?? "");
-  if (id.length < 1 || id.length > 80) throw new Error("无效报价编号");
-  const found = await prisma.flightPriceSample.findUnique({ where: { id } });
-  if (!found) throw new Error("报价不存在");
-  await prisma.$transaction(async (tx) => {
-    await tx.flightPriceSample.delete({ where: { id } });
-    await tx.auditLog.create({ data: { actorId: actor.id, action: "删除", entity: "机票报价", entityId: id, summary: found.route } });
-  });
-  revalidatePath("/admin/flights");
-  revalidatePath("/admin");
-  revalidatePath("/");
-  if (found.destinationId) revalidatePath(`/destinations/${found.destinationId}`);
 }
 
 export async function savePlaceAction(_state: FormState, form: FormData): Promise<FormState> {

@@ -42,7 +42,7 @@ export function TravelPlanForm({ destinations, currency, initial }: {
 }) {
   const formAction = initial ? saveTravelPlanAction : createTravelPlanAction;
   const [state, action, pending] = useActionState(formAction, INITIAL_STATE);
-  return <form action={action} className="admin-form">
+  return <form action={action} className="admin-form" id="plan-overview">
     {initial ? <input type="hidden" name="id" value={initial.id} /> : null}
     <section className="admin-panel">
       <h2>旅行基本信息</h2>
@@ -61,7 +61,7 @@ export function TravelPlanForm({ destinations, currency, initial }: {
          </> : <select name="currency" defaultValue={initial?.currency ?? currency}>{CURRENCIES.map(code => <option key={code} value={code}>{code}</option>)}</select>}
        </label>
       </div>
-      <label>旅行备注<textarea name="notes" rows={4} maxLength={4000} defaultValue={initial?.notes ?? ""} placeholder="机票、住宿、同行安排或出发前需要记住的事情" /></label>
+      <label>旅行备注<textarea name="notes" rows={4} maxLength={4000} defaultValue={initial?.notes ?? ""} placeholder="住宿、交通、同行安排或出发前需要记住的事情" /></label>
     </section>
     <div className="admin-save-row">
       {state.error ? <p className="form-error" role="alert">{state.error}</p> : null}

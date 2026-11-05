@@ -26,7 +26,7 @@ function expenseDate(value: string): Date | null {
   return date;
 }
 
-// 新增一笔费用，金额按旅行计划币种的最小单位保存。
+// 新增一笔旅行花费，金额按旅行计划币种的最小单位保存。
 export async function addTravelExpenseAction(_state: ExpenseFormState, form: FormData): Promise<ExpenseFormState> {
   const actor = await requireEditor();
   let planId = "";
@@ -39,7 +39,7 @@ export async function addTravelExpenseAction(_state: ExpenseFormState, form: For
     if (!plan) throw new Error("旅行计划不存在或已被删除");
 
     const category = expenseField(form, "category", 20, true);
-    if (!EXPENSE_CATEGORIES.some(item => item.value === category)) throw new Error("请选择机票、酒店、吃喝或其它分类");
+    if (!EXPENSE_CATEGORIES.some(item => item.value === category)) throw new Error("请选择餐饮、住宿、交通或其它分类");
     const amountMinor = parseMoneyToMinorUnits(expenseField(form, "amount", 24, true), plan.currency);
     const spentAt = expenseDate(expenseField(form, "spentAt", 10));
     const note = expenseField(form, "description", 160);

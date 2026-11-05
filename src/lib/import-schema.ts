@@ -21,11 +21,8 @@ export const visitItemSchema = z.object({
 });
 
 export const budgetSchema = z.object({
-  flight: z.number().int().min(0).max(1_000_000).default(0),
-  hotel: z.number().int().min(0).max(1_000_000).default(0),
-  group: z.number().int().min(0).max(1_000_000).default(0),
   food: z.number().int().min(0).max(1_000_000).default(0),
-  tickets: z.number().int().min(0).max(1_000_000).default(0),
+  accommodation: z.number().int().min(0).max(1_000_000).default(0),
   transport: z.number().int().min(0).max(1_000_000).default(0),
   other: z.number().int().min(0).max(1_000_000).default(0),
 }).strict();
@@ -86,28 +83,11 @@ export const visitUpdateItemSchema = z.object({
 });
 
 const budgetPatchSchema = z.object({
-  flight: z.number().int().min(0).max(1_000_000).optional(),
-  hotel: z.number().int().min(0).max(1_000_000).optional(),
-  group: z.number().int().min(0).max(1_000_000).optional(),
   food: z.number().int().min(0).max(1_000_000).optional(),
-  tickets: z.number().int().min(0).max(1_000_000).optional(),
+  accommodation: z.number().int().min(0).max(1_000_000).optional(),
   transport: z.number().int().min(0).max(1_000_000).optional(),
   other: z.number().int().min(0).max(1_000_000).optional(),
 }).strict().refine(value => Object.keys(value).length > 0, "预算补丁至少需要一个金额字段");
-
-const flightPricingSchema = z.object({
-  route: safeText(140),
-  normalMin: z.number().int().min(0).max(2_000_000),
-  normalMax: z.number().int().min(0).max(2_000_000),
-  holidayMin: z.number().int().min(0).max(2_000_000),
-  holidayMax: z.number().int().min(0).max(2_000_000),
-  normalSample: z.string().trim().max(4000),
-  holidaySample: z.string().trim().max(4000),
-}).strict().superRefine((value, ctx) => {
-  if (value.normalMin > value.normalMax || value.holidayMin > value.holidayMax) {
-    ctx.addIssue({ code: "custom", message: "机票价格区间下限不能超过上限" });
-  }
-});
 
 export const destinationUpdateItemSchema = z.object({
   id: safeText(64),
@@ -118,14 +98,11 @@ export const destinationUpdateItemSchema = z.object({
   vibe: optionalText(220),
   reason: optionalText(2000),
   groupText: optionalText(1500),
-  flightNote: optionalText(3000),
-  flightSource: z.union([z.string().url().refine(value => ["http:", "https:"].includes(new URL(value).protocol)), z.null()]).optional(),
   route: z.array(safeText(200)).max(40).optional(),
   spots: z.array(safeText(120)).max(40).optional(),
   budget: budgetPatchSchema.optional(),
   minBudget: z.number().int().min(0).max(2_000_000).optional(),
   maxBudget: z.number().int().min(0).max(2_000_000).optional(),
-  flightPricing: z.union([flightPricingSchema, z.null()]).optional(),
   guideDays: z.array(z.object({ title: safeText(150), detail: safeText(1500) }).strict()).max(30).optional(),
   imageId: nullableImageId,
 }).strict().refine(item => Object.keys(item).length > 1, "至少提供一个需要更新的字段");

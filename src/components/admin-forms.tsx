@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { FormState } from "@/app/admin/actions";
-import { createDestinationAction, createFlightAction, createPlaceAction, saveDestinationAction, savePlaceAction, saveSiteSettingsAction } from "@/app/admin/actions";
+import { createDestinationAction, createPlaceAction, saveDestinationAction, savePlaceAction, saveSiteSettingsAction } from "@/app/admin/actions";
 import type { GroupLabels, SiteSettings } from "@/lib/site-settings";
 
 const INITIAL: FormState = { error: "" };
@@ -25,29 +25,20 @@ type DestinationData = {
   vibe: string;
   reason: string;
   groupText: string;
-  flightNote: string;
-  flightSource: string | null;
   route: string[];
   spots: string[];
   guide: null | { intro: string; pace: string; stay: string; transport: string; days: GuideDayInput[] };
   minBudget: number;
   maxBudget: number;
-  budgetFlight: number;
-  budgetHotel: number;
-  budgetGroup: number;
+  budgetAccommodation: number;
   budgetFood: number;
-  budgetTickets: number;
   budgetTransport: number;
   budgetOther: number;
-  flightPricing: null | {
-    route: string; normalMin: number; normalMax: number; holidayMin: number; holidayMax: number;
-    normalSample: string; holidaySample: string;
-  };
 };
 
 const BUDGET_FIELDS = [
-  ["budgetFlight", "往返机票"], ["budgetHotel", "住宿"], ["budgetGroup", "当地团费"],
-  ["budgetFood", "餐饮"], ["budgetTickets", "门票与体验"], ["budgetTransport", "交通"], ["budgetOther", "其他"],
+  ["budgetFood", "餐饮"], ["budgetAccommodation", "住宿"],
+  ["budgetTransport", "交通"], ["budgetOther", "其它"],
 ] as const;
 
 function Field({ name, label, value, required, type, min, max, placeholder, step }: { name: string; label: string; value?: string | number | null; required?: boolean; type?: string; min?: number; max?: number; placeholder?: string; step?: string | number }) {
@@ -88,7 +79,7 @@ function GuideDayEditor({ days }: { days: GuideDayInput[] }) {
   );
 }
 
-// 编辑目的地资料与攻略；预算和机票等低频内容默认收起。
+// 编辑目的地资料、路线、攻略和简化后的四类预算。
 export function DestinationEditForm({ data, currency }: { data: DestinationData; currency: string }) {
   const [state, action, pending] = useActionState(saveDestinationAction, INITIAL);
   return (
@@ -128,7 +119,7 @@ export function DestinationEditForm({ data, currency }: { data: DestinationData;
         <summary>预算设置 · {currency}</summary>
         <section className="admin-panel">
           <h2>两人旅行总预算（{currency}）</h2>
-          <p className="muted-copy">基准预算由下方七项自动合计；最低与最高预算请手动填写。</p>
+          <p className="muted-copy">基准预算由餐饮、住宿、交通和其它四项自动合计；最低与最高预算请手动填写。</p>
           <div className="admin-form-grid">
             <Field name="minBudget" label="预算下限" type="number" value={data.minBudget} min={0} required />
             <Field name="maxBudget" label="预算上限" type="number" value={data.maxBudget} min={0} required />
@@ -136,53 +127,7 @@ export function DestinationEditForm({ data, currency }: { data: DestinationData;
           </div>
         </section>
       </details>
-      <details className="admin-disclosure">
-        <summary>机票规划依据</summary>
-        <section className="admin-panel">
-          <div className="admin-form-grid">
-            <Field name="flightRoute" label="往返航线（可选）" value={data.flightPricing?.route ?? ""} />
-            <Field name="flightSource" label="参考来源链接" value={data.flightSource} type="url" />
-            {([
-              ["normalMin", "平日最低"], ["normalMax", "平日最高"], ["holidayMin", "节假日最低"], ["holidayMax", "节假日最高"],
-            ] as const).map(([name, label]) => <Field key={name} name={name} label={label} type="number" min={0} value={data.flightPricing?.[name] ?? 0} required />)}
-          </div>
-          <label>普通日期报价依据<textarea name="normalSample" rows={3} defaultValue={data.flightPricing?.normalSample ?? ""} /></label>
-          <label>节假日报价依据<textarea name="holidaySample" rows={3} defaultValue={data.flightPricing?.holidaySample ?? ""} /></label>
-          <label>机票注意事项<textarea name="flightNote" rows={3} defaultValue={data.flightNote} /></label>
-        </section>
-      </details>
       <Feedback error={state.error} pending={pending} submitText="保存目的地修改" />
-    </form>
-  );
-}
-
-// 新增机票价格样本，并明确标注所使用的币种。
-export function FlightCreateForm({ destinations, currency }: { destinations: { id: string; title: string }[]; currency: string }) {
-  const [state, action, pending] = useActionState(createFlightAction, INITIAL);
-  return (
-    <form action={action} className="admin-form admin-panel">
-      <h2>新增机票价格记录</h2>
-      <p className="muted-copy">实际查询和估算必须分开标注；不知道的航司、行李和日期可以留空，不能猜测。</p>
-      <div className="admin-form-grid">
-        <label>关联目的地<select name="destinationId" defaultValue=""><option value="">暂不关联</option>{destinations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></label>
-        <label>证据类型<select name="sourceType" defaultValue="USER_REPORTED"><option value="USER_REPORTED">用户实际查询</option><option value="PUBLIC_REFERENCE">公开价格参考</option><option value="HISTORICAL">历史价格样本</option><option value="PLANNING_ESTIMATE">规划估算（非报价）</option></select></label>
-        <Field name="route" label="航线描述" required />
-        <Field name="origin" label="出发城市" required />
-        <Field name="destinationName" label="到达城市" required />
-        <Field name="sourceName" label="平台 / 数据来源" />
-        <Field name="departureDate" label="去程日期" type="date" />
-        <Field name="returnDate" label="返程日期" type="date" />
-        <Field name="pricePerPerson" label={`每人往返价（${currency}）`} type="number" min={0} />
-        <Field name="totalPrice" label={`两人往返总价（${currency}）`} type="number" min={0} />
-        <Field name="checkedAt" label="查询日期" type="date" />
-        <Field name="airline" label="航司（未知可空）" />
-        <label>航班类型<select name="flightType" defaultValue=""><option value="">未确认</option><option value="DIRECT">直飞</option><option value="TRANSFER">中转</option></select></label>
-        <label>是否含托运行李<select name="baggageIncluded" defaultValue="unknown"><option value="unknown">尚未确认</option><option value="yes">包含</option><option value="no">不包含</option></select></label>
-        <Field name="baggageDetails" label="托运行李说明" />
-        <Field name="sourceUrl" label="来源链接" type="url" />
-      </div>
-      <label>查询条件、备注和价格限制<textarea name="notes" rows={3} /></label>
-      <Feedback error={state.error} pending={pending} submitText="保存机票样本" />
     </form>
   );
 }
@@ -231,7 +176,7 @@ export function DestinationCreateForm() {
       <label>路线节点（每行一个）<textarea name="routeItems" rows={3} placeholder="例如：大阪 → 京都\n京都 → 奈良" /></label>
       <label>一句话亮点<textarea name="vibe" rows={2} /></label>
       <label>目的地介绍<textarea name="reason" rows={4} /></label>
-      <p className="muted-copy">新目的地会先使用通用占位封面，预算默认留空。创建后可以继续编辑预算、机票、路线和攻略，也可以通过 AI 导入照片。</p>
+      <p className="muted-copy">新目的地会先使用通用占位封面，预算默认留空。创建后可以继续编辑预算、路线和攻略，也可以通过 AI 导入照片。</p>
     </section>
     <Feedback error={state.error} pending={pending} submitText="创建目的地" />
   </form>;
@@ -291,7 +236,7 @@ export function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
       <label>币种<select name="currency" defaultValue={settings.currency}>
         {[["CNY", "人民币 CNY"], ["USD", "美元 USD"], ["SGD", "新加坡元 SGD"], ["EUR", "欧元 EUR"], ["GBP", "英镑 GBP"], ["JPY", "日元 JPY"], ["AUD", "澳元 AUD"], ["CAD", "加拿大元 CAD"], ["HKD", "港币 HKD"], ["TWD", "新台币 TWD"], ["KRW", "韩元 KRW"], ["THB", "泰铢 THB"], ["MYR", "马来西亚林吉特 MYR"], ["IDR", "印尼盾 IDR"], ["VND", "越南盾 VND"], ["PHP", "菲律宾比索 PHP"], ["INR", "印度卢比 INR"], ["NZD", "新西兰元 NZD"], ["CHF", "瑞士法郎 CHF"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select></label>
-      <p className="muted-copy">更改币种不会自动换算数据库中已有的预算数字。切换币种前，请先确认并按新币种重新核对已有目的地预算；机票样本会保留各自记录的币种。</p>
+      <p className="muted-copy">更改币种不会自动换算数据库中已有的预算数字。切换币种前，请先确认并按新币种重新核对已有目的地和旅行计划预算。</p>
     </section>
     <Feedback error={state.error} pending={pending} submitText="保存站点设置" />
   </form>;

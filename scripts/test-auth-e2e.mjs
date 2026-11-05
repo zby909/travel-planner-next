@@ -180,20 +180,8 @@ async function run() {
   const dest = await page.goto(host + "/destinations/test-island");
   assert(dest?.status() === 200 && (await page.locator("body").innerText()).includes("虚构岛屿·端到端测试"), "Destination save failed");
 
-  await page.goto(host + "/admin/flights");
-  await page.getByText("＋ 新增一条机票价格样本").click();
-  await page.locator('select[name="destinationId"]').selectOption("test-island");
-  await page.locator('input[name="route"]').fill("示例城市往返虚构岛屿·自动化测试");
-  await page.locator('input[name="origin"]').fill("示例城市");
-  await page.locator('input[name="destinationName"]').fill("虚构岛屿");
-  await page.locator('input[name="totalPrice"]').fill("4567");
-  await page.locator('input[name="departureDate"]').fill("2026-11-11");
-  await page.locator('input[name="returnDate"]').fill("2026-11-18");
-  await page.getByRole("button", { name: "保存机票样本" }).click();
-  await page.waitForURL("**/admin/flights?added=1");
-  assert((await page.locator("body").innerText()).includes("示例城市往返虚构岛屿·自动化测试"), "Flight save failed");
-  await page.goto(host + "/destinations/test-island");
-  assert((await page.locator("body").innerText()).includes("4,567"), "Saved flight evidence not shown on public destination page");
+  const removedFlightPage = await page.goto(host + "/admin/flights");
+  assert(removedFlightPage?.status() === 404, "Removed flight management page should no longer be available");
 
   await page.goto(host + "/admin/places/test-town");
   await page.locator('input[name="whenLabel"]').fill("示例小镇·测试");
@@ -225,7 +213,7 @@ async function run() {
   const createdPlanId = new URL(page.url()).pathname.split("/").at(-1);
   assert((await page.locator("body").innerText()).includes("日本七日游·旅行计划测试"), "Travel plan was not created");
 
-  // 验证四类轻量记账、SGD 小数精度、预算余额和删除后的重新汇总。
+  // 验证四类简单花费、SGD 小数精度、预算余额和删除后的重新汇总。
   async function recordExpense(category, amount, date, note) {
     await page.goto(host + `/admin/plans/${createdPlanId}`);
     const form = page.locator(".expense-form");
@@ -236,10 +224,10 @@ async function run() {
     await form.getByRole("button", { name: "记录这笔费用" }).click();
     await page.waitForURL(url => url.searchParams.get("expenseSaved") === "1");
   }
-  await recordExpense("FLIGHT", "1250.50", "2026-11-20", "两人往返机票");
-  await recordExpense("HOTEL", "800", "2026-12-01", "京都住宿");
+  await recordExpense("TRANSPORT", "1250.50", "2026-11-20", "当地交通");
+  await recordExpense("ACCOMMODATION", "800", "2026-12-01", "京都住宿");
   await recordExpense("FOOD", "250.25", "2026-12-03", "沿途餐饮");
-  await recordExpense("OTHER", "100", "", "当地交通");
+  await recordExpense("OTHER", "100", "", "旅行杂项");
   const expenseRows = await prisma.expense.findMany({ where: { planId: createdPlanId } });
   assert(expenseRows.length === 4 && expenseRows.reduce((sum, item) => sum + item.amountMinor, 0) === 240075,
     "Four expense categories or currency minor-unit storage failed");
@@ -431,7 +419,7 @@ async function run() {
   assert(sharedPlanPage?.status() === 200 && (await page.locator(".plan-guide-list").innerText()).includes("日本七日完整旅行手册·修订版"),
     "Partner cannot access the shared plan and its AI guide links");
   assert((await page.locator(".expense-overview").innerText()).includes("2,300.75")
-    && (await page.locator(".expense-record-list").innerText()).includes("两人往返机票"),
+    && (await page.locator(".expense-record-list").innerText()).includes("当地交通"),
   "Partner cannot view the shared travel expenses");
   assert((await page.locator(".memory-admin-list").innerText()).includes("抵达京都的第一天·修订版"),
     "Partner cannot access the shared travel diary");
@@ -556,7 +544,7 @@ async function run() {
   await page.goto(host + "/admin");
   assert(page.url().endsWith("/login"), "Logout did not revoke session");
 
-  console.log("E2E_PASS: public pages, couple accounts, admin/editor permissions, travel plans, four-category expenses, travel diaries, visited-place links, multi-photo uploads, photo deletion, public/private memory access, currency precision and locking, budget summaries, expense deletion, full-trip and daily HTML guide links, URL validation, shared plan editing, destination/place editing, timeline, flights, photo uploads, token access, password rotation, session revocation, logout");
+  console.log("E2E_PASS: public pages, couple accounts, admin/editor permissions, travel plans, four-category expenses, travel diaries, visited-place links, multi-photo uploads, photo deletion, public/private memory access, currency precision and locking, budget summaries, expense deletion, full-trip and daily HTML guide links, URL validation, shared plan editing, destination/place editing, timeline, simplified expense categories, photo uploads, token access, password rotation, session revocation, logout");
 }
 
 try {

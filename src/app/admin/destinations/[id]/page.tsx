@@ -16,7 +16,7 @@ export default async function DestinationEdit({ params, searchParams }: Props) {
   const [data, settings] = await Promise.all([
     prisma.destination.findUnique({
       where: { id },
-      include: { flightPricing: true, guide: { include: { days: { orderBy: { sortOrder: "asc" } } } } },
+      include: { guide: { include: { days: { orderBy: { sortOrder: "asc" } } } } },
     }),
     getSiteSettings(),
   ]);

@@ -112,18 +112,18 @@ export async function commitImport(draftId: string, ownerId: string) {
       for (const item of data.items) {
         const found = await tx.destination.findFirst({ where: { title: item.title } });
         if (found) { skipped.push(item.title); continue; }
-        const b = item.budget ?? { flight: 0, hotel: 0, group: 0, food: 0, tickets: 0, transport: 0, other: 0 };
+        const b = item.budget ?? { food: 0, accommodation: 0, transport: 0, other: 0 };
         const sum = Object.values(b).reduce((a, x) => a + x, 0);
         const dest = await tx.destination.create({
           data: {
             id: randomUUID(),
-            title: item.title, subtitle: item.subtitle, flag: "✈️", kind: "旅行计划",
+            title: item.title, subtitle: item.subtitle, flag: "🌍", kind: "旅行计划",
             typesJson: "[]", months: item.months ?? "", seasonsJson: "[]", days: item.days ?? "",
             minBudget: item.minBudget ?? sum, maxBudget: item.maxBudget ?? sum, pickBudget: sum,
             rank: ++rank,
-            budgetFlight: b.flight, budgetHotel: b.hotel, budgetGroup: b.group, budgetFood: b.food,
-            budgetTickets: b.tickets, budgetTransport: b.transport, budgetOther: b.other,
-            groupText: "", flightNote: "", vibe: item.vibe ?? "", reason: item.reason ?? "",
+            budgetFood: b.food, budgetAccommodation: b.accommodation,
+            budgetTransport: b.transport, budgetOther: b.other,
+            groupText: "", vibe: item.vibe ?? "", reason: item.reason ?? "",
             spotsJson: JSON.stringify(item.spots), routeJson: JSON.stringify(item.route),
             imagePath: item.imageId ? `/api/media/${item.imageId}` : "/images/destination-placeholder.svg",
           },

@@ -11,7 +11,7 @@ A self-hosted travel archive for two people to plan future trips, map places the
 - A shared travel space with two separate member accounts.
 - A cinematic home page, destination wishlist, visited-place map, and timeline.
 - Trip plans with dates, budgets, and links to independently hosted HTML guides.
-- Lightweight expenses with four fixed categories: flights, hotels, food & drinks, and other.
+- Lightweight trip costs with four broad categories: food, accommodation, transport, and other.
 - Date-based travel diaries with optional visited-place links and multiple photos.
 - Photo processing that converts uploads to WebP and strips EXIF/GPS metadata.
 - Public or members-only site visibility.

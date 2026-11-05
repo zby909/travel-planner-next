@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { TravelMotion } from "@/components/travel-motion";
-import { formatDate, formatMoney, parseJsonArray } from "@/lib/format";
+import { formatMoney, parseJsonArray } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site-settings";
 import { requireSiteContentAccess } from "@/lib/site-access";
 import { prisma } from "@/lib/prisma";
@@ -19,9 +19,7 @@ export default async function DestinationPage({ params }: PageProps) {
     prisma.destination.findUnique({
       where: { id },
       include: {
-        flightPricing: true,
         guide: { include: { days: { orderBy: { sortOrder: "asc" } } } },
-        priceSamples: { orderBy: { createdAt: "desc" } },
       },
     }),
     getSiteSettings(),
@@ -29,13 +27,10 @@ export default async function DestinationPage({ params }: PageProps) {
   if (!destination) notFound();
 
   const budget = [
-    ["机票", destination.budgetFlight],
-    ["住宿", destination.budgetHotel],
-    ["当地团费", destination.budgetGroup],
     ["餐饮", destination.budgetFood],
-    ["门票与体验", destination.budgetTickets],
-    ["当地交通", destination.budgetTransport],
-    ["其他", destination.budgetOther],
+    ["住宿", destination.budgetAccommodation],
+    ["交通", destination.budgetTransport],
+    ["其它", destination.budgetOther],
   ] as const;
   const route = parseJsonArray<string>(destination.routeJson);
   const spots = parseJsonArray<string>(destination.spotsJson);
@@ -112,36 +107,9 @@ export default async function DestinationPage({ params }: PageProps) {
             <div className="budget-breakdown">
               {budget.map(([label, value]) => <div key={label}><span>{label}</span><strong>{formatMoney(value, settings.currency)}</strong></div>)}
             </div>
-            <p className="budget-warning">预算是规划参考，不是已锁定报价。出发前请重新核对机票、酒店和景区票价。</p>
+            <p className="budget-warning">预算仅供旅行规划参考，出发前请按实际交通、住宿和游玩安排核对。</p>
           </section>
 
-          {destination.flightPricing && (destination.flightPricing.normalMax > 0 || destination.flightPricing.holidayMax > 0) && (
-            <section className="flight-panel">
-              <p className="eyebrow">FLIGHT PRICE RANGE</p>
-              <h3>{destination.flightPricing.route}</h3>
-              <div className="flight-range"><span>普通日期 · 两人往返总额</span><strong>{formatMoney(destination.flightPricing.normalMin, settings.currency)}–{formatMoney(destination.flightPricing.normalMax, settings.currency)}</strong></div>
-              <p>{destination.flightPricing.normalSample}</p>
-              <div className="flight-range"><span>节假日 · 两人往返总额</span><strong>{formatMoney(destination.flightPricing.holidayMin, settings.currency)}–{formatMoney(destination.flightPricing.holidayMax, settings.currency)}</strong></div>
-              <p>{destination.flightPricing.holidaySample}</p>
-              <p className="muted-copy">{destination.flightNote}</p>
-              {destination.flightSource && <a className="source-link" href={destination.flightSource} target="_blank" rel="noreferrer">查看参考来源 ↗</a>}
-            </section>
-          )}
-          {destination.priceSamples.length > 0 && (
-            <section className="flight-panel">
-              <p className="eyebrow">SAVED FLIGHT EVIDENCE</p>
-              <h3>已保存的机票价格样本</h3>
-              {destination.priceSamples.map(item => (
-                <div className="saved-flight-entry" key={item.id}>
-                  <strong>{item.totalPrice == null ? formatMoney(item.pricePerPerson, item.currency) + "/人" : formatMoney(item.totalPrice, item.currency) + "/两人总价"}</strong>
-                  <span>{item.sourceType === "PLANNING_ESTIMATE" ? "规划估算（非报价）" : item.sourceType === "USER_REPORTED" ? "用户实际查询" : item.sourceType === "HISTORICAL" ? "历史样本" : "公开价格参考"}</span>
-                  <small>{formatDate(item.departureDate)}—{formatDate(item.returnDate)}</small>
-                  <p>{item.notes || "此价格的行李政策、航司及购买条件应再次核实。"}</p>
-                  {item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="source-link">查看报价来源 ↗</a> : null}
-                </div>
-              ))}
-            </section>
-          )}
           <section className="season-panel">
             <p className="eyebrow">WHEN TO GO</p>
             <h3>{destination.months}</h3>

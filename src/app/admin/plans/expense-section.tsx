@@ -20,7 +20,7 @@ type Props = {
   deleted: boolean;
 };
 
-// 展示单趟旅行的四类实际支出、预算余额和费用明细。
+// 展示单趟旅行的四类主要花费、预算余额和简要明细。
 export function TravelExpenseSection({ planId, currency, plannedBudget, expenses, saved, deleted }: Props) {
   const totalMinor = expenses.reduce((sum, item) => sum + item.amountMinor, 0);
   const scale = 10 ** currencyFractionDigits(currency);
@@ -31,12 +31,12 @@ export function TravelExpenseSection({ planId, currency, plannedBudget, expenses
     total: expenses.filter(item => item.category === category.value).reduce((sum, item) => sum + item.amountMinor, 0),
   }));
 
-  return <section className="admin-panel plan-expenses-section">
+  return <section className="admin-panel plan-expenses-section" id="plan-expenses">
     <div className="timeline-editor-heading">
       <div>
-        <p className="eyebrow">TRAVEL EXPENSES</p>
-        <h2>旅行记账</h2>
-        <p className="muted-copy">只记录机票、酒店、吃喝和其它，快速掌握这趟旅行花了多少。</p>
+        <p className="eyebrow">TRIP COSTS</p>
+        <h2>旅行花费</h2>
+        <p className="muted-copy">按餐饮、住宿、交通和其它简单归类即可，不必逐笔精细记账。</p>
       </div>
       <span className="admin-panel-count">{expenses.length} 笔</span>
     </div>
@@ -69,11 +69,11 @@ export function TravelExpenseSection({ planId, currency, plannedBudget, expenses
       ))}
     </div>
 
-    <div className="expense-add-heading"><h3>记录一笔费用</h3><span>金额按 {currency} 录入</span></div>
+    <div className="expense-add-heading"><h3>记录一笔花费</h3><span>金额按 {currency} 录入</span></div>
     <ExpenseForm planId={planId} currency={currency} />
 
     <div className="expense-records">
-      <div className="expense-add-heading"><h3>费用明细</h3><span>按消费日期排列</span></div>
+      <div className="expense-add-heading"><h3>花费明细</h3><span>按消费日期排列</span></div>
       {expenses.length ? <div className="expense-record-list">
         {expenses.map(item => {
           const categoryLabel = getExpenseCategoryLabel(item.category);
@@ -89,7 +89,7 @@ export function TravelExpenseSection({ planId, currency, plannedBudget, expenses
             </div>
           </article>;
         })}
-      </div> : <p className="expense-empty">还没有费用记录。旅行开始后，随手记下四类主要支出即可。</p>}
+      </div> : <p className="expense-empty">还没有花费记录。旅行开始后，简单记下吃、住、行和其它几类即可。</p>}
     </div>
   </section>;
 }

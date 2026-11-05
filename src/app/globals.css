@@ -1,6 +1,5 @@
 @charset "UTF-8";
 
-.saved-flight-entry{display:grid;gap:5px;padding:13px 0;border-top:1px solid var(--line)}.saved-flight-entry strong{font-size:17px}.saved-flight-entry span,.saved-flight-entry small{font-size:11px;color:var(--muted)}.saved-flight-entry p{font-size:11px;color:var(--muted);margin:4px 0 0;line-height:1.8}
 .token-scope-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:5px 0 14px}.admin-form .token-scope-list label{display:flex;flex-direction:row;align-items:center;gap:8px;margin:0;padding:11px;border:1px solid var(--line);font-size:12px}.token-scope-list input{width:auto;accent-color:#247164}.token-secret-panel{padding:18px;border:1px solid #e9bb8e;background:#fdf0da;display:grid;gap:9px}.token-secret-panel textarea{font-family:monospace;overflow-wrap:anywhere}
 .cli-guide-steps{display:grid;gap:17px}.cli-guide-steps>div{border-top:1px solid #e2e5dd;padding-top:14px}.cli-guide-steps>div:first-child{border-top:0;padding-top:0}.cli-guide-steps strong{display:block;font-size:13px;margin-bottom:6px}.cli-guide-steps p{font-size:12px;color:#66766b;line-height:1.8;margin:5px 0}.cli-guide-steps code{font-size:12px;overflow-wrap:anywhere}.cli-copy-row{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:10px 0;padding:12px;background:#f1f3ed;border:1px solid #dce2d8}.cli-copy-row code{flex:1;min-width:220px;word-break:break-word}
 .empty-state{display:grid;justify-items:start;gap:10px;padding:34px;border:1px dashed var(--line);margin-bottom:25px;background:#fffdf8}.empty-state h3{margin:0;font-size:21px}.empty-state p{margin:0;color:var(--muted);font-size:13px;line-height:1.9}
@@ -155,9 +154,6 @@ img { display: block; max-width: 100%; }
 .budget-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 17px; padding-top: 14px; border-top: 1px solid var(--line); }
 .budget-line span { color: var(--muted); font-size: 10px; }
 .budget-line strong { font-size: 14px; font-variant-numeric: tabular-nums; }
-.flight-line { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; padding: 13px 0 16px; border-bottom: 1px solid var(--line); font-size: 10px; }
-.flight-line span { color: var(--muted); }
-.flight-line b { font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .card-more { display: flex; justify-content: space-between; padding: 15px 21px 18px; color: var(--green); font-size: 11px; font-weight: 800; }
 .card-more:hover { color: var(--orange); }
 .sample-section { padding-block: 78px; background: #ece6d8; }
@@ -206,17 +202,14 @@ img { display: block; max-width: 100%; }
 .route-list li span { color: var(--orange); font: 12px Georgia, serif; }
 .spot-note { color: var(--muted); font-size: 11px; }
 .detail-aside { display: grid; gap: 16px; }
-.budget-panel, .flight-panel, .season-panel { padding: 24px; background: #fffdf8; border: 1px solid var(--line); }
+.budget-panel, .season-panel { padding: 24px; background: #fffdf8; border: 1px solid var(--line); }
 .budget-panel h2 { margin: 4px 0; font: 700 37px/1.3 Georgia, serif; letter-spacing: -.04em; }
 .budget-breakdown { margin-top: 20px; border-top: 1px solid var(--line); }
-.budget-breakdown > div, .flight-range { display: flex; justify-content: space-between; align-items: start; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
-.budget-breakdown span, .flight-range span { color: var(--muted); font-size: 11px; }
+.budget-breakdown > div { display: flex; justify-content: space-between; align-items: start; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.budget-breakdown span { color: var(--muted); font-size: 11px; }
 .budget-breakdown strong { font-size: 12px; }
 .budget-warning { margin: 15px 0 0; color: #9b6d4b; font-size: 10px; line-height: 1.8; }
-.flight-panel h3, .season-panel h3 { margin: 0 0 14px; font-size: 17px; }
-.flight-range { flex-direction: column; gap: 4px; }
-.flight-range strong { font-size: 16px; }
-.flight-panel > p:not(.eyebrow) { color: #697a71; font-size: 10px; line-height: 1.9; }
+.season-panel h3 { margin: 0 0 14px; font-size: 17px; }
 .source-link { display: inline-block; margin-top: 5px; color: var(--green); font-size: 11px; font-weight: 800; }
 .visited-hero { min-height: 440px; }
 .visited-hero-content h1 { margin: 0; }
@@ -296,7 +289,6 @@ img { display: block; max-width: 100%; }
   .destination-meta { flex-direction: column; gap: 2px; }
   .destination-vibe { font-size: 11px; }
   .budget-line { flex-direction: column; gap: 4px; }
-  .flight-line { grid-template-columns: 1fr; }
   .card-more { padding-inline: 14px; }
   .sample-inner { grid-template-columns: 1fr; gap: 22px; }
   .sample-price { min-width: 0; }
@@ -328,7 +320,6 @@ img { display: block; max-width: 100%; }
   .destination-grid { grid-template-columns: 1fr; }
   .destination-meta { flex-direction: row; }
   .destination-vibe { min-height: 0; }
-  .flight-line { grid-template-columns: 1fr auto; }
   .stats-row { gap: 18px; }
   .stats-row strong { font-size: 26px; }
   .place-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -159,7 +159,7 @@ async function run() {
     title: "测试未来小岛", subtitle: "虚构目的地", months: "4月", days: "4天", vibe: "轻松出行",
     reason: "测试目的地完整导入", spots: ["测试海湾"], route: ["小岛", "海湾"],
     guideDays: [{ title: "抵达", detail: "入住酒店" }],
-    budget: { flight: 2500, hotel: 1200, group: 0, food: 500, tickets: 400, transport: 300, other: 100 },
+    budget: { food: 500, accommodation: 1200, transport: 2800, other: 500 },
     minBudget: 4500, maxBudget: 6000, imageId: picture.imageId,
   }] };
   const futureDraft = await api("/api/v1/imports/prepare", {
@@ -172,9 +172,7 @@ async function run() {
 
   const destinationPatch = { kind: "destinations-update", items: [{
     id: created.id, title: "测试未来小岛（修订）", reason: "补充更完整的测试攻略",
-    budget: { flight: 2600 }, minBudget: 4600, maxBudget: 6200,
-    flightPricing: { route: "广州往返测试小岛", normalMin: 1800, normalMax: 2200,
-      holidayMin: 2800, holidayMax: 3600, normalSample: "平日样本：测试日期", holidaySample: "节假日样本：测试日期" },
+    budget: { transport: 2900 }, minBudget: 4600, maxBudget: 6200,
     guideDays: [{ title: "第一天：抵达", detail: "入住并休息" }, { title: "第二天：环岛", detail: "游览测试海湾" }],
   }] };
   const destinationPatchDraft = await api("/api/v1/imports/prepare", {
@@ -185,10 +183,10 @@ async function run() {
     "Destination update preview unexpectedly changed the database");
   const destinationPatchResult = await api("/api/v1/imports/" + destinationPatchDraft.draftId + "/commit", { method: "POST" });
   check(destinationPatchResult.updated.length === 1, "Destination update commit failed");
-  const revisedDestination = await db.destination.findUnique({ where: { id: created.id }, include: { guide: { include: { days: true } }, flightPricing: true } });
+  const revisedDestination = await db.destination.findUnique({ where: { id: created.id }, include: { guide: { include: { days: true } } } });
   check(revisedDestination?.title === "测试未来小岛（修订）" && revisedDestination.pickBudget === 5100
-    && revisedDestination.guide?.days.length === 2 && revisedDestination.flightPricing?.normalMin === 1800,
-    "Destination title, budget, flight pricing or guide update was not persisted");
+    && revisedDestination.guide?.days.length === 2,
+    "Destination title, four-category budget or guide update was not persisted");
 
   const page = await fetch(host + "/destinations/" + created.id);
   check(page.ok && (await page.text()).includes("测试未来小岛"), "Future destination public page is broken");
@@ -267,7 +265,7 @@ async function run() {
   await db.apiToken.updateMany({ where: { userId: admin.id }, data: { revokedAt: new Date() } });
   const disabled = await fetch(host + "/api/v1/visits", { headers: requestHeaders });
   check(disabled.status === 401, "Revoked token still works");
-  console.log("IMPORT_E2E_PASS: auth, DPAPI migration, media staging, visit/destination create+update, timeline list/create/update, budget/flight/guide updates, CLI logout, revocation");
+  console.log("IMPORT_E2E_PASS: auth, DPAPI migration, media staging, visit/destination create+update, timeline list/create/update, four-category budget and guide updates, CLI logout, revocation");
 }
 try { await run(); }
 catch (e) { console.error("IMPORT_E2E_FAIL:", e.message); process.exitCode = 1; }

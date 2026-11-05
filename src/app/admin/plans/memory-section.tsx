@@ -52,7 +52,7 @@ export function TravelMemorySection({ planId, places, memories, visibility, edit
   photoDeleted: boolean;
 }) {
   const photoCount = memories.reduce((sum, memory) => sum + memory.photos.filter(photo => memoryPhotoUrl(photo)).length, 0);
-  return <section className="admin-panel plan-memories-section">
+  return <section className="admin-panel plan-memories-section" id="plan-memories">
     <div className="timeline-editor-heading">
       <div>
         <p className="eyebrow">JOURNAL / LITTLE MOMENTS</p>

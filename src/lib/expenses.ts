@@ -1,7 +1,7 @@
 export const EXPENSE_CATEGORIES = [
-  { value: "FLIGHT", label: "机票" },
-  { value: "HOTEL", label: "酒店" },
-  { value: "FOOD", label: "吃喝" },
+  { value: "FOOD", label: "餐饮" },
+  { value: "ACCOMMODATION", label: "住宿" },
+  { value: "TRANSPORT", label: "交通" },
   { value: "OTHER", label: "其它" },
 ] as const;
 

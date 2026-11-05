@@ -128,7 +128,6 @@ export async function isBlankForRestore() {
   const counts = await Promise.all([
     prisma.destination.count(), prisma.visitedPlace.count(), prisma.timelineEntry.count(),
     prisma.travelPlan.count(), prisma.travelPhoto.count(), prisma.mediaAsset.count(),
-    prisma.flightPriceSample.count(),
   ]);
   return counts.every(n => n === 0);
 }

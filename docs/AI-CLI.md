@@ -94,13 +94,10 @@ Use the most precise date that is actually known: 2025 for year-only data, or 20
     "route": ["京都", "宇治"],
     "spots": ["伏见稻荷大社"],
     "budget": {
-      "flight": 2400,
-      "hotel": 1800,
-      "group": 0,
       "food": 1000,
-      "tickets": 500,
-      "transport": 500,
-      "other": 300
+      "accommodation": 1800,
+      "transport": 2900,
+      "other": 800
     }
   }]
 }

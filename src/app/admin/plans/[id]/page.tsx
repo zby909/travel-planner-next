@@ -74,6 +74,12 @@ export default async function TravelPlanDetailPage({ params, searchParams }: Pag
   return <main>
     <Link className="admin-back" href="/admin/plans">← 返回旅行计划</Link>
     <div className="admin-page-heading"><p className="eyebrow">JOURNEY EDITION / {plan.status}</p><h1>{plan.title}</h1><p>{plan.destination?.title ?? "尚未关联目的地"} · {plan.startDate ? formatDate(plan.startDate) : "日期待定"}{plan.endDate ? ` — ${formatDate(plan.endDate)}` : ""}</p></div>
+    <nav className="plan-section-nav" aria-label="旅行计划模块">
+      <a href="#plan-overview">基本信息</a>
+      <a href="#plan-guides">HTML 攻略</a>
+      <a href="#plan-expenses">旅行花费</a>
+      <a href="#plan-memories">旅行日记</a>
+    </nav>
     {query.created === "1" ? <p className="form-success" role="status">旅行计划已创建，可以继续添加 AI HTML 攻略。</p> : null}
     {query.saved === "1" ? <p className="form-success" role="status">旅行计划资料已保存。</p> : null}
     {query.guideSaved === "1" ? <p className="form-success" role="status">攻略入口已保存。</p> : null}
@@ -108,7 +114,7 @@ export default async function TravelPlanDetailPage({ params, searchParams }: Pag
       deleted={query.memoryDeleted === "1"}
       photoDeleted={query.photoDeleted === "1"}
     />
-    <section className="admin-panel plan-guides-section">
+    <section className="admin-panel plan-guides-section" id="plan-guides">
       <div className="timeline-editor-heading"><div><p className="eyebrow">EXTERNAL HTML GUIDES</p><h2>AI 旅行攻略</h2><p className="muted-copy">原始 HTML 保留在 Stack-Nest；这里管理入口，不上传文件、不做代理。</p></div><span className="admin-panel-count">{plan.guides.length}</span></div>
       {editingGuide ? <>
         <div className="plan-guide-form-heading"><h3>编辑攻略入口</h3><Link className="admin-back" href={`/admin/plans/${plan.id}`}>取消</Link></div>
