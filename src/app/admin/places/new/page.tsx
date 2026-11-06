@@ -8,7 +8,7 @@ export default async function NewPlacePage() {
   const settings = await getSiteSettings();
   return <main>
     <Link className="admin-back" href="/admin/places">← 返回足迹列表</Link>
-    <div className="admin-page-heading"><p className="eyebrow">NEW PLACE</p><h1>新增足迹地点</h1><p>地点会显示在足迹列表中；填写国家、省份、城市和坐标后，也可以参与地图展示。</p></div>
+    <div className="admin-page-heading"><p className="eyebrow">ADD A PLACE</p><h1>记录一个去过的地方</h1><p>地点、故事、照片一次保存。坐标可以以后再补，不影响相册展示。</p></div>
     <PlaceCreateForm groupLabels={getGroupLabels(settings)} />
   </main>;
 }

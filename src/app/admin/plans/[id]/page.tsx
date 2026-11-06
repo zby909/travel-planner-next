@@ -13,18 +13,17 @@ import {
   TravelPlanForm,
 } from "../plan-forms";
 import { TravelExpenseSection } from "../expense-section";
-import { TravelMemorySection } from "../memory-section";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ created?: string; saved?: string; guideSaved?: string; guideDeleted?: string; expenseSaved?: string; expenseDeleted?: string; editExpense?: string; memorySaved?: string; memoryDeleted?: string; photoDeleted?: string; memoryId?: string; editMemory?: string; editGuide?: string; newGuide?: string }>;
+  searchParams: Promise<{ created?: string; saved?: string; guideSaved?: string; guideDeleted?: string; expenseSaved?: string; expenseDeleted?: string; editExpense?: string; editGuide?: string; newGuide?: string }>;
 };
 
 // 编辑旅行资料，并管理关联的整趟或单日 HTML 攻略入口。
 export default async function TravelPlanDetailPage({ params, searchParams }: PageProps) {
   await requireEditor();
   const [{ id }, query, settings] = await Promise.all([params, searchParams, getSiteSettings()]);
-  const [plan, destinations, places] = await Promise.all([
+  const [plan, destinations] = await Promise.all([
     prisma.travelPlan.findUnique({
       where: { id },
       include: {
@@ -34,27 +33,14 @@ export default async function TravelPlanDetailPage({ params, searchParams }: Pag
           orderBy: [{ spentAt: "desc" }, { createdAt: "desc" }],
           select: { id: true, category: true, amountMinor: true, description: true, spentAt: true },
         },
-        memories: {
-          orderBy: [{ happenedAt: "desc" }, { createdAt: "desc" }],
-          include: {
-            place: { select: { id: true, name: true, region: true, isArchived: true } },
-            photos: {
-              orderBy: { sortOrder: "asc" },
-              include: { mediaAsset: { select: { id: true, status: true, fileName: true } } },
-            },
-          },
-        },
       },
     }),
     prisma.destination.findMany({ select: { id: true, title: true, isArchived: true }, orderBy: { rank: "asc" } }).then(items => items.map(item => ({ id: item.id, title: item.title + (item.isArchived ? "（已归档）" : "") }))),
-    prisma.visitedPlace.findMany({ select: { id: true, name: true, region: true, isArchived: true }, orderBy: { sortOrder: "asc" } }).then(items => items.map(item => ({ ...item, name: item.name + (item.isArchived ? "（已归档）" : "") }))),
   ]);
   if (!plan) notFound();
   if (query.editExpense && !plan.expenses.some(item => item.id === query.editExpense)) notFound();
   const editingGuide = query.editGuide ? plan.guides.find(item => item.id === query.editGuide) : null;
   if (query.editGuide && !editingGuide) notFound();
-  const editingMemory = query.editMemory ? plan.memories.find(item => item.id === query.editMemory) : null;
-  if (query.editMemory && !editingMemory) notFound();
   const guideInput = editingGuide ? {
     id: editingGuide.id,
     title: editingGuide.title,
@@ -64,14 +50,6 @@ export default async function TravelPlanDetailPage({ params, searchParams }: Pag
     description: editingGuide.description ?? "",
     sortOrder: editingGuide.sortOrder,
   } : undefined;
-  const memoryInput = editingMemory ? {
-    id: editingMemory.id,
-    title: editingMemory.title,
-    content: editingMemory.content,
-    happenedAt: editingMemory.happenedAt?.toISOString().slice(0, 10) ?? "",
-    placeId: editingMemory.placeId ?? "",
-    photoCount: editingMemory.photos.length,
-  } : undefined;
   return <main>
     <Link className="admin-back" href="/admin/plans">← 返回旅行计划</Link>
     <div className="admin-page-heading"><p className="eyebrow">JOURNEY EDITION / {plan.status}</p><h1>{plan.title}</h1><p>{plan.destination?.title ?? "尚未关联目的地"} · {plan.startDate ? formatDate(plan.startDate) : "日期待定"}{plan.endDate ? ` — ${formatDate(plan.endDate)}` : ""}</p></div>
@@ -79,7 +57,6 @@ export default async function TravelPlanDetailPage({ params, searchParams }: Pag
       <a href="#plan-overview">基本信息</a>
       <a href="#plan-guides">HTML 攻略</a>
       <a href="#plan-expenses">旅行花费</a>
-      <a href="#plan-memories">旅行日记</a>
     </nav>
     {query.created === "1" ? <p className="form-success" role="status">旅行计划已创建，可以继续添加 AI HTML 攻略。</p> : null}
     {query.saved === "1" ? <p className="form-success" role="status">旅行计划资料已保存。</p> : null}
@@ -106,16 +83,7 @@ export default async function TravelPlanDetailPage({ params, searchParams }: Pag
       deleted={query.expenseDeleted === "1"}
       editingExpenseId={query.editExpense}
     />
-    <TravelMemorySection
-      planId={plan.id}
-      places={places}
-      memories={plan.memories}
-      visibility={settings.visibility}
-      editingMemory={memoryInput}
-      saved={query.memorySaved === "1"}
-      deleted={query.memoryDeleted === "1"}
-      photoDeleted={query.photoDeleted === "1"}
-    />
+    <p className="muted-copy">旅行故事与照片请直接前往<Link href="/admin/places">「去过的地方」</Link>记录，不需要先创建旅行计划。</p>
     <section className="admin-panel plan-guides-section" id="plan-guides">
       <div className="timeline-editor-heading"><div><p className="eyebrow">EXTERNAL HTML GUIDES</p><h2>AI 旅行攻略</h2><p className="muted-copy">原始 HTML 保留在 Stack-Nest；这里管理入口，不上传文件、不做代理。</p></div><span className="admin-panel-count">{plan.guides.length}</span></div>
       {editingGuide ? <>
@@ -138,6 +106,6 @@ export default async function TravelPlanDetailPage({ params, searchParams }: Pag
         </article>
       ))}</div> : <p className="muted-copy">还没有关联攻略。你可以先用 AI 生成 HTML，再通过 Stack-Nest CLI 部署，然后把访问地址添加到这里。</p>}
     </section>
-    <section className="admin-danger-zone"><div><strong>删除这趟旅行</strong><p>会删除计划、攻略入口、费用、旅行日记及其照片；不会删除 Stack-Nest 上的 HTML 页面。</p></div><form action={deleteTravelPlanAction}><input type="hidden" name="id" value={plan.id} /><DeleteTravelPlanButton /></form></section>
+    <section className="admin-danger-zone"><div><strong>删除这趟旅行</strong><p>只删除本条计划、攻略入口和花费；已经记录的旅行故事与照片会保留在去过的地方。不会删除 Stack-Nest 上的 HTML 页面。</p></div><form action={deleteTravelPlanAction}><input type="hidden" name="id" value={plan.id} /><DeleteTravelPlanButton /></form></section>
   </main>;
 }

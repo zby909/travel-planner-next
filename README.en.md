@@ -1,6 +1,6 @@
 # A Travel Journal for Two
 
-A self-hosted travel archive for two people to plan future trips, map places they have visited, track simple trip expenses, and keep travel diaries with photos.
+A self-hosted travel archive for two people. Record visited places with stories and photos in one workflow; keep future trip plans, HTML guide links and simple costs separate.
 
 [简体中文](README.md) · [Deployment](docs/DEPLOYMENT.md) · [Development](docs/DEVELOPMENT.md) · [AI / CLI](docs/AI-CLI.md)
 
@@ -15,7 +15,7 @@ A self-hosted travel archive for two people to plan future trips, map places the
 - Reversible destination/place archiving with consistent page, story, and media visibility.
 - Reference-aware media cleanup that preserves shared photos and archived records.
 - Administrator-only ZIP export and verified restore on a blank instance, including older schema upgrades.
-- Date-based travel diaries with optional visited-place links and multiple photos.
+- Stories and photo galleries live under visited places, with multiple visits per place and no required trip plan.
 - Photo processing that converts uploads to WebP and strips EXIF/GPS metadata.
 - Public or members-only site visibility.
 - AI-assisted data import through a scoped API token, travelctl, and an Agent Skill.
@@ -23,7 +23,7 @@ A self-hosted travel archive for two people to plan future trips, map places the
 
 Each deployment has its own database and uploads directory, so different couples or two-person travel groups can run separate instances. This is a lightweight record keeper, not a booking or accounting platform. Deployments remain manually triggered; building/publishing an image does not automatically update the running application.
 
-Archiving a destination removes its public detail page and wishlist card without deleting trip plans. Archiving a visited place also hides its linked timeline events and diaries from the public archive; restoring it brings them back. Members retain access in the admin area. Backups include archived records. Restored inactive historical accounts do not consume the two active-member slots.
+Archiving a destination removes its public detail page and wishlist card without deleting trip plans. Archiving a visited place also hides its linked timeline events, stories, and photo albums from the public archive; restoring it brings them back. Members retain access in the admin area. Backups include archived records. Restored inactive historical accounts do not consume the two active-member slots.
 
 ## Quick start
 
@@ -51,7 +51,7 @@ The container listens on port 3000 and stores persistent data in /app/data. Use 
 
 ## Privacy
 
-Fresh installations default to public display. The administrator can switch the site to members-only mode. In public mode, travel diaries and their associated photos are visible to visitors; the admin area always requires login. Future trip plans, budgets, and external guide links remain in the authenticated admin area.
+Fresh installations default to public display. The administrator can switch the site to members-only mode. In public mode, visited-place stories and their photos are visible to visitors; the admin area always requires login. Future trip plans, budgets, and external guide links remain in the authenticated admin area.
 
 Do not upload photos or diary content that should remain private while the site is public. Switching to private mode cannot revoke copies that visitors have already downloaded or cached.
 

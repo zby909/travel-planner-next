@@ -134,7 +134,7 @@ export default async function HomePage() {
             <p>每一张照片背后，都有一次出发的理由。一页页翻下去，就是属于我们的旅行纪事。</p>
             <div className="editorial-memory-links">
               <Link href="/visited" className="editorial-arrow-link">进入足迹相册 <span aria-hidden="true">↗</span></Link>
-              <Link href="/memories" className="editorial-arrow-link">翻阅旅行日记 <span aria-hidden="true">↗</span></Link>
+              <Link href="/memories" className="editorial-arrow-link">翻阅旅行故事 <span aria-hidden="true">↗</span></Link>
             </div>
             <div className="editorial-moments-photo editorial-moments-photo-small">
               <Image src={secondMemory ? getPlaceImageUrl(secondMemory.image) : "/images/place-placeholder.svg"} alt={secondMemory ? `${secondMemory.name}的旅途` : "尚待记录的旅途"} fill unoptimized sizes="(max-width: 760px) 60vw, 23vw" />

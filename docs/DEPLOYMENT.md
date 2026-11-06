@@ -50,7 +50,7 @@ If the reverse proxy rewrites the Host header, configure APP_ORIGIN to the exact
 
 New installations default to public display. The administrator can switch to members-only mode under /admin/settings. The admin area always requires a member session.
 
-In public mode, travel diaries and their associated photos are visible to visitors. In private mode, travel pages and media require an authenticated member session. A private-mode switch cannot revoke content already copied, downloaded, cached, or indexed by visitors.
+In public mode, visited-place stories and their photos are visible to visitors. In private mode, travel pages and media require an authenticated member session. A private-mode switch cannot revoke content already copied, downloaded, cached, or indexed by visitors.
 
 ## GitHub Actions and GHCR
 

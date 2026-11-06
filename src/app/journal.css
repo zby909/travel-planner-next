@@ -392,3 +392,21 @@
  .editorial-topbar .top-nav{gap:9px;}
  .editorial-topbar .top-nav a{font-size:10px;}
 }
+/* Stories live inside their visited place; albums expand without leaving the atlas. */
+.atlas-place-stories{margin-top:18px;border-block:1px solid var(--ed-rule);}
+.atlas-place-stories>summary{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:48px;padding:12px 0;cursor:pointer;list-style:none;color:#56705c;font-size:12px;font-weight:650;}
+.atlas-place-stories>summary::-webkit-details-marker{display:none;}
+.atlas-place-stories>summary span{color:var(--ed-rust);font-size:21px;line-height:1;}
+.atlas-place-stories[open]>summary span{transform:rotate(45deg);}
+.atlas-place-story-list{display:grid;gap:24px;padding:8px 0 24px;}
+.atlas-place-story{min-width:0;padding-top:17px;border-top:1px solid var(--ed-rule);scroll-margin-top:108px;}
+.atlas-place-story h4{margin:8px 0;color:var(--ed-ink);font:400 22px/1.4 var(--ed-serif);}
+.atlas-place-story>p,.atlas-place-note{margin:8px 0 14px;color:#69786e;font-size:12px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere;}
+.atlas-place-story-photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.atlas-place-story-photos figure{position:relative;aspect-ratio:1.15;overflow:hidden;margin:0;background:#e3dfd5;}
+.atlas-place-story-photos img{object-fit:cover;}
+.atlas-place-note{padding-top:12px;border-top:1px solid var(--ed-rule);}
+@media(max-width:550px){
+ .atlas-place-story-photos{gap:6px;}
+ .atlas-place-story h4{font-size:19px;}
+}

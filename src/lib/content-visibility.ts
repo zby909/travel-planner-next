@@ -5,7 +5,7 @@ export const visibleTimelineWhere = {
   places: { none: { place: { isArchived: true } } },
 } satisfies Prisma.TimelineEntryWhereInput;
 
-// 不关联地点或关联展示中地点的日记可以在前台呈现。
+// 只有已归入展示中地点的故事才公开呈现；旧的孤立故事在后台保留待归类。
 export const visibleMemoryWhere = {
-  OR: [{ placeId: null }, { place: { isArchived: false } }],
+  place: { isArchived: false },
 } satisfies Prisma.TravelMemoryWhereInput;

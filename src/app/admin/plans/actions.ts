@@ -120,21 +120,19 @@ export async function saveTravelPlanAction(_state: PlanFormState, form: FormData
   redirect(`/admin/plans/${encodeURIComponent(id)}?saved=1`);
 }
 
-// 删除旅行计划及其专属行程、费用和攻略链接。
+// 删除旅行计划和花费、攻略；保留已经发生的旅行故事及其照片。
 export async function deleteTravelPlanAction(form: FormData): Promise<void> {
   const actor = await requireEditor();
   const id = String(form.get("id") ?? "").trim();
   if (!id || id.length > 64) throw new Error("无效的旅行计划编号");
   const fileNames = await prisma.$transaction(async tx => {
     const plan = await tx.travelPlan.findUnique({
-      where: { id }, include: { photos: true, memories: { include: { photos: true } } },
+      where: { id }, include: { photos: { where: { memoryId: null } } },
     });
     if (!plan) throw new Error("旅行计划不存在");
-    const photos = [...plan.photos, ...plan.memories.flatMap(memory => memory.photos)];
-    const assetIds = photos.flatMap(photo => [photo.mediaAssetId, mediaIdFromPath(photo.filePath)].filter((value): value is string => Boolean(value)));
-    const memoryIds = plan.memories.map(memory => memory.id);
-    await tx.travelPhoto.deleteMany({ where: { OR: [{ planId: id }, { memoryId: { in: memoryIds } }] } });
-    await tx.travelMemory.deleteMany({ where: { planId: id } });
+    const assetIds = plan.photos.flatMap(photo => [photo.mediaAssetId, mediaIdFromPath(photo.filePath)].filter((value): value is string => Boolean(value)));
+    await tx.travelPhoto.deleteMany({ where: { planId: id, memoryId: null } });
+    // 其它照片和故事由外键 SetNull 解除计划关联，不应因删除计划被销毁。
     await tx.travelPlan.delete({ where: { id } });
     await tx.auditLog.create({ data: { actorId: actor.id, action: "删除", entity: "旅行计划", entityId: id, summary: plan.title } });
     return releaseUnusedMedia(tx, assetIds);

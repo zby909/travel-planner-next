@@ -50,7 +50,7 @@ export default async function AdminHome() {
       <div className="admin-stats">
         <Link href="/admin/destinations"><strong>{destinations.length}</strong><span>心愿目的地 →</span></Link>
         <Link href="/admin/places"><strong>{places}</strong><span>已到访地点 →</span></Link>
-        <Link href="/admin/timeline"><strong>{timeline}</strong><span>旅行时间记录 →</span></Link>
+        <Link href="/admin/places"><strong>{timeline}</strong><span>历史时间记录 →</span></Link>
         <Link href="/admin/plans"><strong>{plans}</strong><span>旅行计划 →</span></Link>
       </div>
       {onboardingProgress < onboardingItems.length ? (
@@ -73,9 +73,8 @@ export default async function AdminHome() {
           <div className="admin-links">
             <Link href="/admin/destinations/new">＋ 新增心愿目的地</Link>
             <Link href="/admin/places/new">＋ 记录一个到访地点</Link>
-            <Link href="/admin/timeline?new=1">＋ 写下一条旅行时间记录</Link>
             <Link href="/admin/plans/new">＋ 创建旅行计划</Link>
-            <Link href="/admin/plans">＋ 管理旅行计划与日记</Link>
+            <Link href="/admin/places">＋ 管理故事与相册</Link>
           </div>
         </section>
         <section className="admin-panel">

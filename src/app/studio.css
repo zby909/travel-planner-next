@@ -361,3 +361,27 @@ a.admin-list-item:hover{border-color:#c9c4b5;transform:none;background:#eeece3;}
  .plan-guide-cover{height:170px;}
  .plan-guide-actions{gap:12px;}
 }
+.place-stories-section{margin-bottom:24px;scroll-margin-top:130px;}
+.place-stories-section>.timeline-editor-heading{align-items:flex-start;}
+.place-stories-section .memory-form-grid{grid-template-columns:1fr 1.4fr;}
+.place-story-form-wrap{padding:17px;}
+.place-story-form-wrap .memory-form{margin:0;}
+.place-more-options{scroll-margin-top:125px;}
+.place-settings{display:grid;gap:20px;padding:20px;}
+.place-settings>.admin-form{margin:0;}
+.place-create-form>.admin-panel{margin-bottom:20px;}
+.place-unassigned{margin-top:28px;}
+.place-assign-row{display:grid;grid-template-columns:minmax(150px,1fr) minmax(200px,1.2fr) auto;gap:12px;align-items:center;padding:15px 0;border-top:1px solid #e3e0d6;}
+.place-assign-row span{display:grid;gap:5px;min-width:0;}
+.place-assign-row strong{overflow-wrap:anywhere;font-size:13px;}
+.place-assign-row small{color:#839083;}
+.place-assign-row select{min-width:0;min-height:42px;padding:7px 10px;border:1px solid #d8d6ce;background:#fffdf8;}
+.place-assign-row button{min-height:42px;}
+@media(max-width:700px){
+ .place-stories-section .memory-form-grid{grid-template-columns:1fr;}
+ .place-story-form-wrap{padding:12px;}
+ .place-story-form-wrap .memory-form{padding:15px;}
+ .place-settings{padding:12px;}
+ .place-assign-row{grid-template-columns:1fr;}
+ .place-assign-row select,.place-assign-row button{width:100%;min-height:46px;}
+}

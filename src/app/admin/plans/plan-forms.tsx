@@ -92,7 +92,7 @@ export function TravelGuideLinkForm({ planId, initial }: { planId: string; initi
 // 删除计划前说明关联数据的处理方式并要求再次确认。
 export function DeleteTravelPlanButton() {
   return <button className="admin-danger" type="submit" onClick={event => {
-    if (!window.confirm("确定删除这趟旅行计划吗？其攻略入口、费用、旅行日记和照片也会一并删除；Stack-Nest 上的 HTML 页面不会被删除。")) event.preventDefault();
+    if (!window.confirm("确定删除这趟旅行计划吗？只删除计划、费用和攻略入口；已记录的地点故事及照片会保留。Stack-Nest 上的 HTML 页面不会被删除。")) event.preventDefault();
   }}>删除旅行计划</button>;
 }
 

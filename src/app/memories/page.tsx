@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "旅行日记｜我们的旅行手记",
+  title: "旅行故事｜我们的旅行手记",
   description: "把旅途中的照片、地点和小故事，按日期收藏起来。",
 };
 
@@ -26,7 +26,7 @@ function safePhotoUrl(photo: {
   return /^\/api\/media\/[a-f0-9-]{36}$/i.test(photo.filePath) ? photo.filePath : null;
 }
 
-// 按年份整理情侣共同维护的旅行日记与照片。
+// 按年份聚合去过的地方中的故事与照片；内容只从地点编辑入口维护。
 export default async function MemoriesPage() {
   await requireSiteContentAccess("/memories");
   const [settings, records] = await Promise.all([
@@ -64,13 +64,13 @@ export default async function MemoriesPage() {
         <h1>把旅途写下来，<br /><em>让日子留下来。</em></h1>
         <p>有些瞬间不在攻略里，也不在地图上。<br />一张照片、几句话，就足够让我们重新回到那一天。</p>
         <div className="memory-archive-stats">
-          <span><strong>{memories.length}</strong> 篇日记</span>
+          <span><strong>{memories.length}</strong> 段故事</span>
           <span><strong>{photoCount}</strong> 张照片</span>
         </div>
       </div>
     </section>
 
-    <section className="memory-archive page-width" aria-label="按年份整理的旅行日记">
+    <section className="memory-archive page-width" aria-label="按年份整理的旅行故事">
       <div className="memory-archive-intro">
         <div><p className="editorial-overline">A CHRONICLE OF LITTLE MOMENTS</p><h2>慢慢翻，<em>都是故事。</em></h2></div>
         <Link href="/visited" className="editorial-arrow-link">回到旅行足迹 <span aria-hidden="true">↗</span></Link>
@@ -101,8 +101,8 @@ export default async function MemoriesPage() {
         </section>;
       }) : <div className="memory-archive-empty">
         <span>THE FIRST PAGE IS WAITING</span>
-        <h3>还没有写下第一篇旅行日记。</h3>
-        <p>登录编辑室，打开一趟旅行计划，就可以从某一天的小故事开始记录。</p>
+        <h3>还没有留下第一段故事。</h3>
+        <p>登录编辑室，在「去过的地方」里写几句话、上传几张照片，就会自动汇集到这里。</p>
         <Link href="/login">进入编辑室 ↗</Link>
       </div>}
     </section>

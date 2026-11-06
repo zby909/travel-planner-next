@@ -28,7 +28,7 @@ src/
     admin/       Authenticated editorial workspace and Server Actions
     api/         Authentication, media, health and scoped CLI APIs
     destinations/ Destination detail pages
-    memories/    Public travel diary archive
+    memories/    Public year-grouped aggregation of visited-place stories
     visited/     Visited-place map, gallery and timeline
   components/    Shared UI components
   lib/           Authentication, access control, formatting and storage helpers
@@ -49,7 +49,7 @@ docs/             User, deployment and contributor documentation
 - Destination/place archiving never deletes records. Any timeline linked to an archived place and any diary belonging to that place is hidden from public pages and anonymous media access until the place is restored.
 - All cover/photo removal flows use `src/lib/media-lifecycle.ts` in the same database transaction as the reference change, then remove files after commit. Shared content, archived content and active drafts retain their referenced assets.
 - `scripts/prune-staged-media.mjs` reclaims old unreferenced media and interrupted uploads at startup, and removes expired drafts/sessions.
-- Travel diaries belong to a trip plan, can optionally reference one visited place, and can contain multiple managed photo assets.
+- Visited places own their stories and photo albums. Trip plans do not control memory creation or deletion. Historical plan-linked memories are preserved, and unassigned stories can be linked to a place from the admin list.
 - Expense amounts are stored in the currency's minor unit to avoid floating-point accumulation errors. Add/edit/delete share the same validation and totals are always derived, never entered separately.
 - There is no internal `TravelPlanDay`, manually maintained `actualBudget`, payer or receipt subsystem. Upgrade migration `20261106100000_close_lightweight_records` preserves populated legacy values in the `AppSetting` key `legacy_lightweight_20261106` before removing unused columns/tables.
 - Backup export takes a SQLite write lock while creating a `VACUUM INTO` snapshot and copying media, then releases it before ZIP compression. Restore validates file hashes and runs only trusted repository migrations against a staged copy before preview. See the [backup guide](PRIVATE-BACKUP-RESTORE.md).

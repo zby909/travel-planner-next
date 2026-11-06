@@ -13,15 +13,14 @@ const NAV_GROUPS = [
   {
     caption: "CONTENT / 内容管理",
     items: [
-      { href: "/admin/destinations", label: "目的地" },
-      { href: "/admin/places", label: "旅行足迹" },
-      { href: "/admin/timeline", label: "旅行时间轴" },
+      { href: "/admin/destinations", label: "想去的地方" },
+      { href: "/admin/places", label: "去过的地方" },
     ],
   },
   {
     caption: "PLANNING / 旅行数据",
     items: [
-      { href: "/admin/plans", label: "旅行计划" },
+      { href: "/admin/plans", label: "旅行计划与花费" },
     ],
   },
   {

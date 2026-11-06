@@ -45,24 +45,27 @@ export async function verifyRecordLoops({ page, browser, host, prisma, planId, d
     assert.equal((await guest.goto(`${host}/destinations/${destinationId}`)).status(), 200);
 
     await page.goto(`${host}/admin/places/test-town`);
+    await page.locator(".place-more-options").evaluate(details => { details.open = true; });
     await page.getByRole("button", { name: "归档记录", exact: true }).click();
     await page.getByRole("button", { name: "恢复展示", exact: true }).waitFor();
     await guest.goto(`${host}/visited`);
     assert.equal(await guest.locator("#place-test-town").count(), 0);
-    assert.equal(await guest.locator(".atlas-entry").count(), 0, "关联归档足迹的时间轴仍在前台");
+    assert.equal(await guest.locator(".atlas-entry").filter({ hasText: "示例小镇" }).count(), 0, "关联归档足迹的时间轴仍在前台");
     await guest.goto(`${host}/memories`);
-    assert.equal(await guest.locator(".memory-story").count(), 0);
+    assert.equal(await guest.locator(".memory-story").filter({ hasText: "抵达京都的第一天" }).count(), 0);
     assert.equal((await guest.request.get(host + photoUrl)).status(), 404, "归档日记照片被匿名访问");
     const memberPhoto = await page.request.get(host + photoUrl);
     assert.equal(memberPhoto.status(), 200);
     assert.match(memberPhoto.headers()["cache-control"], /private/);
     assert.equal(await prisma.travelPhoto.count({ where: { memoryId } }), 1, "归档不能删照片");
+    await page.locator(".place-more-options").evaluate(details => { details.open = true; });
     await page.getByRole("button", { name: "恢复展示", exact: true }).click();
+    await page.locator(".place-more-options").evaluate(details => { details.open = true; });
     await page.getByRole("button", { name: "归档记录", exact: true }).waitFor();
     assert.equal((await guest.request.get(host + photoUrl)).status(), 200);
     await guest.goto(`${host}/visited`);
     assert.equal(await guest.locator("#place-test-town").count(), 1);
-    assert.equal(await guest.locator(".atlas-entry").count(), 1);
+    assert.ok((await guest.locator(".atlas-entry").count()) >= 1, "恢复地点后时间轴应重新显示故事");
 
     const oldCover = (await prisma.destination.findUniqueOrThrow({ where: { id: destinationId } })).imagePath;
     const oldId = oldCover.split("/").at(-1);
@@ -70,6 +73,7 @@ export async function verifyRecordLoops({ page, browser, host, prisma, planId, d
     // 两个记录共用的图片要等最后一个引用被替换后才删除。
     for (const route of [`/admin/destinations/${destinationId}`, "/admin/places/test-town"]) {
       await page.goto(host + route);
+      if (route.includes("/places/")) await page.locator(".place-more-options").evaluate(details => { details.open = true; });
       await page.locator('input[name="image"]').setInputFiles({ name: "new-cover.png", mimeType: "image/png", buffer: photoBuffer });
       await page.getByRole("button", { name: "保存封面照片" }).click();
       await page.waitForURL(url => url.searchParams.get("photo") === "1");
@@ -82,7 +86,7 @@ export async function verifyRecordLoops({ page, browser, host, prisma, planId, d
 
     // 日记照片可被封面共用；删日记不能误删这张封面。
     await prisma.destination.update({ where: { id: "test-island" }, data: { imagePath: photoUrl } });
-    await page.goto(`${host}/admin/plans/${planId}`);
+    await page.goto(`${host}/admin/places/test-town`);
     page.once("dialog", dialog => dialog.accept());
     await page.locator(".memory-admin-photo").first().getByRole("button", { name: "移除照片" }).click();
     await page.waitForURL(url => url.searchParams.get("photoDeleted") === "1");

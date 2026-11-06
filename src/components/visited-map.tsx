@@ -189,6 +189,8 @@ export function VisitedMap({ places, groupLabels = DEFAULT_GROUP_NAMES }: { plac
       if (!placeId) return;
       const target = document.getElementById("place-" + placeId);
       if (!target) return;
+      const storyAlbum = target.querySelector<HTMLDetailsElement>("details.atlas-place-stories");
+      if (storyAlbum) storyAlbum.open = true;
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
       target.focus({ preventScroll: true });
@@ -203,7 +205,7 @@ export function VisitedMap({ places, groupLabels = DEFAULT_GROUP_NAMES }: { plac
           const params = rawParams as EChartsParams;
           const item = params.data;
           if (item?.value) {
-            return `<strong>${escapeHtml(item.name ?? params.name)}</strong><br/>${escapeHtml(item.placeGroup ?? "已到访")}<br/><small>${escapeHtml(item.note)}</small><br/><small>点击地图点，查看对应照片记录</small>`;
+            return `<strong>${escapeHtml(item.name ?? params.name)}</strong><br/>${escapeHtml(item.placeGroup ?? "已到访")}<br/><small>${escapeHtml(item.note)}</small><br/><small>点击地图点，翻阅对应故事和相册</small>`;
           }
           const name = String(params.name ?? "");
           const matched = groupedRegions.get(name) ?? [];

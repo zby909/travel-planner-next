@@ -182,24 +182,44 @@ export function DestinationCreateForm() {
   </form>;
 }
 
-// 新建足迹地点，坐标为可选项；补齐后会自动出现在地图上。
+// 新建足迹时可以一次保存到访地点、首篇故事和相册，不必创建旅行计划。
 export function PlaceCreateForm({ groupLabels }: { groupLabels: GroupLabels }) {
   const [state, action, pending] = useActionState(createPlaceAction, INITIAL);
-  return <form action={action} className="admin-form admin-panel">
-    <div className="admin-form-grid">
-      <Field name="name" label="地点名称" required />
-      <Field name="region" label="国家 / 省份 / 地区" required />
-      <label>到访归属<select name="group" defaultValue="mine"><option value="mine">{groupLabels.mine}</option><option value="her">{groupLabels.her}</option><option value="both">{groupLabels.both}</option></select></label>
-      <Field name="whenLabel" label="到访日期或时间描述" />
-      <Field name="country" label="国家（地图用）" />
-      <Field name="province" label="省份 / 州（地图用）" />
-      <Field name="city" label="城市（地图用）" />
-      <Field name="latitude" label="纬度（可选）" type="number" step="any" />
-      <Field name="longitude" label="经度（可选）" type="number" step="any" />
-    </div>
-    <label>地点备注<textarea name="mapNote" rows={3} /></label>
-    <p className="muted-copy">不填写坐标也可以保存；封面照片可以之后通过 AI 图片导入补充。</p>
-    <Feedback error={state.error} pending={pending} submitText="新增足迹地点" />
+  return <form action={action} className="admin-form place-create-form">
+    <section className="admin-panel">
+      <h2>去过哪里？</h2>
+      <div className="admin-form-grid">
+        <Field name="name" label="地点名称" required placeholder="例如：京都" />
+        <Field name="region" label="国家 / 地区" required placeholder="例如：日本 · 关西" />
+        <label>和谁一起<select name="group" defaultValue="both"><option value="both">{groupLabels.both}</option><option value="mine">{groupLabels.mine}</option><option value="her">{groupLabels.her}</option></select></label>
+        <Field name="whenLabel" label="到访时间描述（可选）" placeholder="例如：2026 年秋天" />
+      </div>
+    </section>
+    <section className="admin-panel">
+      <h2>故事与相册 <span className="muted-copy">· 可选</span></h2>
+      <p className="muted-copy">一张照片、几句话就足够；上传首张照片后会自动作为这个地点的封面，以后还能继续添加。</p>
+      <div className="admin-form-grid">
+        <Field name="storyDate" label="到访日期" type="date" />
+        <Field name="storyTitle" label="故事标题" placeholder="不填写就使用地点名称" />
+      </div>
+      <label>那天的故事<textarea name="storyContent" maxLength={4000} rows={4} placeholder="想记录的风景、经历和心情……" /></label>
+      <label>旅行照片<input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple /></label>
+      <p className="muted-copy">支持 JPG、PNG、WebP；单次最多 8 张、总大小不超过 8 MiB。照片自动压缩并清除 GPS/EXIF。</p>
+    </section>
+    <details className="admin-disclosure">
+      <summary>地图坐标与更多信息（可选）</summary>
+      <section className="admin-panel">
+        <div className="admin-form-grid">
+          <Field name="country" label="国家（地图用）" />
+          <Field name="province" label="省份 / 州（地图用）" />
+          <Field name="city" label="城市（地图用）" />
+          <Field name="latitude" label="纬度" type="number" step="any" />
+          <Field name="longitude" label="经度" type="number" step="any" />
+        </div>
+        <label>地图说明<textarea name="mapNote" rows={3} /></label>
+      </section>
+    </details>
+    <Feedback error={state.error} pending={pending} submitText="保存这个去过的地方" />
   </form>;
 }
 
