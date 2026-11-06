@@ -1,91 +1,56 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireEditor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { removeStoredMediaFiles } from "@/lib/media-storage";
 import { mediaIdFromPath, releaseUnusedMedia } from "@/lib/media-lifecycle";
-import { attachStoryPhotos, optionalStoryDate, prepareStoryPhotos } from "@/lib/story-photos";
+import { optionalStoryDate } from "@/lib/story-photos";
 import { refreshPlaceCoverAfterRemoval } from "@/lib/place-cover";
 
 export type StoryFormState = { error: string };
 
-// 校验表单文本长度，拒绝空值和异常输入。
-function storyField(form: FormData, key: string, max: number, required = false): string {
-  const text = String(form.get(key) ?? "").trim();
-  if (text.length > max || (required && !text)) throw new Error("请检查故事标题和内容");
-  return text;
+// 校验地点回忆文字、日期或 ID 的输入长度。
+function noteField(form: FormData, key: string, max: number): string {
+  const value = String(form.get(key) ?? "").trim();
+  if (value.length > max) throw new Error("输入内容过长");
+  return value;
 }
 
-// 为指定地点写故事或追加照片；不要求先创建旅行计划。
+// 每个地点只有一份文字，保存时创建或更新，照片始终独立上传不受文字保存影响。
 export async function savePlaceStoryAction(_state: StoryFormState, form: FormData): Promise<StoryFormState> {
   const actor = await requireEditor();
-  const placeId = storyField(form, "placeId", 64, true);
-  const requestedId = storyField(form, "id", 64);
-  const written: string[] = [];
-  const memoryId = requestedId || randomUUID();
+  const placeId = noteField(form, "placeId", 64);
   try {
-    const place = await prisma.visitedPlace.findUnique({ where: { id: placeId }, select: { id: true, name: true } });
-    if (!place) throw new Error("到访地点不存在");
-    const title = storyField(form, "title", 120) || place.name;
-    const content = storyField(form, "content", 4000);
-    const happenedAt = optionalStoryDate(storyField(form, "happenedAt", 10));
-    const prepared = await prepareStoryPhotos(form);
-    written.push(...prepared.map(photo => photo.fileName));
+    if (!placeId) throw new Error("缺少足迹地点");
+    const content = noteField(form, "content", 20000);
+    const happenedAt = optionalStoryDate(noteField(form, "happenedAt", 10));
     await prisma.$transaction(async tx => {
-      const current = requestedId
-        ? await tx.travelMemory.findFirst({ where: { id: requestedId, placeId }, select: { id: true } })
-        : null;
-      if (requestedId && !current) throw new Error("故事不存在或不属于这个地点");
-      if (!await tx.visitedPlace.findUnique({ where: { id: placeId }, select: { id: true } })) throw new Error("地点已删除");
-      const data = { title, content, happenedAt, placeId };
-      if (current) await tx.travelMemory.update({ where: { id: memoryId }, data });
-      else await tx.travelMemory.create({ data: { id: memoryId, ...data } });
-      await attachStoryPhotos(tx, actor.id, memoryId, prepared);
+      const place = await tx.visitedPlace.findUnique({ where: { id: placeId }, select: { id: true, name: true } });
+      if (!place) throw new Error("地点不存在");
+      const note = await tx.travelMemory.upsert({
+        where: { placeId },
+        create: { placeId, title: place.name, content, happenedAt },
+        update: { title: place.name, content, happenedAt },
+        select: { id: true },
+      });
       await tx.auditLog.create({ data: {
-        actorId: actor.id, action: current ? "更新" : "新增", entity: "旅行故事",
-        entityId: memoryId, summary: `${place.name} · ${title}${prepared.length ? ` · ${prepared.length} 张照片` : ""}`,
+        actorId: actor.id, action: "更新", entity: "地点旅行记录", entityId: note.id, summary: place.name,
       } });
     });
-    written.length = 0;
     revalidatePath("/");
     revalidatePath("/visited");
     revalidatePath("/memories");
     revalidatePath("/admin/places");
     revalidatePath(`/admin/places/${placeId}`);
   } catch (error) {
-    await removeStoredMediaFiles(written);
-    return { error: error instanceof Error ? error.message : "保存故事失败" };
+    return { error: error instanceof Error ? error.message : "保存失败" };
   }
   redirect(`/admin/places/${encodeURIComponent(placeId)}?storySaved=1#place-stories`);
 }
 
-// 删除一个地点下的故事和独占照片，不影响同地点的其它故事。
-export async function deletePlaceStoryAction(form: FormData): Promise<void> {
-  const actor = await requireEditor();
-  const placeId = String(form.get("placeId") ?? "").trim();
-  const id = String(form.get("id") ?? "").trim();
-  if (!placeId || placeId.length > 64 || !id || id.length > 64) throw new Error("无效的故事编号");
-  const files = await prisma.$transaction(async tx => {
-    const story = await tx.travelMemory.findFirst({ where: { id, placeId }, include: { photos: true } });
-    if (!story) throw new Error("故事不存在或不属于这个地点");
-    const ids = story.photos.flatMap(photo => [photo.mediaAssetId, mediaIdFromPath(photo.filePath)].filter((x): x is string => Boolean(x)));
-    await tx.travelPhoto.deleteMany({ where: { memoryId: id } });
-    await tx.travelMemory.delete({ where: { id } });
-    await refreshPlaceCoverAfterRemoval(tx, placeId, ids);
-    await tx.auditLog.create({ data: { actorId: actor.id, action: "删除", entity: "旅行故事", entityId: id, summary: story.title } });
-    return releaseUnusedMedia(tx, ids);
-  });
-  await removeStoredMediaFiles(files);
-  revalidatePath("/visited");
-  revalidatePath("/memories");
-  revalidatePath(`/admin/places/${placeId}`);
-  redirect(`/admin/places/${encodeURIComponent(placeId)}?storyDeleted=1#place-stories`);
-}
-
-// 移除指定地点故事中的单张照片并清理不再被引用的媒体文件。
+// 从统一地点相册中移除单张照片，并正确维护封面及媒体引用计数。
 export async function deletePlaceStoryPhotoAction(form: FormData): Promise<void> {
   const actor = await requireEditor();
   const placeId = String(form.get("placeId") ?? "").trim();
@@ -108,7 +73,32 @@ export async function deletePlaceStoryPhotoAction(form: FormData): Promise<void>
   redirect(`/admin/places/${encodeURIComponent(placeId)}?photoDeleted=1#place-stories`);
 }
 
-// 将历史上未关联地点的故事归入指定足迹，原旅行计划关联与照片均保留。
+// 在同一相册里选择封面，必要时回收不再被引用的旧单独封面文件。
+export async function setPlaceCoverFromAlbumAction(form: FormData): Promise<void> {
+  const actor = await requireEditor();
+  const placeId = String(form.get("placeId") ?? "").trim();
+  const photoId = String(form.get("photoId") ?? "").trim();
+  if (!placeId || placeId.length > 64 || !photoId || photoId.length > 64) throw Error("无效的照片参数");
+  const files = await prisma.$transaction(async tx => {
+    const place = await tx.visitedPlace.findUnique({ where: { id: placeId }, select: { image: true } });
+    const photo = await tx.travelPhoto.findFirst({ where: { id: photoId, memory: { placeId } },
+      include: { mediaAsset: { select: { id: true, fileName: true, status: true } } } });
+    if (!place || !photo?.mediaAsset || photo.mediaAsset.status !== "PUBLIC" ||
+        photo.mediaAsset.fileName !== `${photo.mediaAsset.id}.webp`) throw Error("照片不属于此地点");
+    const previousId = mediaIdFromPath(place.image);
+    await tx.visitedPlace.update({ where: { id: placeId }, data: { image: `api/media/${photo.mediaAsset.id}` } });
+    await tx.auditLog.create({ data: { actorId: actor.id, action: "更新", entity: "足迹封面", entityId: placeId, summary: photoId } });
+    return releaseUnusedMedia(tx, previousId ? [previousId] : []);
+  });
+  await removeStoredMediaFiles(files);
+  revalidatePath("/");
+  revalidatePath("/visited");
+  revalidatePath(`/admin/places/${placeId}`);
+  revalidatePath("/admin/places");
+  redirect(`/admin/places/${encodeURIComponent(placeId)}?coverSaved=1#place-stories`);
+}
+
+// 老日记归入地点时合并其文字与照片，不会创建第二篇或破坏计划关联的媒体。
 export async function assignStoryPlaceAction(form: FormData): Promise<void> {
   const actor = await requireEditor();
   const storyId = String(form.get("storyId") ?? "").trim();
@@ -118,8 +108,22 @@ export async function assignStoryPlaceAction(form: FormData): Promise<void> {
     const story = await tx.travelMemory.findFirst({ where: { id: storyId, placeId: null } });
     const place = await tx.visitedPlace.findUnique({ where: { id: placeId }, select: { name: true } });
     if (!story || !place) throw new Error("故事或地点不存在，请刷新重试");
-    await tx.travelMemory.update({ where: { id: storyId }, data: { placeId } });
-    await tx.auditLog.create({ data: { actorId: actor.id, action: "整理", entity: "旅行故事", entityId: storyId, summary: `${story.title} → ${place.name}` } });
+    const existing = await tx.travelMemory.findUnique({ where: { placeId } });
+    if (existing) {
+      const appendix = [story.title !== place.name ? story.title : "", story.content].filter(Boolean).join("\n");
+      const next = [existing.content, appendix].filter(Boolean).join("\n\n");
+      await tx.travelMemory.update({ where: { id: existing.id }, data: {
+        content: next, happenedAt: existing.happenedAt ?? story.happenedAt,
+      } });
+      await tx.travelPhoto.updateMany({ where: { memoryId: storyId }, data: { memoryId: existing.id } });
+      await tx.travelMemory.delete({ where: { id: storyId } });
+    } else {
+      await tx.travelMemory.update({ where: { id: storyId }, data: {
+        placeId, title: place.name,
+        content: [story.title !== place.name ? story.title : "", story.content].filter(Boolean).join("\n"),
+      } });
+    }
+    await tx.auditLog.create({ data: { actorId: actor.id, action: "整理", entity: "地点旅行记录", entityId: storyId, summary: `${story.title} → ${place.name}` } });
   });
   revalidatePath("/visited");
   revalidatePath("/memories");

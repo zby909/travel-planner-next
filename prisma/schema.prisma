@@ -178,7 +178,7 @@ model VisitedPlace {
   mapNote   String?
   isArchived Boolean        @default(false)
   timeline  TimelinePlace[]
-  memories  TravelMemory[]
+  memory    TravelMemory?
 
   @@index([group, sortOrder])
 }
@@ -264,7 +264,7 @@ model TravelMemory {
   title      String
   content    String
   happenedAt DateTime?
-  placeId    String?
+  placeId    String?       @unique
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   plan       TravelPlan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
@@ -272,7 +272,6 @@ model TravelMemory {
   photos     TravelPhoto[] @relation("MemoryPhotos")
 
   @@index([planId, happenedAt])
-  @@index([placeId])
 }
 
 model TravelPhoto {

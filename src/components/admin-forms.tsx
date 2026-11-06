@@ -182,7 +182,7 @@ export function DestinationCreateForm() {
   </form>;
 }
 
-// 新建足迹时可以一次保存到访地点、首篇故事和相册，不必创建旅行计划。
+// 新建地点只录入一次文字；照片转到地点详情页分块上传，避免表单超时。
 export function PlaceCreateForm({ groupLabels }: { groupLabels: GroupLabels }) {
   const [state, action, pending] = useActionState(createPlaceAction, INITIAL);
   return <form action={action} className="admin-form place-create-form">
@@ -196,15 +196,10 @@ export function PlaceCreateForm({ groupLabels }: { groupLabels: GroupLabels }) {
       </div>
     </section>
     <section className="admin-panel">
-      <h2>故事与相册 <span className="muted-copy">· 可选</span></h2>
-      <p className="muted-copy">一张照片、几句话就足够；上传首张照片后会自动作为这个地点的封面，以后还能继续添加。</p>
-      <div className="admin-form-grid">
-        <Field name="storyDate" label="到访日期" type="date" />
-        <Field name="storyTitle" label="故事标题" placeholder="不填写就使用地点名称" />
-      </div>
-      <label>那天的故事<textarea name="storyContent" maxLength={4000} rows={4} placeholder="想记录的风景、经历和心情……" /></label>
-      <label>旅行照片<input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple /></label>
-      <p className="muted-copy">支持 JPG、PNG、WebP；单次最多 8 张、总大小不超过 8 MiB。照片自动压缩并清除 GPS/EXIF。</p>
+      <h2>旅行记录 <span className="muted-copy">· 可选</span></h2>
+      <p className="muted-copy">每个地点只有一份文字，随时可继续修改。创建后进入相册逐张上传照片，可以看到上传进度。</p>
+      <label>到访日期<input type="date" name="storyDate" /></label>
+      <label>想记录的话<textarea name="storyContent" maxLength={20000} rows={5} placeholder="写下关于这个地方的经历和感受……" /></label>
     </section>
     <details className="admin-disclosure">
       <summary>地图坐标与更多信息（可选）</summary>

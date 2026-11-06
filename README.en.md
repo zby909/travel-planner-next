@@ -15,7 +15,7 @@ A self-hosted travel archive for two people. Record visited places with stories 
 - Reversible destination/place archiving with consistent page, story, and media visibility.
 - Reference-aware media cleanup that preserves shared photos and archived records.
 - Administrator-only ZIP export and verified restore on a blank instance, including older schema upgrades.
-- Stories and photo galleries live under visited places, with multiple visits per place and no required trip plan.
+- Each visited place holds one editable note and photo album, not multiple diaries. Photos upload one by one with a progress bar; failed photos can be retried without resending previously successful photos (20 MiB per image).
 - Photo processing that converts uploads to WebP and strips EXIF/GPS metadata.
 - Public or members-only site visibility.
 - AI-assisted data import through a scoped API token, travelctl, and an Agent Skill.

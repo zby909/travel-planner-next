@@ -32,6 +32,8 @@ jobs:
         run: npm run build
         env:
           DATABASE_URL: file:../data/ci-build.db
+      - name: Preserve historical place notes and photos
+        run: npm run test:place-note:migration
       - name: Production startup and persistence smoke test
         run: npm run test:production:smoke
         env:

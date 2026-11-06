@@ -13,7 +13,7 @@ docker compose up -d --build
 docker compose logs -f
 ~~~
 
-The application listens on container port 3000. The default health endpoint is /api/health. The Compose file mounts ./data to /app/data, which contains the SQLite database and uploaded photos.
+The application listens on container port 3000. The default health endpoint is /api/health. The Compose file mounts ./data to /app/data, which contains SQLite and uploaded photos. Photo uploads use a single request per image with a browser progress bar; no resumable upload state is stored.
 
 The container runs as UID 1001. Ensure the mounted data directory is writable by that user.
 
@@ -68,7 +68,7 @@ Prefer deploying a fixed SHA tag when reproducibility matters.
 
 The repository builds and publishes images; it does **not** automatically deploy to StackNest. After the image build succeeds, manually update the existing application in StackNest or use `stacknest-deploy app deploy` with the existing image address, application-scoped Token file, and current generation. Keep any configured registry proxy prefix. Do not silently switch a configured `:latest` address to another tag or digest.
 
-Before an upgrade, download a current backup from `/admin/restore`. Keep `/app/data` mounted, and never recreate the data volume during an image update. The image applies pending Prisma migrations at startup. A successful container rollback alone does not roll back a database migration.
+Before an upgrade, download a current backup from `/admin/restore`. Keep `/app/data` mounted, and never recreate the data volume during an image update. The image applies pending Prisma migrations at startup. Migration `20261106230000_one_note_per_place` merges historical multiple diaries for each place into a single text while retaining all photo references and unassigned memories. The container first creates a consistent SQLite snapshot at `/app/data/pre-migration-backups/before-one-note-per-place-20261107.db` when that migration is pending and place notes exist; keep this file and the existing uploads directory safe. Also download an administrator backup when available. A successful container rollback alone does not roll back a database migration.
 
 Wait for the exact deployment generation to become `ready`, then check `/api/health` and the public or members-only pages. Only report success after both task completion and application verification. See [Backup and restore](PRIVATE-BACKUP-RESTORE.md) for recovery.
 

@@ -71,16 +71,18 @@ export async function verifyRecordLoops({ page, browser, host, prisma, planId, d
     const oldId = oldCover.split("/").at(-1);
     await prisma.visitedPlace.update({ where: { id: "test-town" }, data: { image: oldCover } });
     // 两个记录共用的图片要等最后一个引用被替换后才删除。
-    for (const route of [`/admin/destinations/${destinationId}`, "/admin/places/test-town"]) {
-      await page.goto(host + route);
-      if (route.includes("/places/")) await page.locator(".place-more-options").evaluate(details => { details.open = true; });
-      await page.locator('input[name="image"]').setInputFiles({ name: "new-cover.png", mimeType: "image/png", buffer: photoBuffer });
-      await page.getByRole("button", { name: "保存封面照片" }).click();
-      await page.waitForURL(url => url.searchParams.get("photo") === "1");
-      const shared = await prisma.mediaAsset.findUnique({ where: { id: oldId } });
-      if (route.includes("destinations")) assert.ok(shared, "仍被足迹引用的封面被误删");
-      else assert.equal(shared, null, "最后引用移除后旧封面未清理");
-    }
+    await page.goto(`${host}/admin/destinations/${destinationId}`);
+    await page.locator('input[name="image"]').setInputFiles({ name: "new-cover.png", mimeType: "image/png", buffer: photoBuffer });
+    await page.getByRole("button", { name: "保存封面照片" }).click();
+    await page.waitForURL(url => url.searchParams.get("photo") === "1");
+    assert.ok(await prisma.mediaAsset.findUnique({ where: { id: oldId } }), "仍被足迹引用的旧封面被误删");
+
+    // 地点照片只从相册上传，选择相册已有照片作为新封面。
+    await page.goto(`${host}/admin/places/test-town`);
+    await page.locator(".place-photo-actions").getByRole("button", { name: "设为封面" }).first().click();
+    await page.waitForURL(url => url.searchParams.get("coverSaved") === "1");
+    assert.equal(await prisma.mediaAsset.findUnique({ where: { id: oldId } }), null,
+      "最后一处旧封面引用移除后未清理");
     assert.equal((await guest.request.get(host + oldCover)).status(), 404);
     assert.equal(existsSync(join(process.env.UPLOAD_DIR, `${oldId}.webp`)), false);
 

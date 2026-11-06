@@ -18,7 +18,7 @@ npm run user:create -- owner "管理员" ADMIN
 npm run dev
 ~~~
 
-The default SQLite URL in .env.example points to data/travel.db. Prisma resolves this path relative to prisma/schema.prisma. The upload directory defaults to data/uploads/; set UPLOAD_DIR only when a different persistent directory is required.
+The default SQLite URL in .env.example points to data/travel.db. Prisma resolves this path relative to prisma/schema.prisma. The upload directory defaults to data/uploads/; set UPLOAD_DIR only when a different persistent directory is required. Uploaded photos are written to that persistent directory after each successful request; there are no photo-upload chunk sessions.
 
 ## Main source layout
 
@@ -49,7 +49,8 @@ docs/             User, deployment and contributor documentation
 - Destination/place archiving never deletes records. Any timeline linked to an archived place and any diary belonging to that place is hidden from public pages and anonymous media access until the place is restored.
 - All cover/photo removal flows use `src/lib/media-lifecycle.ts` in the same database transaction as the reference change, then remove files after commit. Shared content, archived content and active drafts retain their referenced assets.
 - `scripts/prune-staged-media.mjs` reclaims old unreferenced media and interrupted uploads at startup, and removes expired drafts/sessions.
-- Visited places own their stories and photo albums. Trip plans do not control memory creation or deletion. Historical plan-linked memories are preserved, and unassigned stories can be linked to a place from the admin list.
+- Each visited place has at most one TravelMemory note (unique nullable placeId), with one editable text and one photo gallery; trip plans never control its creation or deletion. Migration 20261106230000_one_note_per_place merges multiple historical entries per place without deleting any photos or unassigned entries; unassigned entries can still be merged manually.
+- Authenticated same-origin POST /api/admin/place-photos accepts one JPG/PNG/WebP image per request (max 20 MiB). The browser uses XHR progress events and uploads selected images sequentially. Failed images can be retried; completed requests are saved independently. Server-side Sharp validation strips EXIF/GPS and encodes WebP. A location gallery supports up to 120 photos and directly selects the cover image.
 - Expense amounts are stored in the currency's minor unit to avoid floating-point accumulation errors. Add/edit/delete share the same validation and totals are always derived, never entered separately.
 - There is no internal `TravelPlanDay`, manually maintained `actualBudget`, payer or receipt subsystem. Upgrade migration `20261106100000_close_lightweight_records` preserves populated legacy values in the `AppSetting` key `legacy_lightweight_20261106` before removing unused columns/tables.
 - Backup export takes a SQLite write lock while creating a `VACUUM INTO` snapshot and copying media, then releases it before ZIP compression. Restore validates file hashes and runs only trusted repository migrations against a staged copy before preview. See the [backup guide](PRIVATE-BACKUP-RESTORE.md).
@@ -77,7 +78,8 @@ Additional integration tests:
 
 | Command | Purpose |
 | --- | --- |
-| npm run test:auth:e2e | Browser login, two-member permissions, expense editing, archive/restore and related stories, shared cover/photo cleanup, public/private access |
+| npm run test:auth:e2e | Browser login, two-member permissions, photo progress and failed-upload retry, archive/restore, shared media cleanup and public/private access |
+| npm run test:place-note:migration | Synthetic legacy SQLite merge checks for multi-note text, all original photos and unassigned entries |
 | npm run test:import:e2e | Scoped tokens, preview/commit/cancel, CLI, reversible archive updates and reference-aware media cleanup |
 | npm run test:production:smoke | Blank database initialization and persistence after restart |
 | npm run test:backup:restore | Real export/restore roundtrip, old-schema migration preservation, manifest tampering, account isolation, copy replay and SQLite swap rollback |

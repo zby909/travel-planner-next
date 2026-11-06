@@ -21,9 +21,8 @@ function storyImageUrl(photo: { filePath: string; mediaAsset: { id: string; stat
 }
 
 // 优先采用地点已有的时间描述，未填写时显示最新一篇带日期故事的时间。
-function visitDateLabel(whenLabel: string, stories: { happenedAt: Date | null }[]): string {
-  const date = stories.find(story => story.happenedAt)?.happenedAt;
-  return whenLabel || (date ? formatDate(date) : "到访时间未记录");
+function visitDateLabel(whenLabel: string, note: { happenedAt: Date | null } | null): string {
+  return whenLabel || (note?.happenedAt ? formatDate(note.happenedAt) : "到访时间未记录");
 }
 
 // 将足迹地图、地点故事、摄影相册和历史时间轴串联成旅行档案。
@@ -32,9 +31,8 @@ export default async function VisitedPage() {
   const [settings, places, timeline] = await Promise.all([
     getSiteSettings(),
     prisma.visitedPlace.findMany({ where: { isArchived: false }, orderBy: { sortOrder: "asc" },
-      include: { memories: { orderBy: [{ happenedAt: "desc" }, { createdAt: "desc" }],
-        include: { photos: { orderBy: { sortOrder: "asc" },
-          include: { mediaAsset: { select: { id: true, status: true, fileName: true } } } } } } } }),
+      include: { memory: { include: { photos: { orderBy: { sortOrder: "asc" },
+        include: { mediaAsset: { select: { id: true, status: true, fileName: true } } } } } } } }),
     prisma.timelineEntry.findMany({
       where: visibleTimelineWhere,
       orderBy: [{ year: "asc" }, { sortOrder: "asc" }],
@@ -47,10 +45,10 @@ export default async function VisitedPage() {
   const bothCount = places.filter(place => place.group === "both").length;
   const herCount = places.filter(place => place.group === "her").length;
   const mineCount = places.filter(place => place.group === "mine").length;
-  const datedStories = places.flatMap(place => place.memories.flatMap(story => story.happenedAt
-    ? [{ id: story.id, year: story.happenedAt.getUTCFullYear(), happenedAt: story.happenedAt, title: story.title,
-      note: story.content, place }]
-    : []));
+  const datedStories = places.flatMap(place => place.memory?.happenedAt
+    ? [{ id: place.memory.id, year: place.memory.happenedAt.getUTCFullYear(), happenedAt: place.memory.happenedAt,
+      title: place.name, note: place.memory.content, place }]
+    : []);
   const years = [...new Set([...timeline.map(event => event.year), ...datedStories.map(story => story.year)])]
     .sort((a, b) => b - a);
 
@@ -107,19 +105,18 @@ export default async function VisitedPage() {
                 <Image unoptimized src={getPlaceImageUrl(place.image)} alt={place.image.endsWith(".svg") ? `${place.name}主题示意插画（非实景照片）` : `${place.name}代表性旅行照片`} fill sizes="(max-width: 680px) 100vw, (max-width: 1000px) 50vw, 33vw" />
                 <span>FRAME {String(index + 1).padStart(2, "0")}</span>
               </div>
-              <div className="atlas-photo-text"><div><small>{place.region || place.country || "TRAVEL NOTES"}</small><h3>{place.name}</h3><p>{visitDateLabel(place.whenLabel, place.memories)}</p></div><span className={`atlas-group atlas-group-${place.group}`}>{groupLabels[place.group as keyof typeof groupLabels] ?? "已到访"}</span></div>
-              {place.memories.length ? <details className="atlas-place-stories">
-                <summary>翻开这个地方的 {place.memories.length} 段故事与相册 <span aria-hidden="true">＋</span></summary>
+              <div className="atlas-photo-text"><div><small>{place.region || place.country || "TRAVEL NOTES"}</small><h3>{place.name}</h3><p>{visitDateLabel(place.whenLabel, place.memory)}</p></div><span className={`atlas-group atlas-group-${place.group}`}>{groupLabels[place.group as keyof typeof groupLabels] ?? "已到访"}</span></div>
+              {place.memory && (place.memory.content || place.memory.photos.length) ? <details className="atlas-place-stories">
+                <summary>查看旅行文字与相册（{place.memory.photos.length} 张） <span aria-hidden="true">＋</span></summary>
                 <div className="atlas-place-story-list">
-                  {place.memories.map(story => <section className="atlas-place-story" id={`story-${story.id}`} key={story.id}>
-                    <span className="editorial-overline">{story.happenedAt ? formatDate(story.happenedAt) : "时间未记录"}</span>
-                    <h4>{story.title}</h4>
-                    {story.content ? <p>{story.content}</p> : null}
-                    {story.photos.length ? <div className="atlas-place-story-photos">{story.photos.map(photo => {
+                  <section className="atlas-place-story" id={`story-${place.memory.id}`}>
+                    {place.memory.happenedAt ? <span className="editorial-overline">{formatDate(place.memory.happenedAt)}</span> : null}
+                    {place.memory.content ? <p>{place.memory.content}</p> : null}
+                    {place.memory.photos.length ? <div className="atlas-place-story-photos">{place.memory.photos.map(photo => {
                       const src = storyImageUrl(photo);
-                      return src ? <figure key={photo.id}><Image src={src} alt={photo.altText || story.title} fill unoptimized sizes="(max-width: 680px) 42vw, 240px" /></figure> : null;
+                      return src ? <figure key={photo.id}><Image src={src} alt={photo.altText || place.name} fill unoptimized sizes="(max-width: 680px) 42vw, 240px" /></figure> : null;
                     })}</div> : null}
-                  </section>)}
+                  </section>
                 </div>
               </details> : place.mapNote ? <p className="atlas-place-note">{place.mapNote}</p> : null}
             </article>

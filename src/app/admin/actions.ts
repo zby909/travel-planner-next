@@ -5,8 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireEditor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { removeStoredMediaFiles } from "@/lib/media-storage";
-import { attachStoryPhotos, optionalStoryDate, prepareStoryPhotos } from "@/lib/story-photos";
+import { optionalStoryDate } from "@/lib/story-photos";
 
 export type FormState = { error: string };
 
@@ -201,7 +200,6 @@ export async function createDestinationAction(_state: FormState, form: FormData)
 export async function createPlaceAction(_state: FormState, form: FormData): Promise<FormState> {
   const actor = await requireEditor();
   let id = "";
-  const written: string[] = [];
   try {
     const group = stringField(form, "group", 8, true);
     if (!["both", "her", "mine"].includes(group)) throw new Error("到访归属无效");
@@ -212,20 +210,16 @@ export async function createPlaceAction(_state: FormState, form: FormData): Prom
     const region = stringField(form, "region", 160, true);
     if (await prisma.visitedPlace.findFirst({ where: { name, region }, select: { id: true } })) throw new Error("已经存在同名同地区的足迹地点");
     const latest = await prisma.visitedPlace.aggregate({ _max: { sortOrder: true } });
-    const storyTitle = stringField(form, "storyTitle", 120);
-    const storyContent = stringField(form, "storyContent", 4000);
+    const storyContent = stringField(form, "storyContent", 20000);
     const dateText = stringField(form, "storyDate", 10);
     const storyDate = optionalStoryDate(dateText);
-    const prepared = await prepareStoryPhotos(form);
-    written.push(...prepared.map(photo => photo.fileName));
-    const hasStory = Boolean(storyTitle || storyContent || storyDate || prepared.length);
     id = randomUUID();
     const data = {
       id,
       group,
       name,
       region,
-      image: prepared[0] ? `api/media/${prepared[0].id}` : "images/place-placeholder.svg",
+      image: "images/place-placeholder.svg",
       whenLabel: stringField(form, "whenLabel", 240) || dateText,
       sortOrder: (latest._max.sortOrder ?? -1) + 1,
       latitude,
@@ -237,20 +231,16 @@ export async function createPlaceAction(_state: FormState, form: FormData): Prom
     };
     await prisma.$transaction(async tx => {
       await tx.visitedPlace.create({ data });
-      if (hasStory) {
-        const memoryId = randomUUID();
-        await tx.travelMemory.create({ data: { id: memoryId, placeId: id, title: storyTitle || name, content: storyContent, happenedAt: storyDate } });
-        await attachStoryPhotos(tx, actor.id, memoryId, prepared);
-      }
+      await tx.travelMemory.create({ data: {
+        id: randomUUID(), placeId: id, title: name, content: storyContent, happenedAt: storyDate,
+      } });
       await tx.auditLog.create({ data: { actorId: actor.id, action: "新增", entity: "足迹地点", entityId: id, summary: data.name } });
     });
-    written.length = 0;
     revalidatePath("/visited");
     revalidatePath("/memories");
     revalidatePath("/admin");
     revalidatePath("/admin/places");
   } catch (error) {
-    await removeStoredMediaFiles(written);
     return errorState(error);
   }
   redirect(`/admin/places/${encodeURIComponent(id)}?created=1`);

@@ -18,6 +18,7 @@
     "media:cleanup": "node scripts/prune-staged-media.mjs",
     "user:create": "node scripts/create-user.mjs",
     "test:auth:e2e": "node scripts/run-auth-e2e.mjs",
+    "test:place-note:migration": "node scripts/test-place-note-migration.mjs",
     "test:import:e2e": "node scripts/run-import-e2e.mjs",
     "test:bootstrap": "node scripts/test-bootstrap.mjs",
     "test:production:smoke": "node scripts/test-production-smoke.mjs",

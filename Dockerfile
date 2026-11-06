@@ -40,4 +40,4 @@ COPY --from=builder --chown=nextjs:nodejs /app/src ./src
 COPY --from=builder --chown=nextjs:nodejs /app/next.config.ts ./next.config.ts
 USER nextjs
 EXPOSE 3000
-CMD ["sh", "-c", "node scripts/apply-pending-restore.mjs && npx prisma migrate deploy && node scripts/start-container.mjs"]
+CMD ["sh", "-c", "node scripts/apply-pending-restore.mjs && node scripts/backup-before-place-note.mjs && npx prisma migrate deploy && node scripts/start-container.mjs"]
