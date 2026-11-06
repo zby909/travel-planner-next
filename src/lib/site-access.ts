@@ -7,7 +7,7 @@ import { getSiteVisibility } from "@/lib/site-settings";
 export async function getSiteContentAccess() {
   const [visibility, user] = await Promise.all([getSiteVisibility(), getCurrentUser()]);
   const isMember = Boolean(user && ["ADMIN", "EDITOR"].includes(user.role));
-  return { visibility, allowed: visibility === "PUBLIC" || isMember };
+  return { visibility, isMember, allowed: visibility === "PUBLIC" || isMember };
 }
 
 // 私密站点拒绝匿名页面访问，并保留登录后的原始访问地址。

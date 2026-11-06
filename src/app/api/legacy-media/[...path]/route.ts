@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { getSiteContentAccess } from "@/lib/site-access";
+import { hasVisibleLegacyReference } from "@/lib/media-lifecycle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
     : name.endsWith(".svg") ? "image/svg+xml"
     : name.endsWith(".webp") ? "image/webp" : null;
   if (!mime) return new Response("Not found", { status: 404 });
+  if (!access.isMember && !await hasVisibleLegacyReference(path.join("/"))) {
+    return new Response("Not found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+  }
   try {
     const dataDir = process.env.RESTORE_DATA_DIR || (process.env.DATABASE_URL?.startsWith("file:/app/data/") ? "/app/data" : join(process.cwd(), "data"));
     const root = process.env.LEGACY_MEDIA_DIR || join(dataDir, "legacy-images");
@@ -32,9 +36,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         "Content-Type": mime,
-        "Cache-Control": access.visibility === "PRIVATE" ? "private, no-store" : "public, max-age=0, must-revalidate",
+        "Cache-Control": (access.visibility === "PRIVATE" || access.isMember) ? "private, no-store" : "public, max-age=0, must-revalidate",
         "X-Content-Type-Options": "nosniff",
-        ...(access.visibility === "PRIVATE" ? { "X-Robots-Tag": "noindex" } : {}),
+        ...((access.visibility === "PRIVATE" || access.isMember) ? { "X-Robots-Tag": "noindex" } : {}),
         ...(mime === "image/svg+xml" ? { "Content-Security-Policy": "sandbox; default-src 'none'" } : {}),
       },
     });

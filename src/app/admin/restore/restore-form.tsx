@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 type Preview = {
   id: string;
-  counts: { destinations: number; places: number; timeline: number; users: number; photos: number };
+  counts: { destinations: number; places: number; timeline: number; users: number; photos: number; plans: number; memories: number; expenses: number };
   images: { legacy: number; uploads: number };
   warnings: string[];
   expiresAt: string;
@@ -204,6 +204,9 @@ export function RestoreBackupForm({ allowUpload = true }: { allowUpload?: boolea
         <div><strong>{preview.counts.places}</strong><span>旅行足迹</span></div>
         <div><strong>{preview.counts.destinations}</strong><span>未来目的地</span></div>
         <div><strong>{preview.counts.timeline}</strong><span>时间轴</span></div>
+        <div><strong>{preview.counts.plans}</strong><span>旅行计划</span></div>
+        <div><strong>{preview.counts.memories}</strong><span>旅行日记</span></div>
+        <div><strong>{preview.counts.expenses}</strong><span>费用记录</span></div>
         <div><strong>{preview.images.legacy + preview.images.uploads}</strong><span>媒体文件</span></div>
       </div>
       {preview.warnings.map((w, index) => <p className="muted-copy" key={index}>注意：{w}</p>)}

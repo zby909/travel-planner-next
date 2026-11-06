@@ -45,9 +45,14 @@ docs/             User, deployment and contributor documentation
 
 - SQLite is the source of truth for travel content, accounts, settings, audit records and media metadata.
 - Original image files are stored outside the public directory under the persistent upload directory.
-- Public image access goes through /api/media/[id], which checks site visibility and the media record.
+- Public image access goes through /api/media/[id], which checks site visibility and a visible content reference. Members can preview archived media with private, non-cacheable responses.
+- Destination/place archiving never deletes records. Any timeline linked to an archived place and any diary belonging to that place is hidden from public pages and anonymous media access until the place is restored.
+- All cover/photo removal flows use `src/lib/media-lifecycle.ts` in the same database transaction as the reference change, then remove files after commit. Shared content, archived content and active drafts retain their referenced assets.
+- `scripts/prune-staged-media.mjs` reclaims old unreferenced media and interrupted uploads at startup, and removes expired drafts/sessions.
 - Travel diaries belong to a trip plan, can optionally reference one visited place, and can contain multiple managed photo assets.
-- Expense amounts are stored in the currency's minor unit to avoid floating-point accumulation errors.
+- Expense amounts are stored in the currency's minor unit to avoid floating-point accumulation errors. Add/edit/delete share the same validation and totals are always derived, never entered separately.
+- There is no internal `TravelPlanDay`, manually maintained `actualBudget`, payer or receipt subsystem. Upgrade migration `20261106100000_close_lightweight_records` preserves populated legacy values in the `AppSetting` key `legacy_lightweight_20261106` before removing unused columns/tables.
+- Backup export takes a SQLite write lock while creating a `VACUUM INTO` snapshot and copying media, then releases it before ZIP compression. Restore validates file hashes and runs only trusted repository migrations against a staged copy before preview. See the [backup guide](PRIVATE-BACKUP-RESTORE.md).
 
 ## Database migrations
 
@@ -72,10 +77,10 @@ Additional integration tests:
 
 | Command | Purpose |
 | --- | --- |
-| npm run test:auth:e2e | Browser login, two-member permissions, trip plans, expenses, diaries, photo upload/deletion, public/private access |
-| npm run test:import:e2e | Scoped API tokens, import drafts, CLI and media processing |
+| npm run test:auth:e2e | Browser login, two-member permissions, expense editing, archive/restore and related stories, shared cover/photo cleanup, public/private access |
+| npm run test:import:e2e | Scoped tokens, preview/commit/cancel, CLI, reversible archive updates and reference-aware media cleanup |
 | npm run test:production:smoke | Blank database initialization and persistence after restart |
-| npm run test:backup:restore | Backup upload, integrity checks and restore flow |
+| npm run test:backup:restore | Real export/restore roundtrip, old-schema migration preservation, manifest tampering, account isolation, copy replay and SQLite swap rollback |
 
 test:auth:e2e requires Google Chrome. It uses data/auth-e2e.db, data/auth-e2e-uploads/ and a dedicated Next.js build directory, then cleans them up. The other integration tests also use disposable databases and temporary storage.
 

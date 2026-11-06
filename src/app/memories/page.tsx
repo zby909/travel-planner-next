@@ -6,6 +6,7 @@ import { TravelMotion } from "@/components/travel-motion";
 import { formatDate } from "@/lib/format";
 import { getSiteSettings } from "@/lib/site-settings";
 import { requireSiteContentAccess } from "@/lib/site-access";
+import { visibleMemoryWhere } from "@/lib/content-visibility";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export default async function MemoriesPage() {
   const [settings, records] = await Promise.all([
     getSiteSettings(),
     prisma.travelMemory.findMany({
+      where: visibleMemoryWhere,
       orderBy: [{ happenedAt: "desc" }, { createdAt: "desc" }],
       include: {
         plan: { select: { id: true, title: true } },

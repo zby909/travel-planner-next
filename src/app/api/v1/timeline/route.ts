@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     include: {
       places: {
         orderBy: { sortOrder: "asc" },
-        include: { place: { select: { id: true, name: true, region: true, group: true, whenLabel: true } } },
+        include: { place: { select: { id: true, name: true, region: true, group: true, whenLabel: true, isArchived: true } } },
       },
     },
   });

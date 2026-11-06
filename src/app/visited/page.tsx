@@ -6,6 +6,7 @@ import { TravelMotion } from "@/components/travel-motion";
 import { getPlaceImageUrl } from "@/lib/media";
 import { getGroupLabels, getSiteSettings } from "@/lib/site-settings";
 import { requireSiteContentAccess } from "@/lib/site-access";
+import { visibleTimelineWhere } from "@/lib/content-visibility";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +16,9 @@ export default async function VisitedPage() {
   await requireSiteContentAccess("/visited");
   const [settings, places, timeline] = await Promise.all([
     getSiteSettings(),
-    prisma.visitedPlace.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.visitedPlace.findMany({ where: { isArchived: false }, orderBy: { sortOrder: "asc" } }),
     prisma.timelineEntry.findMany({
+      where: visibleTimelineWhere,
       orderBy: [{ year: "asc" }, { sortOrder: "asc" }],
       include: { places: { orderBy: { sortOrder: "asc" }, include: { place: true } } },
     }),

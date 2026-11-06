@@ -15,9 +15,9 @@ export default async function AdminTimelinePage({ searchParams }: PageProps) {
   const [entries, places, settings] = await Promise.all([
     prisma.timelineEntry.findMany({
       orderBy: [{ year: "desc" }, { sortOrder: "asc" }],
-      include: { places: { orderBy: { sortOrder: "asc" }, include: { place: { select: { id: true, name: true, region: true } } } } },
+      include: { places: { orderBy: { sortOrder: "asc" }, include: { place: { select: { id: true, name: true, region: true, isArchived: true } } } } },
     }),
-    prisma.visitedPlace.findMany({ select: { id: true, name: true, region: true, group: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.visitedPlace.findMany({ select: { id: true, name: true, region: true, group: true, isArchived: true }, orderBy: { sortOrder: "asc" } }),
     getSiteSettings(),
   ]);
   const editing = query.edit ? entries.find(entry => entry.id === query.edit) : null;
@@ -45,7 +45,7 @@ export default async function AdminTimelinePage({ searchParams }: PageProps) {
             <strong>{entry.title}</strong>
             <span>{entry.date} · {entry.year} · {groupLabels[entry.group as keyof typeof groupLabels] ?? "已到访"}</span>
             {entry.note ? <p>{entry.note}</p> : null}
-            <span>{entry.places.length ? entry.places.map(item => item.place.name).join("、") : "尚未关联足迹地点"}</span>
+            <span>{entry.places.length ? entry.places.map(item => item.place.name + (item.place.isArchived ? "（已归档）" : "")).join("、") : "尚未关联足迹地点"}</span>
           </div>
           <div className="timeline-admin-actions">
             <Link href={`/admin/timeline?edit=${encodeURIComponent(entry.id)}`}>编辑</Link>

@@ -126,6 +126,18 @@ All create and update operations create a preview draft:
 
 The CLI never writes directly to SQLite. Never bypass the API or attempt to exceed the Token's scopes.
 
+## Archive and restore existing records
+
+The visits/destinations list APIs include `isArchived`, including archived entries, so an agent does not accidentally recreate a hidden record. Update JSON can set `isArchived: true` to archive or `false` to restore using the existing `update prepare` command:
+
+~~~json
+{"items":[{"id":"existing-record-id","isArchived":true}]}
+~~~
+
+Always show the affected record and request confirmation before committing. Destination archiving hides its public detail page but leaves travel plans intact. Place archiving also hides linked timelines and diaries (including anonymous photo access) until restored; existing associations and files are retained. Do not present archiving as permanent deletion or as a way to recall copies already downloaded.
+
+Replacing/clearing a cover or canceling a draft only deletes media with no remaining content or active-draft reference. Shared or archived references keep the image. Expired staging and old unreferenced files are cleaned at server startup. There is no CLI access to full-site backups; export requires the administrator's web session.
+
 ## Agent Skill
 
 The Skill is located at [skills/travel-import/SKILL.md](../skills/travel-import/SKILL.md). It contains the full workflow for Codex, Claude Code and other compatible local agents. The agent must resolve the actual CLI path, use the user's own terminal for first-time authorization, and never request the token in chat.

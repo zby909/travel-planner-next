@@ -7,6 +7,7 @@ import { parseJsonArray } from "@/lib/format";
 import { getPlaceImageUrl } from "@/lib/media";
 import { getSiteSettings } from "@/lib/site-settings";
 import { requireSiteContentAccess } from "@/lib/site-access";
+import { visibleTimelineWhere } from "@/lib/content-visibility";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -16,10 +17,10 @@ export default async function HomePage() {
   await requireSiteContentAccess("/");
   const [settings, destinations, visitedCount, visitedPreview, timelineCount] = await Promise.all([
     getSiteSettings(),
-    prisma.destination.findMany({ orderBy: { rank: "asc" } }),
-    prisma.visitedPlace.count(),
-    prisma.visitedPlace.findMany({ orderBy: { sortOrder: "asc" }, take: 4 }),
-    prisma.timelineEntry.count(),
+    prisma.destination.findMany({ where: { isArchived: false }, orderBy: { rank: "asc" } }),
+    prisma.visitedPlace.count({ where: { isArchived: false } }),
+    prisma.visitedPlace.findMany({ where: { isArchived: false }, orderBy: { sortOrder: "asc" }, take: 4 }),
+    prisma.timelineEntry.count({ where: visibleTimelineWhere }),
   ]);
 
   const explorerDestinations: DestinationExplorerItem[] = destinations.map(destination => ({

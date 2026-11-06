@@ -5,7 +5,7 @@ import { saveTimelineAction, type TimelineFormState } from "./actions";
 
 const INITIAL_STATE: TimelineFormState = { error: "" };
 
-type PlaceOption = { id: string; name: string; region: string; group: string };
+type PlaceOption = { id: string; name: string; region: string; group: string; isArchived: boolean };
 type TimelineData = { id: string; date: string; year: number; group: string; title: string; note: string; placeIds: string[] };
 
 // 编辑一条旅行时间记录，并选择它关联的足迹地点。
@@ -23,11 +23,11 @@ export function TimelineForm({ places, groupLabels, initial }: { places: PlaceOp
       <label>故事与备注<textarea name="note" rows={4} maxLength={4000} defaultValue={initial?.note ?? ""} placeholder="记录这段旅程发生了什么" /></label>
       <fieldset className="timeline-place-picker">
         <legend>关联足迹地点</legend>
-        <p className="muted-copy">可多选；关联后，公开时间轴会显示对应地点入口。</p>
+        <p className="muted-copy">可多选；关联已归档地点的事件仅保留在编辑室，恢复该地点后重新展示。</p>
         {places.length ? <div className="timeline-place-options">{places.map(place => (
           <label key={place.id}>
             <input type="checkbox" name="placeIds" value={place.id} defaultChecked={initial?.placeIds.includes(place.id) ?? false} />
-            <span><strong>{place.name}</strong><small>{place.region} · {groupLabels[place.group as keyof typeof groupLabels] ?? "已到访"}</small></span>
+            <span><strong>{place.name}{place.isArchived ? "（已归档）" : ""}</strong><small>{place.region} · {groupLabels[place.group as keyof typeof groupLabels] ?? "已到访"}</small></span>
           </label>
         ))}</div> : <p className="muted-copy">还没有足迹地点，可以先到「旅行足迹」新增地点。</p>}
       </fieldset>

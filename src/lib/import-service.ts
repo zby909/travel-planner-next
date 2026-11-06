@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { importPayloadSchema, type ImportPayload } from "@/lib/import-schema";
 import { commitRecordChange, prepareRecordChange } from "@/lib/record-change-service";
+import { releaseUnusedMedia } from "@/lib/media-lifecycle";
+import { removeStoredMediaFiles } from "@/lib/media-storage";
 
 export async function loadImportImage(imageId: string | undefined, ownerId: string) {
   if (!imageId) return null;
@@ -154,7 +156,8 @@ export async function commitImport(draftId: string, ownerId: string) {
         entityId: draftId, summary: `新增 ${created.length}，跳过 ${skipped.length}`,
       },
     });
-    return { kind: data.kind, created, skipped };
+    return { summary: { kind: data.kind, created, skipped }, files: await releaseUnusedMedia(tx, mediaIds) };
   });
-  return result;
+  await removeStoredMediaFiles(result.files);
+  return result.summary;
 }

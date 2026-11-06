@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const entries = await prisma.visitedPlace.findMany({
     orderBy: { sortOrder: "asc" },
     select: { id: true, name: true, region: true, group: true, whenLabel: true, latitude: true, longitude: true,
-      country: true, province: true, city: true, mapNote: true, image: true, sortOrder: true },
+      country: true, province: true, city: true, mapNote: true, image: true, sortOrder: true, isArchived: true },
   });
   return NextResponse.json({ items: entries }, { headers: { "Cache-Control": "no-store" } });
 }

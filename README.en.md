@@ -11,14 +11,19 @@ A self-hosted travel archive for two people to plan future trips, map places the
 - A shared travel space with two separate member accounts.
 - A cinematic home page, destination wishlist, visited-place map, and timeline.
 - Trip plans with dates, budgets, and links to independently hosted HTML guides.
-- Lightweight trip costs with four broad categories: food, accommodation, transport, and other.
+- Lightweight trip costs with add/edit/delete and recalculated totals for food, accommodation, transport, and other.
+- Reversible destination/place archiving with consistent page, story, and media visibility.
+- Reference-aware media cleanup that preserves shared photos and archived records.
+- Administrator-only ZIP export and verified restore on a blank instance, including older schema upgrades.
 - Date-based travel diaries with optional visited-place links and multiple photos.
 - Photo processing that converts uploads to WebP and strips EXIF/GPS metadata.
 - Public or members-only site visibility.
 - AI-assisted data import through a scoped API token, travelctl, and an Agent Skill.
 - Docker deployment with persistent SQLite data and photo storage.
 
-Each deployment has its own database and uploads directory, so different couples or two-person travel groups can run separate instances.
+Each deployment has its own database and uploads directory, so different couples or two-person travel groups can run separate instances. This is a lightweight record keeper, not a booking or accounting platform. Deployments remain manually triggered; building/publishing an image does not automatically update the running application.
+
+Archiving a destination removes its public detail page and wishlist card without deleting trip plans. Archiving a visited place also hides its linked timeline events and diaries from the public archive; restoring it brings them back. Members retain access in the admin area. Backups include archived records. Restored inactive historical accounts do not consume the two active-member slots.
 
 ## Quick start
 

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { copyFile, cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { copyFile, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { migrateBackupDatabase } from "./migrate-backup.mjs";
+import { installRestoreMedia, rollbackRestoreMedia } from "./restore-media.mjs";
 import { join, resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 
@@ -10,7 +12,9 @@ const data = process.env.RESTORE_DATA_DIR
 const root = join(data, "restore-staging");
 const pendingPath = join(root, "pending.json");
 const dbPath = join(data, "travel.db");
+let databaseSwitched = false;
 
+// 启动前应用已确认的恢复任务，保留当前管理员并在切换失败时回退。
 async function apply() {
   if (!existsSync(pendingPath)) return;
   const pending = JSON.parse(await readFile(pendingPath, "utf8"));
@@ -27,6 +31,7 @@ async function apply() {
     // Recover the original database instead of incorrectly declaring success.
     if (!existsSync(dbPath)) {
       await rename(original, dbPath);
+      await rollbackRestoreMedia(dir, data);
       throw Error("数据库切换中断，已回退到原站点数据；请重新上传备份");
     }
     if (existsSync(newFile)) {
@@ -35,6 +40,7 @@ async function apply() {
     // An old DB copy plus a valid active DB, with no pending ready DB, means
     // that the swap finished but the success marker was interrupted.
     console.log("Restored database already rotated, finishing pending marker.");
+    databaseSwitched = true;
     await writeFile(join(root, "last-result.json"), JSON.stringify({
       id: pending.id, ownerId: pending.ownerId, status: "APPLIED", completedAt: new Date().toISOString(),
     }), { mode: 0o600 });
@@ -49,17 +55,18 @@ async function apply() {
   try {
     currentAdmin = await currentDb.user.findUnique({ where: { id: pending.ownerId } });
     if (!currentAdmin?.isActive || currentAdmin.role !== "ADMIN") throw Error("启动前的管理员身份已失效");
-    const [places, destinations, timeline, media, plans, photos] = await Promise.all([
+    const [places, destinations, timeline, media, plans, photos, memories] = await Promise.all([
       currentDb.visitedPlace.count(), currentDb.destination.count(),
       currentDb.timelineEntry.count(), currentDb.mediaAsset.count(),
-      currentDb.travelPlan.count(), currentDb.travelPhoto.count(),
+      currentDb.travelPlan.count(), currentDb.travelPhoto.count(), currentDb.travelMemory.count(),
     ]);
-    if (places || destinations || timeline || media || plans || photos)
+    if (places || destinations || timeline || media || plans || photos || memories)
       throw Error("当前站点已新增旅行数据，取消自动覆盖并保留原数据库");
     await currentDb.$queryRawUnsafe("PRAGMA wal_checkpoint(TRUNCATE)");
   } finally { await currentDb.$disconnect(); }
 
   await copyFile(input, newFile);
+  await migrateBackupDatabase(newFile);
   const newDb = new PrismaClient({ datasources: { db: { url: "file:" + newFile.replace(/\\/g, "/") } } });
   try {
     const check = await newDb.$queryRawUnsafe("PRAGMA integrity_check");
@@ -94,38 +101,22 @@ async function apply() {
     await newDb.$queryRawUnsafe("PRAGMA wal_checkpoint(TRUNCATE)");
   } finally { await newDb.$disconnect(); }
 
-  // Preflight all media destinations before moving any file, to prevent partial
-  // copies from causing a retry to fail on conflicting filenames.
-  const legacySrc = join(dir, "legacy-images");
-  const uploadSrc = join(dir, "uploads");
-  if (existsSync(uploadSrc)) {
-    const uploadDir = join(data, "uploads");
-    for (const name of await readdir(uploadSrc)) {
-      if (existsSync(join(uploadDir, name))) throw Error("已有同名的上传媒体文件，拒绝覆盖：" + name);
-    }
-  }
-  if (existsSync(legacySrc)) {
-    const existing = join(data, "legacy-images");
-    if (existsSync(existing)) {
-      if ((await readdir(existing)).length) throw Error("历史图片目录非空，拒绝覆盖");
-      await rm(existing, { recursive: true, force: true });
-    }
-    await cp(legacySrc, existing, { recursive: true, force: false, errorOnExist: true });
-  }
-  if (existsSync(uploadSrc)) {
-    const target = join(data, "uploads");
-    await mkdir(target, { recursive: true, mode: 0o700 });
-    for (const item of await readdir(uploadSrc)) {
-      await cp(join(uploadSrc, item), join(target, item), { recursive: true, force: false, errorOnExist: true });
-    }
-  }
-  // Rename on the same persistent filesystem; keep original DB for rollback.
-  await rename(dbPath, original);
+  const rollbackMedia = await installRestoreMedia(dir, data);
+  // 先准备媒体，再在同一持久化文件系统切换数据库；切换失败撤回本任务图片。
+  let switched = false;
   try {
-    await rename(newFile, dbPath);
-  } catch (err) {
-    await rename(original, dbPath);
-    throw err;
+    await rename(dbPath, original);
+    try {
+      await rename(newFile, dbPath);
+      switched = true;
+      databaseSwitched = true;
+    } catch (err) {
+      await rename(original, dbPath);
+      throw err;
+    }
+  } catch (error) {
+    if (!switched) await rollbackMedia();
+    throw error;
   }
   for (const suffix of ["-wal", "-shm"]) await rm(dbPath + suffix, { force: true });
   await writeFile(join(root, "last-result.json"), JSON.stringify({
@@ -140,12 +131,16 @@ catch (error) {
   // Leave original database intact if the swap hasn't completed.
   // Record the error so that the administrator can troubleshoot after startup.
   try {
-    const pending = JSON.parse(await readFile(pendingPath, "utf8"));
-    await writeFile(join(root, "last-result.json"), JSON.stringify({
-      id: pending.id, ownerId: pending.ownerId, status: "FAILED",
-      error: error instanceof Error ? error.message : String(error), completedAt: new Date().toISOString(),
-    }), { mode: 0o600 });
-    await rm(pendingPath, { force: true });
+    if (databaseSwitched) {
+      console.warn("数据库与图片已经切换；保留待处理标记，下次重启完成状态记录，不重复恢复。");
+    } else {
+      const pending = JSON.parse(await readFile(pendingPath, "utf8"));
+      await writeFile(join(root, "last-result.json"), JSON.stringify({
+        id: pending.id, ownerId: pending.ownerId, status: "FAILED",
+        error: error instanceof Error ? error.message : String(error), completedAt: new Date().toISOString(),
+      }), { mode: 0o600 });
+      await rm(pendingPath, { force: true });
+    }
   } catch {}
   // A rejected backup must not take an otherwise healthy site offline.
   // The failure status is available to the administrator after normal startup.

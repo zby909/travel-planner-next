@@ -8,7 +8,7 @@ import { TravelPlanForm } from "../plan-forms";
 export default async function NewTravelPlanPage() {
   await requireEditor();
   const [destinations, settings] = await Promise.all([
-    prisma.destination.findMany({ select: { id: true, title: true }, orderBy: { rank: "asc" } }),
+    prisma.destination.findMany({ where: { isArchived: false }, select: { id: true, title: true }, orderBy: { rank: "asc" } }),
     getSiteSettings(),
   ]);
   return <main>

@@ -8,6 +8,8 @@ import { redirect } from "next/navigation";
 import sharp from "sharp";
 import { requireEditor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { mediaIdFromPath, releaseUnusedMedia } from "@/lib/media-lifecycle";
+import { removeStoredMediaFiles } from "@/lib/media-storage";
 
 export type CoverUploadState = { error: string };
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
@@ -53,7 +55,10 @@ export async function uploadCoverAction(_state: CoverUploadState, form: FormData
     await mkdir(directory, { recursive: true });
     await writeFile(filePath, buffer, { flag: "wx" });
     written = true;
-    await prisma.$transaction(async tx => {
+    const oldFiles = await prisma.$transaction(async tx => {
+      const previous = kind === "destination"
+        ? (await tx.destination.findUniqueOrThrow({ where: { id: entityId }, select: { imagePath: true } })).imagePath
+        : (await tx.visitedPlace.findUniqueOrThrow({ where: { id: entityId }, select: { image: true } })).image;
       await tx.mediaAsset.create({ data: {
         id: imageId, ownerId: actor.id, fileName: filename, mimeType: "image/webp",
         byteSize: buffer.length, status: "PUBLIC",
@@ -67,7 +72,11 @@ export async function uploadCoverAction(_state: CoverUploadState, form: FormData
         actorId: actor.id, action: "更新", entity: kind === "destination" ? "目的地封面" : "足迹封面",
         entityId, summary: "通过管理后台上传旅行照片",
       } });
+      const previousId = mediaIdFromPath(previous);
+      return releaseUnusedMedia(tx, previousId ? [previousId] : []);
     });
+    written = false;
+    await removeStoredMediaFiles(oldFiles);
     revalidatePath("/");
     revalidatePath("/visited");
     revalidatePath(`/destinations/${entityId}`);

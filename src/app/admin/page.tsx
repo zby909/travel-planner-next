@@ -9,20 +9,21 @@ export default async function AdminHome() {
   const user = await requireEditor();
   const [destinations, plans, places, placesWithoutCoordinates, timeline, history, siteNameSetting, memberCount, settings] = await Promise.all([
     prisma.destination.findMany({
+      where: { isArchived: false },
       select: { id: true, title: true, imagePath: true, routeJson: true, guide: { select: { destinationId: true } } },
       orderBy: { rank: "asc" },
     }),
     prisma.travelPlan.count(),
-    prisma.visitedPlace.count(),
+    prisma.visitedPlace.count({ where: { isArchived: false } }),
     prisma.visitedPlace.findMany({
-      where: { OR: [{ latitude: null }, { longitude: null }] },
+      where: { isArchived: false, OR: [{ latitude: null }, { longitude: null }] },
       select: { id: true, name: true, region: true },
       orderBy: { sortOrder: "asc" },
     }),
     prisma.timelineEntry.count(),
     prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { actor: { select: { displayName: true } } } }),
     prisma.appSetting.findUnique({ where: { key: "siteName" }, select: { key: true } }),
-    prisma.user.count(),
+    prisma.user.count({ where: { isActive: true } }),
     getSiteSettings(),
   ]);
   const onboardingItems = [

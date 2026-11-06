@@ -64,6 +64,14 @@ The workflow uses GitHub's GITHUB_TOKEN; no Docker Hub password is required. GHC
 
 Prefer deploying a fixed SHA tag when reproducibility matters.
 
+## Manual application updates
+
+The repository builds and publishes images; it does **not** automatically deploy to StackNest. After the image build succeeds, manually update the existing application in StackNest or use `stacknest-deploy app deploy` with the existing image address, application-scoped Token file, and current generation. Keep any configured registry proxy prefix. Do not silently switch a configured `:latest` address to another tag or digest.
+
+Before an upgrade, download a current backup from `/admin/restore`. Keep `/app/data` mounted, and never recreate the data volume during an image update. The image applies pending Prisma migrations at startup. A successful container rollback alone does not roll back a database migration.
+
+Wait for the exact deployment generation to become `ready`, then check `/api/health` and the public or members-only pages. Only report success after both task completion and application verification. See [Backup and restore](PRIVATE-BACKUP-RESTORE.md) for recovery.
+
 ## Backup and restore
 
 Keep backups outside the source repository. A backup should contain the SQLite database and all required image directories. See [Backup and restore](PRIVATE-BACKUP-RESTORE.md) for the supported ZIP workflow and recovery constraints.

@@ -131,6 +131,7 @@ model Destination {
   warning             String?
   style               String?
   badge               String?
+  isArchived      Boolean             @default(false)
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   guide               DestinationGuide?
@@ -175,6 +176,7 @@ model VisitedPlace {
   province  String?
   city      String?
   mapNote   String?
+  isArchived Boolean        @default(false)
   timeline  TimelinePlace[]
   memories  TravelMemory[]
 
@@ -213,31 +215,17 @@ model TravelPlan {
   endDate       DateTime?
   status        String            @default("PLANNED")
   plannedBudget Int?
-  actualBudget  Int?
   currency      String            @default("CNY")
   notes         String?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   destination   Destination?      @relation(fields: [destinationId], references: [id], onDelete: SetNull)
-  days          TravelPlanDay[]
   guides        TravelGuideLink[]
   expenses      Expense[]
   memories      TravelMemory[]
   photos        TravelPhoto[]     @relation("PlanPhotos")
 
   @@index([status, startDate])
-}
-
-model TravelPlanDay {
-  id        String     @id @default(cuid())
-  planId    String
-  date      DateTime?
-  dayNumber Int
-  title     String
-  details   String
-  plan      TravelPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-
-  @@unique([planId, dayNumber])
 }
 
 model TravelGuideLink {
@@ -263,8 +251,6 @@ model Expense {
   amountMinor Int
   description String
   spentAt     DateTime?
-  paidBy      String?
-  receiptPath String?
   createdAt   DateTime   @default(now())
   plan        TravelPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 

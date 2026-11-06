@@ -22,7 +22,7 @@ export async function createAccountAction(_previous: FormState, form: FormData):
   const passwordHash = await hashPassword(password);
   try {
     const created = await prisma.$transaction(async (tx) => {
-      if (await tx.user.count() >= 2) return false;
+      if (await tx.user.count({ where: { isActive: true } }) >= 2) return false;
       const newUser = await tx.user.create({ data: { username, displayName, passwordHash, role: "EDITOR" } });
       await tx.auditLog.create({ data: { actorId: actor.id, action: "创建", entity: "编辑账号", entityId: newUser.id, summary: newUser.username } });
       return true;

@@ -24,7 +24,7 @@ export default async function DestinationPage({ params }: PageProps) {
     }),
     getSiteSettings(),
   ]);
-  if (!destination) notFound();
+  if (!destination || destination.isArchived) notFound();
 
   const budget = [
     ["餐饮", destination.budgetFood],

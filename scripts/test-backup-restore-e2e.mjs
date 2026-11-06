@@ -6,6 +6,8 @@ import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import yazl from "yazl";
+import { verifyBackupRoundtrip } from "./test-backup-roundtrip.mjs";
+import { verifyRestoreMedia } from "./test-restore-media.mjs";
 
 const base = join(process.cwd(), "data", "restore-e2e");
 const target = join(base, "target");
@@ -15,7 +17,8 @@ const sourceUrl = "file:" + join(source, "travel.db").replace(/\\/g, "/");
 const host = "http://127.0.0.1:3018";
 const token = randomBytes(32).toString("base64url");
 const id = randomUUID();
-const env = { ...process.env, DATABASE_URL: targetUrl, RESTORE_DATA_DIR: target, NODE_ENV: "development", NEXT_DIST_DIR: ".next-backup-e2e" };
+const photoId = randomUUID();
+const env = { ...process.env, DATABASE_URL: targetUrl, RESTORE_DATA_DIR: target, UPLOAD_DIR: join(target, "uploads"), LEGACY_MEDIA_DIR: join(target, "legacy-images"), NODE_ENV: "development", NEXT_DIST_DIR: ".next-backup-e2e" };
 let web;
 
 function check(ok, message) { if (!ok) throw Error(message); }
@@ -33,7 +36,7 @@ async function zipBackup() {
   archive.addBuffer(Buffer.from("legacy-photo"), "legacy-images/images/visited/test.jpg");
   archive.addBuffer(Buffer.from("legacy-cover"), "legacy-images/images/test-island-0.jpg");
   archive.addBuffer(Buffer.from("<html>historical credits</html>"), "legacy-images/images/credits.html");
-  archive.addBuffer(randomBytes(900 * 1024), "uploads/test.webp");
+  archive.addBuffer(randomBytes(900 * 1024), `uploads/${photoId}.webp`);
   archive.end();
   await new Promise((yes, no) => {
     archive.outputStream.pipe(createWriteStream(output)).on("close", yes).on("error", no);
@@ -104,9 +107,9 @@ async function waitReady() {
   }
   throw Error("Next server was not ready");
 }
-async function startServer() {
+async function startServer(overrides = {}) {
   web = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-p", "3018", "--hostname", "127.0.0.1"], {
-    cwd: process.cwd(), env, stdio: ["ignore", "pipe", "pipe"],
+    cwd: process.cwd(), env: { ...env, ...overrides }, stdio: ["ignore", "pipe", "pipe"],
   });
   let logs = "";
   web.stdout.on("data", c => { logs = (logs + c.toString()).slice(-2400); });
@@ -150,7 +153,7 @@ async function run() {
     });
     await sourceDb.destination.create({
       data: {
-        id: "test-island", title: "测试岛屿", subtitle: "虚构目的地", flag: "🏝️", kind: "旅行计划",
+        id: "test-island", title: "测试岛屿", subtitle: "虚构目的地", flag: "🏝️", kind: "旅行计划", isArchived: true,
         typesJson: "[]", months: "8月", seasonsJson: "[]", days: "3天",
         minBudget: 1000, maxBudget: 1300, pickBudget: 1100, rank: 1,
         budgetFood: 250, budgetAccommodation: 300, budgetTransport: 400, budgetOther: 150,
@@ -161,6 +164,11 @@ async function run() {
       data: { id: "test-visited", name: "测试小镇", region: "虚构省",
         group: "mine", image: "images/visited/test.jpg", whenLabel: "2024", sortOrder: 1 },
     });
+    await sourceDb.travelPlan.create({ data: { id: "backup-plan", title: "备份旅行", destinationId: "test-island", currency: "CNY", plannedBudget: 1000 } });
+    await sourceDb.expense.create({ data: { id: "backup-expense", planId: "backup-plan", category: "FOOD", amountMinor: 12550, description: "备份餐饮" } });
+    await sourceDb.travelMemory.create({ data: { id: "backup-memory", planId: "backup-plan", placeId: "test-visited", title: "备份日记", content: "合成的故事", happenedAt: new Date("2025-01-01T12:00:00Z") } });
+    await sourceDb.mediaAsset.create({ data: { id: photoId, ownerId: old.id, fileName: `${photoId}.webp`, mimeType: "image/webp", status: "PUBLIC", byteSize: 900 * 1024 } });
+    await sourceDb.travelPhoto.create({ data: { id: "backup-photo", memoryId: "backup-memory", planId: "backup-plan", mediaAssetId: photoId, filePath: `/api/media/${photoId}` } });
   } finally { await sourceDb.$disconnect(); await targetDb.$disconnect(); }
   const backup = await zipBackup();
   await startServer();
@@ -234,6 +242,7 @@ async function run() {
       headers: { Cookie: "travel_session=" + photoSession },
     });
     check(status.ok && (await status.json()).state === "APPLIED", "Restored admin status not shown");
+    await verifyBackupRoundtrip({ host, session: photoSession, base, photoId, startServer, stopServer });
   } finally { await stopServer(); }
   const again = spawnSync(process.execPath, ["scripts/apply-pending-restore.mjs"], {
     cwd: process.cwd(), env, encoding: "utf8", timeout: 60000,
@@ -255,6 +264,7 @@ async function run() {
     "Simulated interrupted restore did not put original database back");
   const failed = JSON.parse(await readFile(join(crashRoot, "restore-staging", "last-result.json"), "utf8"));
   check(failed.status === "FAILED", "Interrupted SQLite swap must not report success");
+  await verifyRestoreMedia(base);
   console.log("BACKUP_RESTORE_E2E_PASS: auth, ZIP preview, restart, user/token isolation, photos, rollback, crash recovery");
 }
 

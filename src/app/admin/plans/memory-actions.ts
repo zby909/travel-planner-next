@@ -9,6 +9,7 @@ import sharp from "sharp";
 import { requireEditor } from "@/lib/auth";
 import { getUploadDirectory, removeStoredMediaFiles } from "@/lib/media-storage";
 import { prisma } from "@/lib/prisma";
+import { mediaIdFromPath, releaseUnusedMedia } from "@/lib/media-lifecycle";
 
 export type MemoryFormState = { error: string };
 
@@ -129,6 +130,7 @@ export async function saveTravelMemoryAction(_state: MemoryFormState, form: Form
         },
       });
     });
+    writtenFiles.length = 0;
 
     revalidatePath("/");
     revalidatePath("/memories");
@@ -147,21 +149,16 @@ export async function deleteTravelMemoryAction(form: FormData): Promise<void> {
   const planId = String(form.get("planId") ?? "").trim();
   if (!id || id.length > 64 || !planId || planId.length > 64) throw new Error("无效的旅行日记编号");
 
-  const memory = await prisma.travelMemory.findFirst({
-    where: { id, planId },
-    include: { photos: { include: { mediaAsset: { select: { id: true, fileName: true } } } } },
-  });
-  if (!memory) throw new Error("旅行日记不存在或不属于这趟旅行");
-
-  const assetIds = memory.photos.flatMap(photo => photo.mediaAsset ? [photo.mediaAsset.id] : []);
-  const fileNames = memory.photos.flatMap(photo => photo.mediaAsset ? [photo.mediaAsset.fileName] : []);
-  await prisma.$transaction(async tx => {
+  const fileNames = await prisma.$transaction(async tx => {
+    const memory = await tx.travelMemory.findFirst({ where: { id, planId }, include: { photos: true } });
+    if (!memory) throw new Error("旅行日记不存在或不属于这趟旅行");
+    const assetIds = memory.photos.flatMap(photo => [photo.mediaAssetId, mediaIdFromPath(photo.filePath)].filter((value): value is string => Boolean(value)));
     await tx.travelPhoto.deleteMany({ where: { memoryId: id } });
-    if (assetIds.length) await tx.mediaAsset.deleteMany({ where: { id: { in: assetIds } } });
     await tx.travelMemory.delete({ where: { id } });
     await tx.auditLog.create({
       data: { actorId: actor.id, action: "删除", entity: "旅行日记", entityId: id, summary: memory.title },
     });
+    return releaseUnusedMedia(tx, assetIds);
   });
   await removeStoredMediaFiles(fileNames);
   revalidatePath("/");
@@ -180,23 +177,21 @@ export async function deleteTravelMemoryPhotoAction(form: FormData): Promise<voi
     throw new Error("无效的旅行照片编号");
   }
 
-  const photo = await prisma.travelPhoto.findFirst({
-    where: { id, memoryId, planId },
-    include: { mediaAsset: { select: { id: true, fileName: true } }, memory: { select: { title: true } } },
-  });
-  if (!photo) throw new Error("照片不存在或不属于这篇旅行日记");
-
-  await prisma.$transaction(async tx => {
+  const files = await prisma.$transaction(async tx => {
+    const photo = await tx.travelPhoto.findFirst({
+      where: { id, memoryId, planId }, include: { memory: { select: { title: true } } },
+    });
+    if (!photo) throw new Error("照片不存在或不属于这篇旅行日记");
     await tx.travelPhoto.delete({ where: { id } });
-    if (photo.mediaAsset) await tx.mediaAsset.delete({ where: { id: photo.mediaAsset.id } });
     await tx.auditLog.create({
       data: {
         actorId: actor.id, action: "删除", entity: "旅行照片", entityId: id,
         summary: `${photo.memory?.title ?? "旅行日记"} · 删除一张照片`,
       },
     });
+    return releaseUnusedMedia(tx, [photo.mediaAssetId, mediaIdFromPath(photo.filePath)].filter((value): value is string => Boolean(value)));
   });
-  if (photo.mediaAsset) await removeStoredMediaFiles([photo.mediaAsset.fileName]);
+  await removeStoredMediaFiles(files);
   revalidatePath("/");
   revalidatePath("/memories");
   revalidatePath(`/admin/plans/${planId}`);

@@ -5,16 +5,19 @@ import { prisma } from "@/lib/prisma";
 import { requireEditor } from "@/lib/auth";
 import { parseJsonArray } from "@/lib/format";
 
-export default async function AdminDestinations() {
+// 按展示中或已归档分开管理，归档内容仍可打开编辑和恢复。
+export default async function AdminDestinations({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   await requireEditor();
+  const isArchived = (await searchParams).view === "archived";
   const [items, settings] = await Promise.all([
-    prisma.destination.findMany({ include: { guide: { select: { destinationId: true } } }, orderBy: { rank: "asc" } }),
+    prisma.destination.findMany({ where: { isArchived }, include: { guide: { select: { destinationId: true } } }, orderBy: { rank: "asc" } }),
     getSiteSettings(),
   ]);
   return (
     <main>
       <div className="admin-page-heading"><p className="eyebrow">DESTINATION MANAGEMENT</p><h1>目的地与预算</h1><p>选择一个目的地编辑预算组成、推荐月份和旅行攻略。更新后公开页面同步显示。</p></div>
-      <div className="admin-links"><Link href="/admin/destinations/new">＋ 新增目的地</Link></div>
+      <div className="admin-links"><Link href="/admin/destinations/new">＋ 新增目的地</Link><Link aria-current={!isArchived ? "page" : undefined} href="/admin/destinations">展示中</Link><Link aria-current={isArchived ? "page" : undefined} href="/admin/destinations?view=archived">已归档</Link></div>
+      {isArchived ? <p className="muted-copy">以下目的地已从前台下架，打开后可恢复展示。</p> : null}
       <div className="admin-list">{items.length === 0 ? <p className="muted-copy">还没有目的地，可以先新增一条记录。</p> : items.map(item => (
         <Link key={item.id} href={`/admin/destinations/${item.id}`} className="admin-list-item">
           <div>

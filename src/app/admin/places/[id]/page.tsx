@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireEditor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PlaceEditForm } from "@/components/admin-forms";
+import { RecordArchiveForm } from "@/components/record-archive-form";
 import { CoverUploadForm } from "@/components/cover-upload-form";
 import { getPlaceImageUrl } from "@/lib/media";
 import { getGroupLabels, getSiteSettings } from "@/lib/site-settings";
@@ -13,7 +14,7 @@ export default async function AdminPlaceEdit({ params, searchParams }: Props) {
   await requireEditor();
   const { id } = await params;
   const [data, settings] = await Promise.all([
-    prisma.visitedPlace.findUnique({ where: { id } }),
+    prisma.visitedPlace.findUnique({ where: { id }, include: { _count: { select: { timeline: true, memories: true } } } }),
     getSiteSettings(),
   ]);
   if (!data) notFound();
@@ -23,6 +24,7 @@ export default async function AdminPlaceEdit({ params, searchParams }: Props) {
     {(await searchParams).created === "1" ? <p className="form-success" role="status">足迹地点已创建。</p> : null}
     {(await searchParams).saved === "1" ? <p className="form-success" role="status">足迹地点已更新。</p> : null}
     {(await searchParams).photo === "1" ? <p className="form-success" role="status">足迹照片已更新。</p> : null}
+    <RecordArchiveForm key={String(data.isArchived)} id={id} kind="place" isArchived={data.isArchived} relatedCount={data._count.timeline + data._count.memories} />
     <CoverUploadForm id={id} kind="place" imageUrl={getPlaceImageUrl(data.image)} />
     <PlaceEditForm data={data} groupLabels={getGroupLabels(settings)} />
   </main>;

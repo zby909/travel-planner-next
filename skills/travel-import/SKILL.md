@@ -47,8 +47,9 @@ The `travelctl` CLI connects this agent to the **user's own** Travel Planner web
 
 ## Updating existing visits
 
-Use `travelctl visits update prepare visit-updates.json`. Each item must include its existing `id` plus only fields to change. Supported fields: `name`, `region`, `when`, `group`, `country`, `province`, `city`, `latitude`, `longitude`, `note`, `imageId`, `sortOrder`.
+Use `travelctl visits update prepare visit-updates.json`. Each item must include its existing `id` plus only fields to change. Supported fields: `name`, `region`, `when`, `group`, `country`, `province`, `city`, `latitude`, `longitude`, `note`, `imageId`, `sortOrder`, `isArchived`.
 
+- `isArchived: true` archives the visit; `false` restores it. Lists include archived records. Archiving also hides linked timeline events, diaries and their anonymous media access until restored; data and associations remain intact. Explain this effect before asking for confirmation.
 - Use `imageId: null` to clear its cover and `when: ""` to clear its date label.
 - Latitude and longitude must be supplied together; use both null to clear coordinates.
 - Name/region changes are checked for duplicate records.
@@ -57,6 +58,7 @@ Use `travelctl visits update prepare visit-updates.json`. Each item must include
 ## Updating future destinations
 
 Use `travelctl destinations update prepare destination-updates.json`. Each item must include its existing `id`. Supported fields include title/subtitle, months/days, vibe/reason, groupText, route/spots, partial four-category CNY budget breakdown, min/max budget, guide days and cover image.
+- `isArchived: true` hides the destination's public page and wishlist card without deleting its trip plans; `false` restores it. Always preview and confirm this change.
 - `guideDays`, when supplied, replaces the existing guide-day list.
 - Use `imageId: null` to clear the cover.
 - When budget amounts or bounds change, the updated breakdown total must remain within the budget range.
@@ -79,4 +81,5 @@ Use `travelctl timeline prepare timeline-changes.json` to create or update event
 - New visits with a known `when` automatically create one linked timeline entry in the same transaction. A visit without a reliable date does not create one. Existing duplicate visits do not gain a new event.
 - Exact duplicate *new* visits (same name + region) and destinations (same title) are warned about and skipped. Updates target explicit IDs and reject conflicting duplicate names.
 - Never bypass the API by editing SQLite directly. Tokens only authorize their selected scopes; do not attempt to circumvent them.
+- Replacing/clearing photos or canceling a draft reclaims only media with no remaining content/active-draft reference. Archived records still retain their media. Do not assume an old `imageId` remains reusable after its last reference is removed.
 - One image per record is supported. No video upload or automatic remote image fetching.

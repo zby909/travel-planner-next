@@ -74,6 +74,7 @@ export const visitUpdateItemSchema = z.object({
   longitude: z.union([coordinate.min(-180).max(180), z.null()]).optional(),
   note: optionalNullableText(600),
   imageId: nullableImageId,
+  isArchived: z.boolean().optional(),
   sortOrder: z.number().int().min(-100000).max(100000).optional(),
 }).strict().superRefine((item, ctx) => {
   if (Object.keys(item).length === 1) ctx.addIssue({ code: "custom", message: "至少提供一个需要更新的字段" });
@@ -105,6 +106,7 @@ export const destinationUpdateItemSchema = z.object({
   maxBudget: z.number().int().min(0).max(2_000_000).optional(),
   guideDays: z.array(z.object({ title: safeText(150), detail: safeText(1500) }).strict()).max(30).optional(),
   imageId: nullableImageId,
+  isArchived: z.boolean().optional(),
 }).strict().refine(item => Object.keys(item).length > 1, "至少提供一个需要更新的字段");
 
 export const timelineItemSchema = z.object({

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatDate, formatMoney } from "@/lib/format";
 import { EXPENSE_CATEGORIES, getExpenseCategoryLabel } from "@/lib/expenses";
 import { currencyFractionDigits, formatMinorMoney } from "@/lib/money";
@@ -18,10 +19,12 @@ type Props = {
   expenses: ExpenseItem[];
   saved: boolean;
   deleted: boolean;
+  editingExpenseId?: string;
 };
 
 // 展示单趟旅行的四类主要花费、预算余额和简要明细。
-export function TravelExpenseSection({ planId, currency, plannedBudget, expenses, saved, deleted }: Props) {
+export function TravelExpenseSection({ planId, currency, plannedBudget, expenses, saved, deleted, editingExpenseId }: Props) {
+  const editing = expenses.find(item => item.id === editingExpenseId);
   const totalMinor = expenses.reduce((sum, item) => sum + item.amountMinor, 0);
   const scale = 10 ** currencyFractionDigits(currency);
   const budgetMinor = plannedBudget === null ? null : plannedBudget * scale;
@@ -69,8 +72,10 @@ export function TravelExpenseSection({ planId, currency, plannedBudget, expenses
       ))}
     </div>
 
-    <div className="expense-add-heading"><h3>记录一笔花费</h3><span>金额按 {currency} 录入</span></div>
-    <ExpenseForm planId={planId} currency={currency} />
+    <div className="expense-add-heading"><h3>{editing ? "编辑这笔花费" : "记录一笔花费"}</h3><span>金额按 {currency} 录入</span></div>
+    <ExpenseForm key={editing?.id ?? "new"} planId={planId} currency={currency} initial={editing ? {
+      ...editing, spentAt: editing.spentAt?.toISOString().slice(0, 10) ?? "",
+    } : undefined} />
 
     <div className="expense-records">
       <div className="expense-add-heading"><h3>花费明细</h3><span>按消费日期排列</span></div>
@@ -85,6 +90,7 @@ export function TravelExpenseSection({ planId, currency, plannedBudget, expenses
             </div>
             <div className="expense-record-side">
               <b>{formatMinorMoney(item.amountMinor, currency)}</b>
+              <Link className="admin-text-action" href={`/admin/plans/${planId}?editExpense=${item.id}#plan-expenses`}>编辑</Link>
               <ExpenseDeleteForm id={item.id} planId={planId} />
             </div>
           </article>;

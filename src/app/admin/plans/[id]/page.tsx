@@ -17,7 +17,7 @@ import { TravelMemorySection } from "../memory-section";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ created?: string; saved?: string; guideSaved?: string; guideDeleted?: string; expenseSaved?: string; expenseDeleted?: string; memorySaved?: string; memoryDeleted?: string; photoDeleted?: string; memoryId?: string; editMemory?: string; editGuide?: string; newGuide?: string }>;
+  searchParams: Promise<{ created?: string; saved?: string; guideSaved?: string; guideDeleted?: string; expenseSaved?: string; expenseDeleted?: string; editExpense?: string; memorySaved?: string; memoryDeleted?: string; photoDeleted?: string; memoryId?: string; editMemory?: string; editGuide?: string; newGuide?: string }>;
 };
 
 // 编辑旅行资料，并管理关联的整趟或单日 HTML 攻略入口。
@@ -37,7 +37,7 @@ export default async function TravelPlanDetailPage({ params, searchParams }: Pag
         memories: {
           orderBy: [{ happenedAt: "desc" }, { createdAt: "desc" }],
           include: {
-            place: { select: { id: true, name: true, region: true } },
+            place: { select: { id: true, name: true, region: true, isArchived: true } },
             photos: {
               orderBy: { sortOrder: "asc" },
               include: { mediaAsset: { select: { id: true, status: true, fileName: true } } },
@@ -46,10 +46,11 @@ export default async function TravelPlanDetailPage({ params, searchParams }: Pag
         },
       },
     }),
-    prisma.destination.findMany({ select: { id: true, title: true }, orderBy: { rank: "asc" } }),
-    prisma.visitedPlace.findMany({ select: { id: true, name: true, region: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.destination.findMany({ select: { id: true, title: true, isArchived: true }, orderBy: { rank: "asc" } }).then(items => items.map(item => ({ id: item.id, title: item.title + (item.isArchived ? "（已归档）" : "") }))),
+    prisma.visitedPlace.findMany({ select: { id: true, name: true, region: true, isArchived: true }, orderBy: { sortOrder: "asc" } }).then(items => items.map(item => ({ ...item, name: item.name + (item.isArchived ? "（已归档）" : "") }))),
   ]);
   if (!plan) notFound();
+  if (query.editExpense && !plan.expenses.some(item => item.id === query.editExpense)) notFound();
   const editingGuide = query.editGuide ? plan.guides.find(item => item.id === query.editGuide) : null;
   if (query.editGuide && !editingGuide) notFound();
   const editingMemory = query.editMemory ? plan.memories.find(item => item.id === query.editMemory) : null;
@@ -103,6 +104,7 @@ export default async function TravelPlanDetailPage({ params, searchParams }: Pag
       expenses={plan.expenses}
       saved={query.expenseSaved === "1"}
       deleted={query.expenseDeleted === "1"}
+      editingExpenseId={query.editExpense}
     />
     <TravelMemorySection
       planId={plan.id}

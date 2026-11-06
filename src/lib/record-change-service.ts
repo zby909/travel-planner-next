@@ -2,6 +2,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { ImportPayload } from "@/lib/import-schema";
+import { mediaIdFromPath, releaseUnusedMedia } from "@/lib/media-lifecycle";
+import { removeStoredMediaFiles } from "@/lib/media-storage";
 
 type ChangePayload = Extract<ImportPayload, { kind: "visits-update" | "destinations-update" | "timeline" }>;
 type ChangeItem = ChangePayload["items"][number];
@@ -86,7 +88,7 @@ export async function prepareRecordChange(payload: ChangePayload, ownerId: strin
         budget: { food: existing.budgetFood, accommodation: existing.budgetAccommodation,
           transport: existing.budgetTransport, other: existing.budgetOther },
         vibe: existing.vibe, reason: existing.reason, imagePath: existing.imagePath,
-        groupText: existing.groupText,
+        groupText: existing.groupText, isArchived: existing.isArchived,
         route: parseArray(existing.routeJson), spots: parseArray(existing.spotsJson),
         guideDays: existing.guide?.days.map(day => ({ title: day.title, detail: day.detail })) ?? [],
       }, changes: item });
@@ -119,13 +121,14 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
     : [];
   for (const id of mediaIds) await validateImage(id, ownerId);
 
-  return prisma.$transaction(async tx => {
+  const result = await prisma.$transaction(async tx => {
     const locked = await tx.importDraft.updateMany({
       where: { id: draftId, ownerId, kind: payload.kind, status: "PREPARED", expiresAt: { gt: new Date() } },
       data: { status: "COMMITTING" },
     });
     if (locked.count !== 1) throw new Error("草稿不存在、已提交或已过期");
 
+    const oldIds: string[] = [];
     const updated: Array<{ id: string; name: string }> = [];
     const created: Array<{ id: string; name: string }> = [];
 
@@ -133,6 +136,8 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
       for (const item of payload.items) {
         const existing = await tx.visitedPlace.findUnique({ where: { id: item.id } });
         if (!existing) throw new Error(`提交时足迹已不存在：${item.id}`);
+        const oldId = mediaIdFromPath(existing.image);
+        if (item.imageId !== undefined && oldId) oldIds.push(oldId);
         const name = item.name ?? existing.name;
         const region = item.region ?? existing.region;
         if ((item.name !== undefined || item.region !== undefined) &&
@@ -151,6 +156,7 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
           ...(item.longitude !== undefined ? { longitude: item.longitude } : {}),
           ...(item.note !== undefined ? { mapNote: item.note } : {}),
           ...(item.sortOrder !== undefined ? { sortOrder: item.sortOrder } : {}),
+          ...(item.isArchived !== undefined ? { isArchived: item.isArchived } : {}),
           ...(item.imageId !== undefined ? { image: item.imageId ? `api/media/${item.imageId}` : "images/place-placeholder.svg" } : {}),
         } });
         if (typeof item.imageId === "string") await tx.mediaAsset.update({ where: { id: item.imageId }, data: { status: "PUBLIC" } });
@@ -160,6 +166,8 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
       for (const item of payload.items) {
         const existing = await tx.destination.findUnique({ where: { id: item.id } });
         if (!existing) throw new Error(`提交时未来目的地已不存在：${item.id}`);
+        const oldId = mediaIdFromPath(existing.imagePath);
+        if (item.imageId !== undefined && oldId) oldIds.push(oldId);
         const title = item.title ?? existing.title;
         if (item.title !== undefined && await tx.destination.findFirst({ where: { id: { not: item.id }, title }, select: { id: true } })) {
           throw new Error(`提交冲突：另一个目的地已使用名称 ${title}`);
@@ -182,6 +190,7 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
           ...(item.budget?.accommodation !== undefined ? { budgetAccommodation: budget.budgetAccommodation } : {}),
           ...(item.budget?.transport !== undefined ? { budgetTransport: budget.budgetTransport } : {}),
           ...(item.budget?.other !== undefined ? { budgetOther: budget.budgetOther } : {}),
+          ...(item.isArchived !== undefined ? { isArchived: item.isArchived } : {}),
           ...(item.imageId !== undefined ? { imagePath: item.imageId ? `/api/media/${item.imageId}` : "/images/destination-placeholder.svg" } : {}),
         } });
         if (item.guideDays !== undefined) {
@@ -236,6 +245,8 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
         : payload.kind === "destinations-update" ? "未来目的地" : "旅行时间轴",
         entityId: draftId, summary: `更新 ${updated.length}，新增 ${created.length}` },
     });
-    return { kind: payload.kind, updated, created, skipped: [] };
+    return { summary: { kind: payload.kind, updated, created, skipped: [] }, files: await releaseUnusedMedia(tx, oldIds) };
   });
+  await removeStoredMediaFiles(result.files);
+  return result.summary;
 }

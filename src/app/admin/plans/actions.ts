@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireEditor } from "@/lib/auth";
 import { removeStoredMediaFiles } from "@/lib/media-storage";
+import { mediaIdFromPath, releaseUnusedMedia } from "@/lib/media-lifecycle";
 import { prisma } from "@/lib/prisma";
 
 export type PlanFormState = { error: string };
@@ -124,24 +125,19 @@ export async function deleteTravelPlanAction(form: FormData): Promise<void> {
   const actor = await requireEditor();
   const id = String(form.get("id") ?? "").trim();
   if (!id || id.length > 64) throw new Error("无效的旅行计划编号");
-  const plan = await prisma.travelPlan.findUnique({
-    where: { id },
-    include: {
-      photos: { include: { mediaAsset: { select: { id: true, fileName: true } } } },
-      memories: { include: { photos: { include: { mediaAsset: { select: { id: true, fileName: true } } } } } },
-    },
-  });
-  if (!plan) throw new Error("旅行计划不存在");
-  const photos = [...plan.photos, ...plan.memories.flatMap(memory => memory.photos)];
-  const assetIds = [...new Set(photos.flatMap(photo => photo.mediaAsset ? [photo.mediaAsset.id] : []))];
-  const fileNames = photos.flatMap(photo => photo.mediaAsset ? [photo.mediaAsset.fileName] : []);
-  const memoryIds = plan.memories.map(memory => memory.id);
-  await prisma.$transaction(async tx => {
+  const fileNames = await prisma.$transaction(async tx => {
+    const plan = await tx.travelPlan.findUnique({
+      where: { id }, include: { photos: true, memories: { include: { photos: true } } },
+    });
+    if (!plan) throw new Error("旅行计划不存在");
+    const photos = [...plan.photos, ...plan.memories.flatMap(memory => memory.photos)];
+    const assetIds = photos.flatMap(photo => [photo.mediaAssetId, mediaIdFromPath(photo.filePath)].filter((value): value is string => Boolean(value)));
+    const memoryIds = plan.memories.map(memory => memory.id);
     await tx.travelPhoto.deleteMany({ where: { OR: [{ planId: id }, { memoryId: { in: memoryIds } }] } });
-    if (assetIds.length) await tx.mediaAsset.deleteMany({ where: { id: { in: assetIds } } });
     await tx.travelMemory.deleteMany({ where: { planId: id } });
     await tx.travelPlan.delete({ where: { id } });
     await tx.auditLog.create({ data: { actorId: actor.id, action: "删除", entity: "旅行计划", entityId: id, summary: plan.title } });
+    return releaseUnusedMedia(tx, assetIds);
   });
   await removeStoredMediaFiles(fileNames);
   revalidatePath("/");

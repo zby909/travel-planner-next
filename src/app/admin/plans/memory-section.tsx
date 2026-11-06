@@ -20,7 +20,7 @@ type MemoryItem = {
   title: string;
   content: string;
   happenedAt: Date | null;
-  place: { id: string; name: string; region: string } | null;
+  place: { id: string; name: string; region: string; isArchived: boolean } | null;
   photos: MemoryPhoto[];
 };
 type MemoryInput = {
@@ -63,7 +63,7 @@ export function TravelMemorySection({ planId, places, memories, visibility, edit
     </div>
     <p className={`memory-visibility-notice memory-visibility-${visibility.toLowerCase()}`}>
       {visibility === "PUBLIC"
-        ? "当前站点为公开展示：保存后的日记文字和照片会出现在「旅行日记」页面，所有访客都可以浏览。"
+        ? "当前站点为公开展示：未关联归档地点的日记文字和照片会出现在「旅行日记」页面，所有访客都可以浏览。关联归档地点的日记暂只在编辑室保留。"
         : "当前站点为仅成员可见：旅行日记和照片只对登录的情侣成员开放。"}
     </p>
     {saved ? <p className="form-success" role="status">旅行日记已保存。</p> : null}
@@ -89,7 +89,7 @@ export function TravelMemorySection({ planId, places, memories, visibility, edit
             <div>
               <span className="eyebrow">{memory.happenedAt ? formatDate(memory.happenedAt) : "日期待补充"}</span>
               <h3>{memory.title}</h3>
-              <p>{memory.place ? `${memory.place.name}${memory.place.region ? ` · ${memory.place.region}` : ""}` : "未关联到访地点"}</p>
+              <p>{memory.place ? `${memory.place.name}${memory.place.region ? ` · ${memory.place.region}` : ""}${memory.place.isArchived ? " · 地点已归档，仅在编辑室保留" : ""}` : "未关联到访地点"}</p>
             </div>
             <div className="memory-admin-actions">
               <Link href={`/admin/plans/${planId}?editMemory=${memory.id}`}>编辑</Link>

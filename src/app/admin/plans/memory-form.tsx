@@ -37,7 +37,7 @@ export function TravelMemoryForm({ planId, places, initial }: {
       <label>旅行日期
         <input name="happenedAt" type="date" required defaultValue={initial?.happenedAt ?? ""} />
       </label>
-      <label>关联到访地点（可选）
+      <label>关联到访地点（可选；归档地点的日记仅在编辑室保留）
         <select name="placeId" defaultValue={initial?.placeId ?? ""}>
           <option value="">暂不关联地点</option>
           {places.map(place => <option key={place.id} value={place.id}>{place.name}{place.region ? ` · ${place.region}` : ""}</option>)}
@@ -63,7 +63,7 @@ export function TravelMemoryForm({ planId, places, initial }: {
 // 删除日记前明确说明关联照片也会一并清理。
 export function DeleteTravelMemoryButton() {
   return <button className="admin-text-action" type="submit" onClick={event => {
-    if (!window.confirm("确定删除这篇旅行日记吗？关联照片及其文件也会一并删除。")) event.preventDefault();
+    if (!window.confirm("确定删除这篇旅行日记吗？会移除日记中的照片；没有其它内容引用的照片文件才会一并清理。")) event.preventDefault();
   }}>删除日记</button>;
 }
 

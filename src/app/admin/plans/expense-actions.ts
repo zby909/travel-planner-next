@@ -26,8 +26,8 @@ function expenseDate(value: string): Date | null {
   return date;
 }
 
-// 新增一笔旅行花费，金额按旅行计划币种的最小单位保存。
-export async function addTravelExpenseAction(_state: ExpenseFormState, form: FormData): Promise<ExpenseFormState> {
+// 新增或编辑旅行花费，金额和记录归属都在事务内校验。
+export async function saveTravelExpenseAction(_state: ExpenseFormState, form: FormData): Promise<ExpenseFormState> {
   const actor = await requireEditor();
   let planId = "";
   try {
@@ -43,7 +43,10 @@ export async function addTravelExpenseAction(_state: ExpenseFormState, form: For
     const amountMinor = parseMoneyToMinorUnits(expenseField(form, "amount", 24, true), plan.currency);
     const spentAt = expenseDate(expenseField(form, "spentAt", 10));
     const note = expenseField(form, "description", 160);
-    const id = randomUUID();
+    const requestedId = expenseField(form, "id", 64);
+    const id = requestedId || randomUUID();
+    const currency = expenseField(form, "currency", 3, true);
+    if (currency !== plan.currency) throw new Error("旅行币种已变化，请刷新后重新记录");
     const categoryLabel = getExpenseCategoryLabel(category);
 
     await prisma.$transaction(async tx => {
@@ -54,13 +57,17 @@ export async function addTravelExpenseAction(_state: ExpenseFormState, form: For
       if (!currentPlan || currentPlan.currency !== plan.currency) {
         throw new Error("旅行计划币种已变化，请刷新页面后重新记录");
       }
-      await tx.expense.create({
-        data: { id, planId, category, amountMinor, description: note || categoryLabel, spentAt },
-      });
+      const data = { category, amountMinor, description: note || categoryLabel, spentAt };
+      if (requestedId) {
+        const result = await tx.expense.updateMany({ where: { id, planId }, data });
+        if (result.count !== 1) throw new Error("费用记录不存在或不属于这趟旅行，请刷新页面");
+      } else {
+        await tx.expense.create({ data: { id, planId, ...data } });
+      }
       await tx.auditLog.create({
         data: {
           actorId: actor.id,
-          action: "新增",
+          action: requestedId ? "更新" : "新增",
           entity: "旅行费用",
           entityId: id,
           summary: `${currentPlan.title} · ${categoryLabel} · ${formatMinorMoney(amountMinor, currentPlan.currency)}`,

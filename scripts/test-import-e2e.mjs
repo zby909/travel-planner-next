@@ -4,6 +4,7 @@ import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import sharp from "sharp";
+import { verifyImportClosure } from "./test-import-closure.mjs";
 
 const host = "http://127.0.0.1:3016";
 const db = new PrismaClient();
@@ -261,6 +262,8 @@ async function run() {
   check((await db.destination.findFirst({ where: { title: "CLI 新旅程" } })) !== null, "CLI did not save future destination");
   const logout = spawnSync(process.execPath, ["cli/bin/travelctl.mjs", "auth", "logout"], { encoding: "utf8", env: cliEnv });
   check(logout.status === 0, "CLI auth logout failed");
+
+  await verifyImportClosure({ api, db, host, visitId: createdVisit.id, destinationId: created.id, imageId: picture.imageId, photo, ownerId: admin.id });
 
   await db.apiToken.updateMany({ where: { userId: admin.id }, data: { revokedAt: new Date() } });
   const disabled = await fetch(host + "/api/v1/visits", { headers: requestHeaders });

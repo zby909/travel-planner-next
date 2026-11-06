@@ -22,11 +22,13 @@ Fresh installations default to **PUBLIC** display:
 
 The administrator can switch to **PRIVATE** mode. Private mode requires an authenticated member session for travel pages and media. Health checks and properly scoped CLI API tokens continue to work independently of public page visibility.
 
+Archiving is reversible, not deletion. Archived destinations are removed from public pages. Archived places also hide linked timeline events and diaries. Anonymous media requests require a visible content reference; members can preview archived images with private, non-cacheable responses. Shared images remain visible if another visible record still uses them.
+
 A visibility switch is not a way to revoke content already copied, downloaded, cached, or indexed by visitors.
 
 ## Member accounts and permissions
 
-A site supports up to two member accounts:
+A site supports up to two active member accounts; inactive historical identities retained during restore do not consume login slots:
 
 - ADMIN: site settings, account management, backup/restore and travel content.
 - EDITOR: shared travel content management, without administrator-only operations.
@@ -37,7 +39,9 @@ There is no public registration endpoint. Each member has a separate password an
 
 Direct uploads and CLI uploads accept static JPEG, PNG and WebP images. The server validates the actual image format, limits pixel count, rotates according to orientation, resizes and converts to WebP, and removes EXIF/GPS metadata.
 
-Travel diary photos use managed media records and the same site-visibility gate as other uploaded images. Do not upload photos of other people without appropriate permission.
+Travel diary photos use managed media records and the same site-visibility gate as other uploaded images. Replacing a cover, deleting a diary/photo or canceling an import releases only assets with no remaining content or active-draft references; archived records retain their photos. Do not upload photos of other people without appropriate permission.
+
+Full-site ZIP export and restore require a same-origin administrator session, not an editor account or CLI Token. Exported ZIPs contain sensitive data and are not encrypted. File hashes detect corruption, not whether an unknown backup source is trustworthy. Restore disables historical login credentials and keeps the new instance administrator. See [Backup and restore](PRIVATE-BACKUP-RESTORE.md).
 
 ## API tokens
 

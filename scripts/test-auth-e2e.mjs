@@ -3,6 +3,7 @@ import { randomBytes, scrypt as scryptCallback } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { chromium } from "playwright-core";
 import sharp from "sharp";
+import { verifyRecordLoops } from "./test-record-loops.mjs";
 
 const host = "http://127.0.0.1:3014";
 const prisma = new PrismaClient();
@@ -236,7 +237,7 @@ async function run() {
   assert(expenseSummary.includes("2,400.75") && expenseSummary.includes("2,599.25"),
     "Actual expense total or remaining travel budget was not calculated correctly");
   assert(await page.locator('select[name="currency"]').count() === 0
-    && await page.locator('input[type="hidden"][name="currency"]').inputValue() === "SGD",
+    && await page.locator('#plan-overview input[type="hidden"][name="currency"]').inputValue() === "SGD",
   "Travel currency was not locked after expenses were added");
   const planForm = page.locator("form.admin-form").first();
   await planForm.locator('input[type="hidden"][name="currency"]').evaluate(input => { input.value = "JPY"; });
@@ -442,6 +443,8 @@ async function run() {
   assert(restrictedSettings?.status() === 404, "Editor accessed site settings");
   const restrictedRestore = await page.goto(host + "/admin/restore");
   assert(restrictedRestore?.status() === 404, "Editor accessed backup restore");
+  const restrictedExport = await page.request.post(host + "/api/admin/backup", { headers: { Origin: host } });
+  assert(restrictedExport.status() === 403, "Editor exported a full-site backup");
 
   await page.goto(host + "/admin");
   await page.getByRole("button", { name: "退出" }).click();
@@ -515,6 +518,8 @@ async function run() {
     "Public travel diary photos must be readable with revalidation-safe cache headers");
   await publicGuest.close();
   await privateGuest.close();
+
+  await verifyRecordLoops({ page, browser, host, prisma, planId: createdPlanId, destinationId: createdDestinationId, memoryId: createdMemoryId, photoBuffer });
 
   // Both people can log in independently; changing a password revokes only that account's sessions.
   const secondaryContext = await browser.newContext();

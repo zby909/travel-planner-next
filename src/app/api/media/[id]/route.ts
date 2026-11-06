@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { prisma } from "@/lib/prisma";
 import { getSiteContentAccess } from "@/lib/site-access";
+import { hasVisibleMediaReference } from "@/lib/media-lifecycle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!asset || asset.status !== "PUBLIC" || asset.mimeType !== "image/webp" || asset.fileName !== `${asset.id}.webp`) {
     return new Response("Not found", { status: 404 });
   }
+  if (!access.isMember && !await hasVisibleMediaReference(id)) {
+    return new Response("Not found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+  }
   try {
     const directory = process.env.UPLOAD_DIR || join(process.cwd(), "data", "uploads");
     const safePath = join(/* turbopackIgnore: true */ directory, asset.id + ".webp");
@@ -25,9 +29,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         "Content-Type": "image/webp",
-        "Cache-Control": access.visibility === "PRIVATE" ? "private, no-store" : "public, max-age=0, must-revalidate",
+        "Cache-Control": (access.visibility === "PRIVATE" || access.isMember) ? "private, no-store" : "public, max-age=0, must-revalidate",
         "X-Content-Type-Options": "nosniff",
-        ...(access.visibility === "PRIVATE" ? { "X-Robots-Tag": "noindex" } : {}),
+        ...((access.visibility === "PRIVATE" || access.isMember) ? { "X-Robots-Tag": "noindex" } : {}),
       },
     });
   } catch { return new Response("Not found", { status: 404 }); }

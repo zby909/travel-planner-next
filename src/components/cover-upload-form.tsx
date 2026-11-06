@@ -15,7 +15,7 @@ export function CoverUploadForm({ id, kind, imageUrl }: {
     <input type="hidden" name="id" value={id} />
     <input type="hidden" name="kind" value={kind} />
     <label>更换照片<input type="file" name="image" accept="image/jpeg,image/png,image/webp" required /></label>
-    <p className="muted-copy">支持 JPG、PNG、WebP，最大 8 MiB。自动压缩并删除 GPS/EXIF；封面会显示在无需登录的公开页面，请勿上传不希望公开的私密照片。</p>
+    <p className="muted-copy">支持 JPG、PNG、WebP，最大 8 MiB。自动压缩并删除 GPS/EXIF；封面遵循站点的公开/私密和归档设置。替换后，无其它引用的旧照片会停止访问并清理。</p>
     {state.error && <p className="form-error" role="alert">{state.error}</p>}
     <div className="admin-save-row"><button className="button button-dark" type="submit" disabled={pending}>{pending ? "上传中…" : "保存封面照片"}</button></div>
   </form>;

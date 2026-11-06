@@ -8,16 +8,17 @@ import { Transform } from "node:stream";
 import { PrismaClient } from "@prisma/client";
 import yauzl, { type Entry } from "yauzl";
 import { prisma } from "@/lib/prisma";
+import { MAX_BACKUP_ENTRIES as MAX_ENTRIES, MAX_BACKUP_UNCOMPRESSED as MAX_UNCOMPRESSED, MAX_BACKUP_ZIP, validBackupImagePath } from "@/lib/backup-format";
+import { validateBackupManifest } from "@/lib/backup-manifest";
+import { migrateBackupDatabase } from "../../scripts/migrate-backup.mjs";
 
-export const MAX_BACKUP_ZIP = 48 * 1024 * 1024;
-const MAX_UNCOMPRESSED = 350 * 1024 * 1024;
-const MAX_ENTRIES = 800;
+export { MAX_BACKUP_ZIP };
 export type BackupPreview = {
   id: string;
   createdAt: string;
   expiresAt: string;
   sha256: string;
-  counts: { destinations: number; places: number; timeline: number; users: number; photos: number };
+  counts: { destinations: number; places: number; timeline: number; users: number; photos: number; plans: number; memories: number; expenses: number };
   images: { legacy: number; uploads: number };
   warnings: string[];
   status: "PREPARED";
@@ -29,12 +30,6 @@ export function restoreDataDir() {
 }
 export const restoreRoot = () => join(restoreDataDir(), "restore-staging");
 
-function validImageName(path: string) {
-  const parts = path.split("/");
-  return parts.length >= 2 && parts.length <= 5
-    && parts.every(x => /^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,119}$/.test(x) && x !== "..")
-    && /\.(?:jpg|jpeg|png|webp|svg)$/i.test(parts[parts.length - 1]);
-}
 function isZipDirectory(name: string) {
   return name.endsWith("/") && !name.includes("\\") && name.split("/").every(x => x === "" || /^[A-Za-z0-9_.-]+$/.test(x));
 }
@@ -47,6 +42,7 @@ async function unzipToStaging(bytes: Buffer, folder: string) {
   let hasDb = false;
   let legacy = 0;
   let uploads = 0;
+  const extracted: string[] = [];
   try {
     await new Promise<void>((done, fail) => {
       let settled = false;
@@ -69,13 +65,15 @@ async function unzipToStaging(bytes: Buffer, folder: string) {
           total += entry.uncompressedSize;
           if (total > MAX_UNCOMPRESSED) throw Error("解压后数据超出 350 MiB 限制");
           const isDb = name === "travel.db";
-          const isLegacy = name.startsWith("legacy-images/images/") && validImageName(name.slice("legacy-images/".length));
-          const isUpload = name.startsWith("uploads/") && validImageName(name);
+          const isManifest = name === "backup.json";
+          const isLegacy = name.startsWith("legacy-images/images/") && validBackupImagePath(name.slice("legacy-images/".length));
+          const isUpload = name.startsWith("uploads/") && validBackupImagePath(name);
           // Historical seed scripts and documentation are never extracted or executed.
-          const ignored = name === "BACKUP-README.txt" || name === "backup.json" || name.startsWith("legacy-seed/")
+          const ignored = name === "BACKUP-README.txt" || name.startsWith("legacy-seed/")
             || (name.startsWith("legacy-images/images/") && (name.toLowerCase().endsWith(".json") || name.toLowerCase().endsWith(".html")));
-          if (!isDb && !isLegacy && !isUpload && !ignored) throw Error("不支持的压缩包条目：" + name.slice(0, 100));
+          if (!isDb && !isManifest && !isLegacy && !isUpload && !ignored) throw Error("不支持的压缩包条目：" + name.slice(0, 100));
           if (ignored) return;
+          if (isManifest && entry.uncompressedSize > 1024 * 1024) throw Error("备份清单过大");
           if (isDb && hasDb) throw Error("备份中存在多个数据库文件");
           if (isDb && entry.uncompressedSize > 100 * 1024 * 1024) throw Error("SQLite 数据库太大");
           if (!isDb && entry.uncompressedSize > 18 * 1024 * 1024) throw Error("单张图片太大");
@@ -96,6 +94,7 @@ async function unzipToStaging(bytes: Buffer, folder: string) {
           });
           await pipeline(input, limiter, createWriteStream(target, { flags: "wx", mode: 0o600 }));
           if (outputBytes !== entry.uncompressedSize) throw Error("压缩包文件不完整");
+          extracted.push(name);
           if (isDb) hasDb = true;
           if (isLegacy) legacy++;
           if (isUpload) uploads++;
@@ -105,6 +104,7 @@ async function unzipToStaging(bytes: Buffer, folder: string) {
     });
   } finally { openZip.close(); }
   if (!hasDb) throw Error("备份 ZIP 必须包含根目录的 travel.db");
+  await validateBackupManifest(folder, extracted);
   return { legacy, uploads };
 }
 
@@ -115,19 +115,22 @@ async function inspectDatabase(path: string) {
     if (quick.length !== 1 || Object.values(quick[0])[0] !== "ok") throw Error("SQLite 完整性检查失败");
     const fk = await db.$queryRawUnsafe<Array<unknown>>("PRAGMA foreign_key_check");
     if (fk.length) throw Error("SQLite 外键关系不完整");
-    const [destinations, places, timeline, users, photos] = await Promise.all([
+    const [destinations, places, timeline, users, photos, plans, memories, expenses] = await Promise.all([
       db.destination.count(), db.visitedPlace.count(), db.timelineEntry.count(), db.user.count(), db.mediaAsset.count(),
+      db.travelPlan.count(), db.travelMemory.count(), db.expense.count(),
     ]);
+    await db.destination.findFirst({ select: { isArchived: true } });
+    await db.visitedPlace.findFirst({ select: { isArchived: true } });
     // Verify that a bundle uses this application's schema rather than an unrelated SQLite file.
     await db.apiToken.count();
     await db.appSetting.count();
-    return { destinations, places, timeline, users, photos };
+    return { destinations, places, timeline, users, photos, plans, memories, expenses };
   } finally { await db.$disconnect(); }
 }
 export async function isBlankForRestore() {
   const counts = await Promise.all([
     prisma.destination.count(), prisma.visitedPlace.count(), prisma.timelineEntry.count(),
-    prisma.travelPlan.count(), prisma.travelPhoto.count(), prisma.mediaAsset.count(),
+    prisma.travelPlan.count(), prisma.travelPhoto.count(), prisma.mediaAsset.count(), prisma.travelMemory.count(),
   ]);
   return counts.every(n => n === 0);
 }
@@ -163,10 +166,12 @@ export async function prepareRestoreBytes(bytes: Buffer, fileName: string, userI
   try {
     const images = await unzipToStaging(bytes, folder);
     const dbPath = join(folder, "travel.db");
-    const dbBytes = await readFile(dbPath);
+    let dbBytes = await readFile(dbPath);
     if (dbBytes.subarray(0, 16).toString() !== "SQLite format 3\0") throw Error("不是有效的 SQLite 数据库");
+    const upgraded = await migrateBackupDatabase(dbPath);
     const counts = await inspectDatabase(dbPath);
-    const warnings: string[] = [];
+    dbBytes = await readFile(dbPath);
+    const warnings: string[] = upgraded ? ["旧版数据库已在隔离副本完成升级，当前站点尚未改变"] : [];
     if (counts.users) warnings.push(`备份含 ${counts.users} 个旧账号；恢复后旧账号和 Token 会失效，保留当前管理员账号`);
     if (counts.places && images.legacy === 0 && images.uploads === 0) warnings.push("备份中无图片，部分已到访地点可能显示占位图");
     if (counts.photos && images.uploads === 0) warnings.push("备份包含图片记录但缺少 uploads 文件夹，图片可能无法显示");
