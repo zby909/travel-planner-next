@@ -2,8 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // 旅行图片由受访问权限保护的媒体接口提供原图和缩略图。
+  images: { unoptimized: true },
   experimental: { serverActions: { bodySizeLimit: "9mb" } },
-  // The app reads SQLite dynamically; avoid stale travel data.
   async headers() {
     return [{
       source: "/:path*",

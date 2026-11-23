@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
-import { issueTokenAction } from "./actions";
+import { useActionState, useState } from "react";
+import { PreservingForm } from "@/components/preserving-form";
+import { issueTokenAction, revokeTokenAction } from "./actions";
 
 const choices = [
   ["visits:read", "读取已有足迹与时间轴"],
@@ -13,7 +14,22 @@ const choices = [
 
 export function TokenCreateForm() {
   const [state, action, pending] = useActionState(issueTokenAction, { token: "", error: "" });
-  return <form className="admin-panel admin-form" action={action}>
+  const [copiedToken, setCopiedToken] = useState("");
+  const [copyError, setCopyError] = useState("");
+
+  // 复制新令牌，剪贴板不可用时提示用户手动复制。
+  async function copyToken(value: string) {
+    setCopyError("");
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedToken(value);
+    } catch {
+      setCopiedToken("");
+      setCopyError("浏览器未能写入剪贴板，请直接选中文本框内容手动复制。");
+    }
+  }
+
+  return <PreservingForm className="admin-panel admin-form" action={action}>
     <h2>新建 AI / CLI 授权令牌</h2>
     <p className="muted-copy">建议只勾选需要的权限。生成后的完整令牌只显示一次；复制后妥善保存，不要直接发给 AI 聊天模型或写入 Skill 文件。</p>
     <div className="admin-form-grid">
@@ -28,7 +44,25 @@ export function TokenCreateForm() {
     {state.token && <div className="token-secret-panel">
       <strong>只显示这一次，请立即复制保存</strong>
       <textarea readOnly rows={3} value={state.token} aria-label="新授权令牌" />
-      <button type="button" className="button" onClick={() => navigator.clipboard.writeText(state.token)}>复制令牌</button>
+      <button type="button" className="button button-dark" onClick={() => { void copyToken(state.token); }}>{copiedToken === state.token ? "已复制令牌" : "复制令牌"}</button>
+      {copyError ? <p className="form-error" role="alert">{copyError}</p> : null}
     </div>}
-  </form>;
+  </PreservingForm>;
+}
+
+// 撤销授权令牌前弹出确认，避免误触导致本地 CLI 立即失联。
+export function RevokeTokenForm({ id, title }: { id: string; title: string }) {
+  return (
+    <form
+      action={revokeTokenAction}
+      onSubmit={event => {
+        if (!window.confirm(`确定撤销令牌「${title}」吗？撤销后对应设备上的 travelctl 将无法继续访问网站。`)) {
+          event.preventDefault();
+        }
+      }}
+    >
+      <input type="hidden" name="id" value={id} />
+      <button type="submit" className="admin-danger">撤销令牌</button>
+    </form>
+  );
 }

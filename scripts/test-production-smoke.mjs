@@ -31,7 +31,7 @@ function check(value, message) {
 }
 
 function runMigrate() {
-  const result = spawnSync(process.execPath, ["node_modules/prisma/build/index.js", "migrate", "deploy"], {
+  const result = spawnSync(process.execPath, ["scripts/deploy-database.mjs"], {
     cwd: process.cwd(), env, encoding: "utf8", timeout: 60000,
   });
   if (result.status !== 0) throw new Error("Prisma migrate deploy failed: " + result.stderr.slice(-1000));
@@ -53,7 +53,7 @@ async function launch(port) {
   const child = spawn(process.execPath, ["scripts/start-container.mjs"], {
     cwd: process.cwd(),
     env: serverEnv,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   let logs = "";
   for (const stream of [child.stdout, child.stderr]) {
@@ -77,7 +77,8 @@ async function launch(port) {
 }
 async function stop(child) {
   if (child.exitCode !== null) return;
-  child.kill("SIGTERM");
+  if (child.connected) child.disconnect();
+  else child.kill("SIGTERM");
   await Promise.race([
     new Promise(resolve => child.once("exit", resolve)),
     new Promise(resolve => setTimeout(resolve, 2500)),

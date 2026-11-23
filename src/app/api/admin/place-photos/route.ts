@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { photoUploadEditor } from "@/lib/place-photo-auth";
-import { PHOTO_MAX_BYTES, uploadPlacePhoto } from "@/lib/place-photo-storage";
+import { uploadPlacePhoto } from "@/lib/place-photo-storage";
+import { PHOTO_MAX_BYTES } from "@/lib/place-album-limits";
 
 export const runtime = "nodejs";
 const headers = { "Cache-Control": "no-store" };
@@ -37,11 +38,12 @@ export async function POST(request: NextRequest) {
     const form = await new Response(new Uint8Array(Buffer.concat(parts, total)),
       { headers: { "Content-Type": contentType } }).formData();
     const placeId = form.get("placeId");
+    const visitId = form.get("visitId");
     const image = form.get("image");
     const requestId = form.get("requestId");
-    if (typeof placeId !== "string" || typeof requestId !== "string" || !(image instanceof File))
-      throw Error("请选择照片和有效地点");
-    return NextResponse.json(await uploadPlacePhoto(placeId, actor.id, image, requestId), {
+    if (typeof placeId !== "string" || typeof visitId !== "string" || typeof requestId !== "string" || !(image instanceof File))
+      throw Error("请选择照片和有效的到访记录");
+    return NextResponse.json(await uploadPlacePhoto(placeId, visitId, actor.id, image, requestId), {
       status: 201, headers,
     });
   } catch (error) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { BACKUP_SIZE_LABEL, MAX_BACKUP_ZIP } from "@/lib/backup-format";
 
 type Preview = {
   id: string;
@@ -55,7 +56,7 @@ export function RestoreBackupForm({ allowUpload = true }: { allowUpload?: boolea
   const [preview, setPreview] = useState<Preview | null>(null);
   const [status, setStatus] = useState<RestoreState | null>(null);
   const [working, setWorking] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
 
@@ -69,86 +70,85 @@ export function RestoreBackupForm({ allowUpload = true }: { allowUpload?: boolea
   async function checkBackup(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!file) return;
-    if (file.size < 100 || file.size > 48 * 1024 * 1024) {
-      setMessage("ZIP 大小需在 100 B 到 48 MiB 之间");
+    if (file.size < 100 || file.size > MAX_BACKUP_ZIP) {
+      setMessage({ kind: "error", text: `ZIP 大小需在 100 B 到 ${BACKUP_SIZE_LABEL} 之间` });
       return;
     }
-    setWorking(true); setMessage(""); setPreview(null); setConfirmed(false);
+    setWorking(true); setMessage(null); setPreview(null); setConfirmed(false);
     try {
-      const bytes = await file.arrayBuffer();
-      const totalHash = await sha256(bytes);
       const chunkSize = 512 * 1024;
-      const chunkCount = Math.ceil(bytes.byteLength / chunkSize);
+      const chunkCount = Math.ceil(file.size / chunkSize);
       const chunkHashes: string[] = [];
-      setProgress({ phase: "hashing", sentBytes: 0, totalBytes: bytes.byteLength, chunkIndex: 0, chunkCount });
+      setProgress({ phase: "hashing", sentBytes: 0, totalBytes: file.size, chunkIndex: 0, chunkCount });
       for (let index = 0; index < chunkCount; index++) {
         const start = index * chunkSize;
-        const part = bytes.slice(start, Math.min(bytes.byteLength, start + chunkSize));
+        const part = await file.slice(start, start + chunkSize).arrayBuffer();
         chunkHashes.push(await sha256(part));
-        setProgress({ phase: "hashing", sentBytes: Math.min(bytes.byteLength, start + part.byteLength),
-          totalBytes: bytes.byteLength, chunkIndex: index + 1, chunkCount });
+        setProgress({ phase: "hashing", sentBytes: Math.min(file.size, start + part.byteLength),
+          totalBytes: file.size, chunkIndex: index + 1, chunkCount });
       }
+      const totalHash = await sha256(new TextEncoder().encode(JSON.stringify(chunkHashes)).buffer);
 
       const initResponse = await fetch("/api/admin/restore/upload/init", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, size: file.size, sha256: totalHash, chunkHashes }),
+        body: JSON.stringify({ filename: file.name, size: file.size, sha256: totalHash, chunkHashes, digestMode: "chunks" }),
         cache: "no-store",
       });
-      const session = await initResponse.json();
-      if (!initResponse.ok) throw new Error(session.error || "无法创建上传任务");
-      const received = new Set<number>(session.receivedChunks as number[]);
+      const session = await initResponse.json().catch(() => ({})) as { error?: string; uploadId?: string; receivedChunks?: number[]; resumed?: boolean };
+      if (!initResponse.ok || !session.uploadId) throw new Error(session.error || `无法创建上传任务（HTTP ${initResponse.status}）`);
+      const received = new Set<number>(session.receivedChunks ?? []);
       let sentBytes = 0;
       for (const index of received) {
-        sentBytes += Math.min(chunkSize, bytes.byteLength - index * chunkSize);
+        sentBytes += Math.min(chunkSize, file.size - index * chunkSize);
       }
-      setProgress({ phase: "uploading", sentBytes, totalBytes: bytes.byteLength,
+      setProgress({ phase: "uploading", sentBytes, totalBytes: file.size,
         chunkIndex: received.size, chunkCount, resumed: Boolean(session.resumed) });
 
       for (let index = 0; index < chunkCount; index++) {
         if (received.has(index)) continue;
         const start = index * chunkSize;
-        const part = bytes.slice(start, Math.min(bytes.byteLength, start + chunkSize));
+        const part = await file.slice(start, start + chunkSize).arrayBuffer();
         await sendChunk(session.uploadId, index, part, chunkHashes[index], loaded => {
-          setProgress({ phase: "uploading", sentBytes: sentBytes + loaded, totalBytes: bytes.byteLength,
+          setProgress({ phase: "uploading", sentBytes: sentBytes + loaded, totalBytes: file.size,
             chunkIndex: index + 1, chunkCount, resumed: Boolean(session.resumed) });
         });
         sentBytes += part.byteLength;
-        setProgress({ phase: "uploading", sentBytes, totalBytes: bytes.byteLength,
+        setProgress({ phase: "uploading", sentBytes, totalBytes: file.size,
           chunkIndex: index + 1, chunkCount, resumed: Boolean(session.resumed) });
       }
 
-      setProgress({ phase: "verifying", sentBytes: bytes.byteLength, totalBytes: bytes.byteLength,
+      setProgress({ phase: "verifying", sentBytes: file.size, totalBytes: file.size,
         chunkIndex: chunkCount, chunkCount, resumed: Boolean(session.resumed) });
       const response = await fetch("/api/admin/restore/upload/finalize", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uploadId: session.uploadId }), cache: "no-store",
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "备份校验失败");
+      const data = await response.json().catch(() => ({})) as Preview & { error?: string };
+      if (!response.ok || !data.id) throw new Error(data.error || `备份校验失败（HTTP ${response.status}）`);
       setPreview(data);
-      setProgress({ phase: "complete", sentBytes: bytes.byteLength, totalBytes: bytes.byteLength,
+      setProgress({ phase: "complete", sentBytes: file.size, totalBytes: file.size,
         chunkIndex: chunkCount, chunkCount, resumed: Boolean(session.resumed) });
-      setMessage("上传及校验通过！请核对记录数量，再决定是否恢复。");
+      setMessage({ kind: "success", text: "上传及校验通过！请核对记录数量，再决定是否恢复。" });
     } catch (e) {
       setProgress(current => current ? { ...current, phase: "interrupted" } : null);
-      setMessage((e instanceof Error ? e.message : "上传失败") + "。如果已开始上传，已接收的分块会保留 2 小时；重新选择同一个 ZIP 并再次上传即可自动续传。");
+      setMessage({ kind: "error", text: (e instanceof Error ? e.message : "上传失败") + "。如果已开始上传，已接收的分块会保留 2 小时；重新选择同一个 ZIP 并再次上传即可自动续传。" });
     } finally { setWorking(false); }
   }
 
   async function confirm() {
     if (!preview || !confirmed) return;
-    setWorking(true); setMessage("");
+    setWorking(true); setMessage(null);
     try {
       const response = await fetch("/api/admin/restore/commit", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: preview.id }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "确认失败");
+      const data = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(data.error || `确认失败（HTTP ${response.status}）`);
       setStatus({ state: "PENDING_RESTART", id: preview.id });
       setPreview(null);
-      setMessage("恢复任务已保存。现在请到 StackNest 对此应用执行「重启」。重启后数据和配图自动恢复，无需手动放文件。");
-    } catch (e) { setMessage(e instanceof Error ? e.message : "确认失败"); }
+      setMessage({ kind: "success", text: "恢复任务已保存。现在请重启当前 Docker 容器或应用服务；重启后数据和配图会自动恢复，无需手动放文件。" });
+    } catch (e) { setMessage({ kind: "error", text: e instanceof Error ? e.message : "确认失败" }); }
     finally { setWorking(false); }
   }
 
@@ -162,7 +162,7 @@ export function RestoreBackupForm({ allowUpload = true }: { allowUpload?: boolea
   return <div className="restore-flow">
     {status?.state === "PENDING_RESTART" && <div className="restore-status" role="status">
       <strong>等待应用重启</strong>
-      <p>已确认恢复任务。请在 StackNest 重启当前 Docker 应用；服务将在启动前恢复数据库和媒体文件。</p>
+      <p>已确认恢复任务。请重启当前 Docker 容器或应用服务；服务将在启动前自动恢复数据库和媒体文件。</p>
     </div>}
     {status?.state === "APPLIED" && <div className="restore-status" role="status">
       <strong>最近一次备份已成功恢复</strong>
@@ -173,11 +173,11 @@ export function RestoreBackupForm({ allowUpload = true }: { allowUpload?: boolea
     </p>}
     {allowUpload && <form className="admin-form admin-panel" onSubmit={checkBackup}>
       <h2>上传历史备份 ZIP</h2>
-      <p className="muted-copy">支持 travel.db 和 legacy-images/、uploads/ 图片目录组成的 ZIP，文件最大 48 MiB。采用 512 KiB 分块上传，网络中断或刷新后重新选择同一个文件即可续传；分块临时保存在持久化目录，2 小时后过期。</p>
+      <p className="muted-copy">备份 ZIP 最大 {BACKUP_SIZE_LABEL}。分块上传支持续传，中断或刷新后重新选择同一文件即可继续，分块保留 2 小时。</p>
       <label>选择 ZIP 文件
         <input type="file" accept=".zip,application/zip" disabled={working || status?.state === "PENDING_RESTART"} onChange={e => {
           setFile(e.target.files?.[0] || null);
-          setPreview(null); setConfirmed(false); setMessage(""); setProgress(null);
+          setPreview(null); setConfirmed(false); setMessage(null); setProgress(null);
         }}/>
       </label>
       {progress && <div className="restore-upload-progress" role="status" aria-live="polite">
@@ -217,6 +217,6 @@ export function RestoreBackupForm({ allowUpload = true }: { allowUpload?: boolea
       </label>
       <button className="button button-dark" type="button" disabled={working || !confirmed} onClick={confirm}>确认恢复，重启后生效</button>
     </section>}
-    {message && <p className={preview || status?.state === "PENDING_RESTART" ? "form-success" : "form-error"} role="status">{message}</p>}
+    {message && <p className={message.kind === "success" ? "form-success" : "form-error"} role={message.kind === "success" ? "status" : "alert"}>{message.text}</p>}
   </div>;
 }

@@ -7,9 +7,23 @@ import { spawnSync } from "node:child_process";
 
 // 经公开 API 验证 CLI 共用的归档、草稿取消和媒体生命周期规则。
 export async function verifyImportClosure({ api, db, host, visitId, destinationId, imageId, photo, ownerId }) {
+  // 每次提交都使用预览时看到的到访，包括地点尚无到访的情况。
+  async function preview(kind, items, status = 200) {
+    return api("/api/v1/imports/prepare", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, items }) }, status);
+  }
+  await preview("visits-update", [{ id: visitId, latitude: null, longitude: 25 }], 400);
+  await preview("visits-update", [{ id: visitId, visitRevision: 0 }], 400);
+  await preview("destinations", [{ title: "合成目的地", subtitle: "测试", minBudget: 1 }], 400);
+  const emptyPlace = await db.visitedPlace.create({ data: { id: randomUUID(), name: "尚无到访", region: "测试", image: "images/place-placeholder.svg", sortOrder: 9 } });
+  const firstVisit = await preview("visits-update", [{ id: emptyPlace.id, journal: "预览时的第一篇" }]);
+  const intervening = await db.travelMemory.create({ data: { placeId: emptyPlace.id, title: "先保存的到访", content: "已保存" } });
+  await api(`/api/v1/imports/${firstVisit.draftId}/commit`, { method: "POST" }, 409);
+  assert.equal((await db.travelMemory.findUniqueOrThrow({ where: { id: intervening.id } })).content, "已保存");
+
   // 归档与恢复仍必须先预览，再确认提交。
   async function change(kind, items) {
-    const draft = await api("/api/v1/imports/prepare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, items }) });
+    const draft = await preview(kind, items);
     return api(`/api/v1/imports/${draft.draftId}/commit`, { method: "POST" });
   }
   await change("visits-update", [{ id: visitId, isArchived: true }]);

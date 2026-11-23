@@ -19,19 +19,27 @@ export async function changePasswordAction(_previous: PasswordState, data: FormD
   if (current === next) return { error: "新密码不能与旧密码相同。" };
 
   const account = await prisma.user.findUnique({ where: { id: user.id } });
-  if (!account?.isActive || !(await verifyPassword(current, account.passwordHash))) {
+  if (!account?.isActive || current.length > 128 || !(await verifyPassword(current, account.passwordHash))) {
     return { error: "当前密码不正确。" };
   }
 
   const passwordHash = await hashPassword(next);
-  await prisma.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
-    // Invalidate all existing sessions, including other devices.
-    await tx.authSession.deleteMany({ where: { userId: user.id } });
-    await tx.auditLog.create({
-      data: { actorId: user.id, action: "修改", entity: "个人密码", entityId: user.id, summary: "修改密码并注销所有设备会话" },
+  let changed = false;
+  try {
+    changed = await prisma.$transaction(async (tx) => {
+      const result = await tx.user.updateMany({ where: { id: user.id, passwordHash: account.passwordHash, isActive: true }, data: { passwordHash } });
+      if (!result.count) return false;
+      // Invalidate all existing sessions, including other devices.
+      await tx.authSession.deleteMany({ where: { userId: user.id } });
+      await tx.auditLog.create({
+        data: { actorId: user.id, action: "修改", entity: "个人密码", entityId: user.id, summary: "修改密码并注销所有设备会话" },
+      });
+      return true;
     });
-  });
+  } catch {
+    return { error: "修改密码时遇到数据库错误，请稍后重试。" };
+  }
+  if (!changed) return { error: "账号已变更，请重新登录后再修改密码。" };
   await endSession();
   redirect("/login?changed=1");
 }

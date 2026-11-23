@@ -17,25 +17,26 @@ export default async function AdminTimelinePage({ searchParams }: PageProps) {
       orderBy: [{ year: "desc" }, { sortOrder: "asc" }],
       include: { places: { orderBy: { sortOrder: "asc" }, include: { place: { select: { id: true, name: true, region: true, isArchived: true } } } } },
     }),
-    prisma.visitedPlace.findMany({ select: { id: true, name: true, region: true, group: true, isArchived: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.visitedPlace.findMany({ select: { id: true, name: true, region: true, isArchived: true }, orderBy: { sortOrder: "asc" } }),
     getSiteSettings(),
   ]);
   const editing = query.edit ? entries.find(entry => entry.id === query.edit) : null;
   if (query.edit && !editing) notFound();
   const groupLabels = getGroupLabels(settings);
+  const defaultYear = new Date().getUTCFullYear();
   return <main>
-    <div className="admin-page-heading"><p className="eyebrow">TRAVEL CHRONICLE</p><h1>旅行时间轴</h1><p>把某次旅行、某个阶段或值得记住的日子整理成事件，并关联对应足迹。保存后会同步到公开足迹页面。</p></div>
+    <div className="admin-page-heading"><h1>时间轴事件</h1><p>记录纪念日或跨越多个地点的旅行。地点下的每次到访会自动进入足迹时间轴。</p></div>
     {query.saved === "1" ? <p className="form-success" role="status">时间记录已保存。</p> : null}
     {query.deleted === "1" ? <p className="form-success" role="status">时间记录已删除。</p> : null}
     {editing ? <section className="admin-panel">
       <div className="timeline-editor-heading"><div><p className="eyebrow">EDIT ENTRY</p><h2>编辑时间记录</h2></div><Link className="admin-back" href="/admin/timeline">取消编辑</Link></div>
-      <TimelineForm places={places} groupLabels={groupLabels} initial={{
+      <TimelineForm key={editing.id} places={places} groupLabels={groupLabels} defaultYear={defaultYear} initial={{
         id: editing.id, date: editing.date, year: editing.year, group: editing.group,
         title: editing.title, note: editing.note, placeIds: editing.places.map(item => item.placeId),
       }} />
     </section> : <details className="admin-disclosure" open={entries.length === 0 || query.new === "1"}>
       <summary>＋ 新增一条时间记录</summary>
-      <section className="admin-panel"><TimelineForm places={places} groupLabels={groupLabels} /></section>
+      <section className="admin-panel"><TimelineForm key="new" places={places} groupLabels={groupLabels} defaultYear={defaultYear} /></section>
     </details>}
     <section className="admin-panel admin-records">
       <div className="timeline-editor-heading"><div><h2>已有记录</h2><p className="muted-copy">共 {entries.length} 条，按年份整理。</p></div><Link href="/visited#timeline" className="source-link">查看公开时间轴 ↗</Link></div>

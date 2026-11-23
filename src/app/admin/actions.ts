@@ -4,8 +4,9 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireEditor } from "@/lib/auth";
+import { isSupportedCurrency } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
-import { optionalStoryDate } from "@/lib/story-photos";
+import { visitFormData } from "@/lib/visit-input";
 
 export type FormState = { error: string };
 
@@ -14,7 +15,7 @@ function stringField(form: FormData, key: string, max: number, required = false)
   if (text.length > max || (required && text.length === 0)) throw new Error(`请检查字段「${key}」的长度`);
   return text;
 }
-function amount(form: FormData, key: string, max = 10_000_000): number {
+function amount(form: FormData, key: string, max = 100_000_000): number {
   const text = String(form.get(key) ?? "").trim();
   if (!/^(0|[1-9]\d*)$/.test(text)) throw new Error(`${key} 应是非负整数`);
   const number = Number(text);
@@ -58,8 +59,6 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
   let id: string;
   try {
     id = stringField(form, "id", 64, true);
-    const existing = await prisma.destination.findUnique({ where: { id } });
-    if (!existing) throw new Error("目的地不存在");
 
     const budget = {
       budgetFood: amount(form, "budgetFood"),
@@ -68,20 +67,22 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
       budgetOther: amount(form, "budgetOther"),
     };
     const pickBudget = Object.values(budget).reduce((sum, n) => sum + n, 0);
-    const minBudget = amount(form, "minBudget");
-    const maxBudget = amount(form, "maxBudget");
+    const minBudget = amount(form, "minBudget", 400_000_000);
+    const maxBudget = amount(form, "maxBudget", 400_000_000);
     if (maxBudget < minBudget) throw new Error("预算上限不能低于下限");
     if (pickBudget < minBudget || pickBudget > maxBudget) throw new Error("预算分项合计必须落在预算区间内");
 
+    const rawCurrency = stringField(form, "currency", 3);
+    if (rawCurrency && !isSupportedCurrency(rawCurrency)) throw new Error("暂不支持该预算币种");
+    const rawFlag = form.get("flag");
+    const parsedFlag = rawFlag === null ? null : (stringField(form, "flag", 12) || "🌍");
+
     const title = stringField(form, "title", 100, true);
-    if (title !== existing.title && await prisma.destination.findFirst({ where: { id: { not: id }, title }, select: { id: true } })) {
-      throw new Error("另一个目的地已经使用相同名称");
-    }
     const kind = stringField(form, "kind", 80);
     const types = listField(form, "types", 12, 40);
     const seasons = listField(form, "seasons", 4, 10);
-    const route = lineListField(form, "routeItems", 60, 160);
-    const spots = lineListField(form, "spotItems", 60, 100);
+    const route = lineListField(form, "routeItems", 60, 200);
+    const spots = lineListField(form, "spotItems", 60, 120);
     const guideIntro = stringField(form, "guideIntro", 4000);
     const guidePace = stringField(form, "guidePace", 2000);
     const guideStay = stringField(form, "guideStay", 2000);
@@ -99,14 +100,14 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
       throw new Error("每日攻略需要填写天数、标题和行程说明，且不能超过长度限制");
     }
     const hasGuide = Boolean(guideIntro || guidePace || guideStay || guideTransport || guideDays.length);
-    const data = {
+    const baseData = {
       title,
       subtitle: stringField(form, "subtitle", 160, true),
       kind,
       typesJson: JSON.stringify(types.length ? types : kind ? [kind] : []),
       seasonsJson: JSON.stringify(seasons),
       months: stringField(form, "months", 100),
-      days: stringField(form, "days", 40),
+      days: stringField(form, "days", 50),
       vibe: stringField(form, "vibe", 220),
       reason: stringField(form, "reason", 3000),
       groupText: stringField(form, "groupText", 1500),
@@ -118,7 +119,15 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
       ...budget,
     };
     await prisma.$transaction(async (tx) => {
-      await tx.destination.update({ where: { id }, data });
+      const existing = await tx.destination.findUnique({ where: { id }, select: { title: true, currency: true, flag: true } });
+      if (!existing) throw new Error("目的地不存在");
+      if (title !== existing.title && await tx.destination.findFirst({ where: { id: { not: id }, title }, select: { id: true } })) {
+        throw new Error("另一个目的地已经使用相同名称");
+      }
+      await tx.destination.update({
+        where: { id },
+        data: { ...baseData, currency: rawCurrency || existing.currency, flag: parsedFlag ?? existing.flag },
+      });
       if (hasGuide) {
         await tx.destinationGuide.upsert({
           where: { destinationId: id },
@@ -126,18 +135,19 @@ export async function saveDestinationAction(_state: FormState, form: FormData): 
           create: { destinationId: id, intro: guideIntro, pace: guidePace, stay: guideStay, transport: guideTransport },
         });
         await tx.guideDay.deleteMany({ where: { guideId: id } });
-        for (const [index, day] of guideDays.entries()) {
-          await tx.guideDay.create({ data: { id: randomUUID(), guideId: id, day: day.day, title: day.title, detail: day.detail, sortOrder: index } });
-        }
+        if (guideDays.length) await tx.guideDay.createMany({
+          data: guideDays.map((day, sortOrder) => ({ ...day, id: randomUUID(), guideId: id, sortOrder })),
+        });
       } else {
         await tx.destinationGuide.deleteMany({ where: { destinationId: id } });
       }
-      await tx.auditLog.create({ data: { actorId: actor.id, action: "更新", entity: "目的地", entityId: id, summary: data.title } });
+      await tx.auditLog.create({ data: { actorId: actor.id, action: "更新", entity: "目的地", entityId: id, summary: baseData.title } });
     });
     revalidatePath("/");
     revalidatePath(`/destinations/${id}`);
     revalidatePath("/admin");
     revalidatePath("/admin/destinations");
+    revalidatePath(`/admin/destinations/${id}`);
   } catch (error) {
     return errorState(error);
   }
@@ -150,13 +160,11 @@ export async function createDestinationAction(_state: FormState, form: FormData)
   let id = "";
   try {
     const title = stringField(form, "title", 100, true);
-    if (await prisma.destination.findFirst({ where: { title }, select: { id: true } })) throw new Error("已经存在同名目的地");
     const kind = stringField(form, "kind", 80) || "其他";
     const types = listField(form, "types", 12, 40);
     const seasons = listField(form, "seasons", 4, 10);
-    const spots = lineListField(form, "spotItems", 40, 80);
-    const route = lineListField(form, "routeItems", 60, 160);
-    const latest = await prisma.destination.aggregate({ _max: { rank: true } });
+    const spots = lineListField(form, "spotItems", 60, 120);
+    const route = lineListField(form, "routeItems", 60, 200);
     id = randomUUID();
     const data = {
       id,
@@ -172,7 +180,6 @@ export async function createDestinationAction(_state: FormState, form: FormData)
       minBudget: 0,
       maxBudget: 0,
       pickBudget: 0,
-      rank: (latest._max.rank ?? -1) + 1,
       budgetFood: 0,
       budgetAccommodation: 0,
       budgetTransport: 0,
@@ -184,7 +191,12 @@ export async function createDestinationAction(_state: FormState, form: FormData)
       routeJson: JSON.stringify(route),
     };
     await prisma.$transaction(async tx => {
-      await tx.destination.create({ data });
+      if (await tx.destination.findFirst({ where: { title }, select: { id: true } })) throw new Error("已经存在同名目的地");
+      const [latest, setting] = await Promise.all([
+        tx.destination.aggregate({ _max: { rank: true } }),
+        tx.appSetting.findUnique({ where: { key: "currency" } }),
+      ]);
+      await tx.destination.create({ data: { ...data, rank: (latest._max.rank ?? -1) + 1, currency: setting?.value || "CNY" } });
       await tx.auditLog.create({ data: { actorId: actor.id, action: "新增", entity: "目的地", entityId: id, summary: title } });
     });
     revalidatePath("/");
@@ -196,32 +208,23 @@ export async function createDestinationAction(_state: FormState, form: FormData)
   redirect(`/admin/destinations/${encodeURIComponent(id)}?created=1`);
 }
 
-// 创建足迹地点，未填写坐标时仍可正常显示在列表中。
+// 一次保存地点与首次到访，后续到访从已有地点添加。
 export async function createPlaceAction(_state: FormState, form: FormData): Promise<FormState> {
   const actor = await requireEditor();
   let id = "";
   try {
-    const group = stringField(form, "group", 8, true);
-    if (!["both", "her", "mine"].includes(group)) throw new Error("到访归属无效");
+    const visit = visitFormData(form);
     const latitude = optionalCoordinate(form, "latitude", -90, 90);
     const longitude = optionalCoordinate(form, "longitude", -180, 180);
     if ((latitude === null) !== (longitude === null)) throw new Error("经纬度必须同时填写");
     const name = stringField(form, "name", 100, true);
     const region = stringField(form, "region", 160, true);
-    if (await prisma.visitedPlace.findFirst({ where: { name, region }, select: { id: true } })) throw new Error("已经存在同名同地区的足迹地点");
-    const latest = await prisma.visitedPlace.aggregate({ _max: { sortOrder: true } });
-    const storyContent = stringField(form, "storyContent", 20000);
-    const dateText = stringField(form, "storyDate", 10);
-    const storyDate = optionalStoryDate(dateText);
     id = randomUUID();
     const data = {
       id,
-      group,
       name,
       region,
       image: "images/place-placeholder.svg",
-      whenLabel: stringField(form, "whenLabel", 240) || dateText,
-      sortOrder: (latest._max.sortOrder ?? -1) + 1,
       latitude,
       longitude,
       country: stringField(form, "country", 80) || null,
@@ -230,14 +233,17 @@ export async function createPlaceAction(_state: FormState, form: FormData): Prom
       mapNote: stringField(form, "mapNote", 1200) || null,
     };
     await prisma.$transaction(async tx => {
-      await tx.visitedPlace.create({ data });
-      await tx.travelMemory.create({ data: {
-        id: randomUUID(), placeId: id, title: name, content: storyContent, happenedAt: storyDate,
+      if (await tx.visitedPlace.findFirst({ where: { name, region }, select: { id: true } })) {
+        throw Error("这个地点已经记录过，请在原地点下添加一次到访");
+      }
+      const latest = await tx.visitedPlace.aggregate({ _max: { sortOrder: true } });
+      await tx.visitedPlace.create({ data: {
+        ...data, sortOrder: (latest._max.sortOrder ?? -1) + 1, visits: { create: visit },
       } });
       await tx.auditLog.create({ data: { actorId: actor.id, action: "新增", entity: "足迹地点", entityId: id, summary: data.name } });
     });
+    revalidatePath("/");
     revalidatePath("/visited");
-    revalidatePath("/memories");
     revalidatePath("/admin");
     revalidatePath("/admin/places");
   } catch (error) {
@@ -253,9 +259,11 @@ export async function saveSiteSettingsAction(_state: FormState, form: FormData):
   try {
     const currency = stringField(form, "currency", 3, true);
     const visibility = stringField(form, "visibility", 10) || "PUBLIC";
-    const supportedCurrencies = ["CNY", "USD", "EUR", "GBP", "SGD", "JPY", "AUD", "CAD", "HKD", "TWD", "KRW", "THB", "MYR", "IDR", "VND", "PHP", "INR", "NZD", "CHF"];
-    if (!supportedCurrencies.includes(currency)) throw new Error("暂不支持该币种");
+    if (!isSupportedCurrency(currency)) throw new Error("暂不支持该币种");
     if (visibility !== "PUBLIC" && visibility !== "PRIVATE") throw new Error("站点访问模式无效");
+    const albumMaxPhotos = amount(form, "albumMaxPhotos", 500);
+    const albumMaxMiB = amount(form, "albumMaxMiB", 256);
+    if (!albumMaxPhotos || !albumMaxMiB) throw Error("相册容量需要大于零");
     const settings = [
       ["siteName", stringField(form, "siteName", 40, true)],
       ["siteSubtitle", stringField(form, "siteSubtitle", 60)],
@@ -264,6 +272,8 @@ export async function saveSiteSettingsAction(_state: FormState, form: FormData):
       ["togetherLabel", stringField(form, "togetherLabel", 40, true)],
       ["currency", currency],
       ["visibility", visibility],
+      ["albumMaxPhotos", String(albumMaxPhotos)],
+      ["albumMaxMiB", String(albumMaxMiB)],
     ] as const;
     await prisma.$transaction(async tx => {
       for (const [key, value] of settings) {
@@ -272,53 +282,49 @@ export async function saveSiteSettingsAction(_state: FormState, form: FormData):
       await tx.auditLog.create({ data: { actorId: actor.id, action: "更新", entity: "站点设置", entityId: "site", summary: settings.map(([key, value]) => `${key}=${value}`).join("; ").slice(0, 500) } });
     });
     revalidatePath("/", "layout");
-    revalidatePath("/visited");
-    revalidatePath("/admin");
-    revalidatePath("/admin/settings");
-    revalidatePath("/login");
   } catch (error) {
     return errorState(error);
   }
   redirect("/admin/settings?saved=1");
 }
 
+// 仅编辑地点自身的名称、地区及地图资料。
 export async function savePlaceAction(_state: FormState, form: FormData): Promise<FormState> {
   const actor = await requireEditor();
   let id: string;
   try {
     id = stringField(form, "id", 64, true);
-    const original = await prisma.visitedPlace.findUnique({ where: { id } });
-    if (!original) throw new Error("足迹地点不存在");
-    const group = stringField(form, "group", 8);
-    if (!["both", "her", "mine"].includes(group)) throw new Error("到访归属无效");
     const latitude = optionalCoordinate(form, "latitude", -90, 90);
     const longitude = optionalCoordinate(form, "longitude", -180, 180);
     if ((latitude === null) !== (longitude === null)) throw new Error("经纬度必须同时填写");
     const name = stringField(form, "name", 100, true);
     const region = stringField(form, "region", 160, true);
-    if ((name !== original.name || region !== original.region) &&
-        await prisma.visitedPlace.findFirst({ where: { id: { not: id }, name, region }, select: { id: true } })) {
-      throw new Error("另一个足迹地点已使用相同名称和地区");
-    }
     const data = {
-      group,
       name,
       region,
-      whenLabel: stringField(form, "whenLabel", 240),
       country: stringField(form, "country", 80) || null,
       province: stringField(form, "province", 80) || null,
       city: stringField(form, "city", 100) || null,
       latitude,
       longitude,
-      mapNote: stringField(form, "mapNote", 1200),
+      mapNote: stringField(form, "mapNote", 1200) || null,
     };
     await prisma.$transaction(async (tx) => {
+      const original = await tx.visitedPlace.findUnique({ where: { id }, select: { name: true, region: true } });
+      if (!original) throw new Error("足迹地点不存在");
+      if ((name !== original.name || region !== original.region) &&
+          await tx.visitedPlace.findFirst({ where: { id: { not: id }, name, region }, select: { id: true } })) {
+        throw new Error("另一个足迹地点已使用相同名称和地区");
+      }
       await tx.visitedPlace.update({ where: { id }, data });
       await tx.auditLog.create({ data: { actorId: actor.id, action: "更新", entity: "足迹地点", entityId: id, summary: data.name } });
     });
+    revalidatePath("/");
     revalidatePath("/visited");
+    revalidatePath(`/visited/${id}`);
     revalidatePath("/admin");
     revalidatePath("/admin/places");
+    revalidatePath(`/admin/places/${id}`);
   } catch (error) {
     return errorState(error);
   }

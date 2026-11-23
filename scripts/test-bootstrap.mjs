@@ -27,7 +27,7 @@ function run(args, processEnv) {
 let db;
 try {
   cleanup();
-  run(["node_modules/prisma/build/index.js", "migrate", "deploy"], env);
+  run(["scripts/deploy-database.mjs"], env);
   const secret = "Test-only-" + randomBytes(20).toString("base64url");
   const setup = { ...env,
     BOOTSTRAP_ADMIN_USERNAME: "first_owner",

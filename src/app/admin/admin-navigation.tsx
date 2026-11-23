@@ -7,34 +7,32 @@ type UserRole = string;
 
 const NAV_GROUPS = [
   {
-    caption: "WORKSPACE / 工作台",
+    caption: "概览",
     items: [{ href: "/admin", label: "工作台" }],
   },
   {
-    caption: "CONTENT / 内容管理",
+    caption: "旅行手记",
     items: [
-      { href: "/admin/destinations", label: "想去的地方" },
       { href: "/admin/places", label: "去过的地方" },
+      { href: "/admin/destinations", label: "想去的地方" },
+      { href: "/admin/plans", label: "出行计划" },
     ],
   },
   {
-    caption: "PLANNING / 旅行数据",
+    caption: "空间与安全",
     items: [
-      { href: "/admin/plans", label: "旅行计划与花费" },
-    ],
-  },
-  {
-    caption: "SYSTEM / 系统管理",
-    items: [
-      { href: "/admin/tokens", label: "AI 助手授权" },
+      { href: "/admin/users", label: "成员与邀请", adminOnly: true },
       { href: "/admin/settings", label: "站点设置", adminOnly: true },
-      { href: "/admin/users", label: "账号管理", adminOnly: true },
-      { href: "/admin/restore", label: "备份恢复", adminOnly: true },
+      { href: "/admin/restore", label: "备份与恢复", adminOnly: true },
+      { href: "/admin/account", label: "修改密码" },
     ],
   },
   {
-    caption: "ACCOUNT / 个人账户",
-    items: [{ href: "/admin/account", label: "修改密码" }],
+    caption: "进阶工具",
+    items: [
+      { href: "/admin/timeline", label: "独立时间轴" },
+      { href: "/admin/tokens", label: "AI / CLI 授权" },
+    ],
   },
 ] as const;
 

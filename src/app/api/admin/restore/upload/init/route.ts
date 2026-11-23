@@ -5,7 +5,7 @@ import { beginRestoreUpload } from "@/lib/restore-upload";
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   const admin = await restoreAdministrator(request);
-  if (!admin) return NextResponse.json({ error: "仅允许同源管理员操作恢复" }, { status: 403 });
+  if (!admin) return NextResponse.json({ error: "仅允许同源管理员操作恢复" }, { status: 403, headers: noStore });
   try {
     const result = await beginRestoreUpload(await request.json(), admin.id);
     return NextResponse.json(result, { headers: noStore });

@@ -73,12 +73,14 @@ travelctl import cancel <draft-id>
     "country": "日本",
     "latitude": 35.6762,
     "longitude": 139.6503,
-    "note": "第一次旅行"
+    "journal": "第一次旅行"
   }]
 }
 ~~~
 
-Use the most precise date that is actually known: 2025 for year-only data, or 2025-05 when the month is known. Do not invent coordinates; omit them if they cannot be verified. group is mine, her, or both.
+Use the most precise date you know, such as `2025`, `2025-05` or `2025-05-20`. Omit unverified coordinates. `group` accepts `mine`, `her` or `both`. `note` describes the map location and `journal` belongs to the visit.
+
+Set `append: true` with the exact `name` and `region` of an existing place to record a revisit. Provide its own `when`, `group`, optional `visitTitle` and `journal`. `travelctl visits list` returns each place's `visits` array. For `visits update prepare`, include the relevant `visitId` when editing the date, companions or journal at a place with several visits. Independent events are managed with `travelctl timeline`; visits appear in the website's timeline from their own date fields.
 
 ## Example: import a future destination
 
@@ -103,7 +105,7 @@ Use the most precise date that is actually known: 2025 for year-only data, or 20
 }
 ~~~
 
-Budget values in this import format are CNY totals for two people, not per-person amounts. Missing estimates should remain missing.
+Budget values in this import format are totals for two people in the destination's `currency` (defaulting to the site currency when omitted), not per-person amounts. Missing estimates should remain missing.
 
 ## Photos
 
@@ -119,7 +121,7 @@ All create and update operations create a preview draft:
 
 1. Read current records with list before proposing changes.
 2. Run a prepare command.
-3. Review current values, proposed changes and warnings.
+3. Review the preview items, warnings, and (for update drafts) current values alongside proposed changes.
 4. Summarize the changes and obtain the user's explicit confirmation.
 5. Only then run travelctl import commit DRAFT_ID --confirm.
 6. If the user declines, run travelctl import cancel DRAFT_ID.
@@ -135,6 +137,8 @@ The visits/destinations list APIs include `isArchived`, including archived entri
 ~~~
 
 Always show the affected record and request confirmation before committing. Destination archiving hides its public detail page but leaves travel plans intact. Place archiving also hides linked timelines and diaries (including anonymous photo access) until restored; existing associations and files are retained. Do not present archiving as permanent deletion or as a way to recall copies already downloaded.
+
+Destination imports accept an optional three-letter `currency` such as `CNY` or `SGD`. Omitting it uses the site's currency at preview time. Later changes to the site default apply to new estimates.
 
 Replacing/clearing a cover or canceling a draft only deletes media with no remaining content or active-draft reference. Shared or archived references keep the image. Expired staging and old unreferenced files are cleaned at server startup. There is no CLI access to full-site backups; export requires the administrator's web session.
 

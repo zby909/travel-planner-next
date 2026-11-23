@@ -34,6 +34,14 @@ jobs:
           DATABASE_URL: file:../data/ci-build.db
       - name: Preserve historical place notes and photos
         run: npm run test:place-note:migration
+      - name: Verify initial admin bootstrap safety
+        run: npm run test:bootstrap
+      - name: Verify CLI token, import preview/commit and media cleanup
+        run: npm run test:import:e2e
+      - name: Install Chromium for browser tests
+        run: npx playwright-core install --with-deps chromium
+      - name: Verify visits, albums and member permissions
+        run: npm run test:auth:e2e
       - name: Production startup and persistence smoke test
         run: npm run test:production:smoke
         env:
@@ -126,6 +134,7 @@ jobs:
           docker exec travel-planner-smoke node -e 'const {PrismaClient}=require("@prisma/client");const db=new PrismaClient();(async()=>{const saved=await db.appSetting.findUnique({where:{key:"ci_docker_persistence"}});const admin=await db.user.findUnique({where:{username:"ci_owner"}});if(saved?.value!=="CI_DOCKER_PERSISTENCE_PROBE"||!admin)throw Error("persistent database was lost or reset");})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>db.$disconnect())'
           echo "LINUX_DOCKER_SMOKE_PASS"
       - name: Push image after Docker smoke test
+        if: github.ref == 'refs/heads/main'
         shell: bash
         env:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}

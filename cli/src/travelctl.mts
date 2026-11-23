@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, writeFile, mkdir, rename, rm, chmod } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename, rm, chmod, stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { basename, join } from "node:path";
 import { homedir } from "node:os";
@@ -55,14 +55,17 @@ function fail(message: string): never {
   throw new Error(message);
 }
 
+// 从 Windows PowerShell 自带路径加载 DPAPI 命令，兼容由 PowerShell 7 启动的 CLI。
 async function runPowerShell(script: string, input: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    const setup = "$ErrorActionPreference='Stop'; Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1'); ";
     const child = spawn("powershell.exe", [
-      "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script,
+      "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", setup + script,
     ], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
     let output = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", chunk => { output += chunk; if (output.length > 16_384) child.kill(); });
+    child.stderr.resume();
     child.once("error", () => reject(new Error("Windows DPAPI 不可用，未保存授权令牌")));
     child.once("close", code => {
       if (code !== 0) reject(new Error("Windows DPAPI 凭据操作失败，未保存授权令牌"));
@@ -74,7 +77,7 @@ async function runPowerShell(script: string, input: string): Promise<string> {
 
 async function protectToken(token: string): Promise<Credential> {
   if (process.platform !== "win32") return { provider: "file", value: token };
-  const script = "$ErrorActionPreference='Stop'; $plain=[Console]::In.ReadToEnd(); $secure=ConvertTo-SecureString -String $plain -AsPlainText -Force; [Console]::Out.Write((ConvertFrom-SecureString -SecureString $secure))";
+  const script = "$plain=[Console]::In.ReadToEnd(); $secure=ConvertTo-SecureString -String $plain -AsPlainText -Force; [Console]::Out.Write((ConvertFrom-SecureString -SecureString $secure))";
   const value = await runPowerShell(script, token);
   if (!value) fail("Windows DPAPI 返回了空凭据，未保存授权令牌");
   return { provider: "windows-dpapi", value };
@@ -85,7 +88,7 @@ async function unprotectToken(credential: Credential): Promise<string> {
   if (credential.provider !== "windows-dpapi" || process.platform !== "win32") {
     fail("该授权凭据由另一平台或 Windows 用户保护；请在本机重新执行 travelctl auth login");
   }
-  const script = "$ErrorActionPreference='Stop'; $encrypted=[Console]::In.ReadToEnd(); $secure=ConvertTo-SecureString -String $encrypted; $ptr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure); try { [Console]::Out.Write([Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }";
+  const script = "$encrypted=[Console]::In.ReadToEnd(); $secure=ConvertTo-SecureString -String $encrypted; $ptr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure); try { [Console]::Out.Write([Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }";
   return runPowerShell(script, credential.value);
 }
 
@@ -93,9 +96,14 @@ async function saveConfig(server: string, token: string): Promise<void> {
   const credential = await protectToken(token);
   await mkdir(configDir, { recursive: true, mode: 0o700 });
   const tempFile = configFile + "." + process.pid + ".tmp";
-  await writeFile(tempFile, JSON.stringify({ server, credential }), { encoding: "utf8", mode: 0o600 });
-  if (process.platform !== "win32") await chmod(tempFile, 0o600);
-  await rename(tempFile, configFile);
+  try {
+    await writeFile(tempFile, JSON.stringify({ server, credential }), { encoding: "utf8", mode: 0o600 });
+    if (process.platform !== "win32") await chmod(tempFile, 0o600);
+    await rename(tempFile, configFile);
+  } catch (error) {
+    await rm(tempFile, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 async function readConfig(): Promise<Session> {
@@ -130,7 +138,8 @@ async function askTerminal(label: string, hidden = false, maxLength = 512): Prom
   terminal.resume();
   return new Promise((resolve, reject) => {
     const listener = (data: Buffer | string) => {
-      for (const character of data.toString("utf8")) {
+      const clean = data.toString("utf8").replace(/\u001b(?:\[[0-9;?]*[ -/]*[@-~]|O[ -~]?)/g, "");
+      for (const character of clean) {
         if (character === "\u0003") { cleanup(); reject(new Error("已取消")); return; }
         if (character === "\r" || character === "\n") { cleanup(); resolve(result); return; }
         if (character === "\u007f" || character === "\b") {
@@ -199,7 +208,8 @@ async function prepare(kind: string, filePath: string): Promise<void> {
     method: "POST", data: { kind, items },
   });
   output(result);
-  console.error(`请检查 before/current、changes 和 warnings。确认后执行：travelctl import commit ${String(result.draftId)} --confirm`);
+  const summaryHint = kind === "visits" || kind === "destinations" ? "items 和 warnings" : "before/current、changes 和 warnings";
+  console.error(`请检查 ${summaryHint}。确认后执行：travelctl import commit ${String(result.draftId)} --confirm`);
 }
 
 async function main(): Promise<void> {
@@ -213,7 +223,7 @@ async function main(): Promise<void> {
       ?? (await askTerminal("Travel Planner 网站地址（https://...）：")).trim();
     let url: URL;
     try { url = new URL(rawServer); } catch { fail("网站地址无效，请包含 https://"); }
-    if (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))) {
+    if (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]", "::1"].includes(url.hostname))) {
       fail("除 localhost 外必须使用 HTTPS");
     }
     if (url.username || url.password) fail("网站地址不能包含账号密码");
@@ -254,8 +264,10 @@ async function main(): Promise<void> {
 
   if (topic === "media" && operation === "upload") {
     if (!argument) fail("请提供本地 JPEG/PNG/WebP 图片路径");
+    const info = await stat(argument);
+    if (!info.isFile()) fail("图片路径必须是普通文件");
+    if (info.size < 20 || info.size > 8 * 1024 * 1024) fail("图片大小需在 20 字节到 8 MiB 之间");
     const bytes = await readFile(argument);
-    if (bytes.byteLength > 8 * 1024 * 1024) fail("图片超过 8 MiB");
     const type = /\.png$/i.test(argument) ? "image/png" : /\.webp$/i.test(argument) ? "image/webp" : "image/jpeg";
     const form = new FormData();
     form.append("image", new Blob([bytes], { type }), basename(argument));

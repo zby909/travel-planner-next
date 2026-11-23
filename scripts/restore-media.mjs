@@ -2,6 +2,7 @@ import { constants } from "node:fs";
 import { copyFile, link, lstat, mkdir, open, readFile, readdir, rmdir, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
+import { fileChecksum } from "./file-checksum.mjs";
 
 // 为恢复媒体建立可重放的复制清单，进程中断后不会把自己复制的文件误判成冲突。
 async function mediaPlan(folder, data) {
@@ -20,7 +21,7 @@ async function mediaPlan(folder, data) {
       if (child.isDirectory()) await walk(kind, name);
       else if (child.isFile()) {
         const from = join(source, child.name);
-        entries.push({ kind, name, sha256: createHash("sha256").update(await readFile(from)).digest("hex"), from, to: join(roots[kind], name) });
+        entries.push({ kind, name, sha256: (await fileChecksum(from)).sha256, from, to: join(roots[kind], name) });
       } else throw Error("恢复图片不能含特殊文件");
     }
   }
@@ -41,8 +42,7 @@ async function rollbackPlan(folder, plan) {
   for (const entry of plan.entries) {
     await rm(restoreMediaTempPath(folder, entry.to), { force: true });
     try {
-      const bytes = await readFile(entry.to);
-      if (createHash("sha256").update(bytes).digest("hex") !== entry.sha256) { changed = true; continue; }
+      if ((await fileChecksum(entry.to)).sha256 !== entry.sha256) { changed = true; continue; }
       await rm(entry.to);
       let directory = dirname(entry.to);
       while (directory !== plan.roots[entry.kind]) {
@@ -59,7 +59,7 @@ async function rollbackPlan(folder, plan) {
 async function hasInstalledMedia(entry) {
   const info = await lstat(entry.to).catch(error => { if (error.code === "ENOENT") return null; throw error; });
   if (info === null) return false;
-  if (!info.isFile() || info.isSymbolicLink() || createHash("sha256").update(await readFile(entry.to)).digest("hex") !== entry.sha256) {
+  if (!info.isFile() || info.isSymbolicLink() || (await fileChecksum(entry.to)).sha256 !== entry.sha256) {
     throw Error("恢复目标文件与本次任务不一致，拒绝覆盖");
   }
   return true;
@@ -91,7 +91,7 @@ export async function installRestoreMedia(folder, data) {
       // 半文件只会留在任务专属临时路径，重放时可以安全清除并重新复制。
       await rm(temp, { force: true });
       await copyFile(entry.from, temp, constants.COPYFILE_EXCL);
-      if (createHash("sha256").update(await readFile(temp)).digest("hex") !== entry.sha256) throw Error("恢复图片复制校验失败");
+      if ((await fileChecksum(temp)).sha256 !== entry.sha256) throw Error("恢复图片复制校验失败");
       const handle = await open(temp, "r+");
       try { await handle.sync(); } finally { await handle.close(); }
       // hard-link 在同一文件系统原子创建目标；与 rename 不同，目标存在时绝不覆盖。

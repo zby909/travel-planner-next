@@ -19,12 +19,14 @@ function readSecret(label) {
     function finish(error) {
       process.stdin.off("data", onData);
       process.stdin.setRawMode(wasRaw);
+      process.stdin.pause();
       process.stdout.write("\n");
       if (error) reject(error);
       else resolve(buffer);
     }
     function onData(data) {
-      for (const char of data.toString("utf8")) {
+      const clean = data.toString("utf8").replace(/\u001b(?:\[[0-9;?]*[ -/]*[@-~]|O[ -~]?)/g, "");
+      for (const char of clean) {
         if (char === "\u0003") return finish(new Error("输入已取消"));
         if (char === "\r" || char === "\n") return finish();
         if (char === "\u007f" || char === "\b") {
@@ -51,13 +53,18 @@ async function main() {
   if (password.length < 12 || password.length > 128 || password !== again) throw new Error("密码长度不足12位、超过128位或两次输入不一致");
   const salt = randomBytes(16);
   const hash = await scrypt(password, salt, 64, { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 });
-  await prisma.user.create({
-    data: {
-      username,
-      displayName,
-      role,
-      passwordHash: `scrypt-v1:${salt.toString("base64url")}:${hash.toString("base64url")}`,
-    },
+  await prisma.$transaction(async tx => {
+    if (await tx.user.count({ where: { isActive: true } }) >= 2) throw new Error("私人旅行站点最多支持两位成员账号");
+    await tx.user.create({ data: {
+      username, displayName, role, passwordHash: `scrypt-v1:${salt.toString("base64url")}:${hash.toString("base64url")}`,
+    } });
+    if (role === "ADMIN") {
+      await tx.appSetting.upsert({
+        where: { key: "admin_bootstrap_v1" },
+        update: { value: "completed" },
+        create: { key: "admin_bootstrap_v1", value: "completed" },
+      });
+    }
   });
   console.log(`已创建账号：${username}（${role}）。密码未输出，也未保存为明文。`);
 }

@@ -3,9 +3,36 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireEditor } from "@/lib/auth";
+import { createPartnerInvite, revokePartnerInvite } from "@/lib/partner-invite";
 import { hashPassword } from "@/lib/security";
 import { prisma } from "@/lib/prisma";
 import type { FormState } from "@/app/admin/actions";
+
+export type PartnerInviteState = { error: string; token: string; expiresAt: string };
+
+// 管理员生成 24 小时一次性邀请链接，让另一半自己设置账号与密码。
+export async function createPartnerInviteAction(_previous: PartnerInviteState, form: FormData): Promise<PartnerInviteState> {
+  const actor = await requireEditor();
+  if (actor.role !== "ADMIN") return { error: "只有管理员可以生成伴侣邀请链接", token: "", expiresAt: "" };
+  const suggestedName = String(form.get("suggestedName") ?? "").trim();
+  if (suggestedName.length > 80) return { error: "预设昵称过长", token: "", expiresAt: "" };
+  try {
+    const result = await createPartnerInvite(actor, suggestedName);
+    revalidatePath("/admin/users");
+    return { error: "", token: result.token, expiresAt: result.expiresAt };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "生成邀请链接失败", token: "", expiresAt: "" };
+  }
+}
+
+// 撤销尚未使用的伴侣邀请链接。
+export async function revokePartnerInviteAction(): Promise<void> {
+  const actor = await requireEditor();
+  if (actor.role !== "ADMIN") throw new Error("只有管理员可以撤销伴侣邀请");
+  await revokePartnerInvite(actor.id);
+  revalidatePath("/admin/users");
+  redirect("/admin/users?inviteRevoked=1");
+}
 
 // 管理员为另一位旅行记录维护者创建独立的私人编辑账号。
 export async function createAccountAction(_previous: FormState, form: FormData): Promise<FormState> {
@@ -28,6 +55,7 @@ export async function createAccountAction(_previous: FormState, form: FormData):
       return true;
     });
     if (!created) return { error: "这个私人站点最多设置两个登录账号，你们的账号已经齐全。" };
+    revalidatePath("/admin");
     revalidatePath("/admin/users");
   } catch {
     return { error: "创建账号失败，请检查是否已经存在同名账号" };

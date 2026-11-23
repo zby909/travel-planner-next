@@ -100,9 +100,11 @@ async function run() {
   check((await db.visitedPlace.count()) === 2, "Visit not persisted");
   const createdVisit = await db.visitedPlace.findFirst({ where: { name: "测试旅途小镇" } });
   check(createdVisit, "Created visit lookup failed");
-  const timelineAfterVisit = await api("/api/v1/timeline");
-  check(timelineAfterVisit.items.length === 1 && timelineAfterVisit.items[0].placeIds.includes(createdVisit.id),
-    "Visit import did not create its linked timeline event");
+  const firstVisitId = saved.created[0].visitId;
+  const visitedPage = await fetch(host + "/visited");
+  check(visitedPage.ok && (await visitedPage.text()).includes(`/visited/${createdVisit.id}#visit-${firstVisitId}`),
+    "Visit import did not enter the public timeline");
+  check((await api("/api/v1/timeline")).items.length === 0, "A visit should not create a duplicate independent event");
 
   const visitPatch = { kind: "visits-update", items: [{
     id: createdVisit.id, name: "测试旅途小镇（修订）", when: "2025-06", city: "测试市", note: "更新后的地图备注",
@@ -116,10 +118,37 @@ async function run() {
   const visitPatchResult = await api("/api/v1/imports/" + visitPatchDraft.draftId + "/commit", { method: "POST" });
   check(visitPatchResult.updated.length === 1 && visitPatchResult.updated[0].name === "测试旅途小镇（修订）",
     "Visit update commit failed");
-  const updatedVisit = await db.visitedPlace.findUnique({ where: { id: createdVisit.id } });
-  check(updatedVisit?.city === "测试市" && updatedVisit.whenLabel === "2025-06" && updatedVisit.mapNote === "更新后的地图备注",
+  const updatedVisit = await db.visitedPlace.findUnique({ where: { id: createdVisit.id }, include: { visits: true } });
+  check(updatedVisit?.city === "测试市" && updatedVisit.visits[0].whenLabel === "2025-06" && updatedVisit.mapNote === "更新后的地图备注",
     "Visit update fields were not persisted");
 
+  const appendPayload = { kind: "visits", items: [{
+    append: true, name: updatedVisit.name, region: updatedVisit.region, when: "2026-05-05", group: "both",
+    visitTitle: "测试重游", journal: "这是另一次到访。",
+  }] };
+  const appendDraft = await api("/api/v1/imports/prepare", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(appendPayload),
+  });
+  const appended = await api(`/api/v1/imports/${appendDraft.draftId}/commit`, { method: "POST" });
+  const returned = (await api("/api/v1/visits")).items.find(item => item.id === createdVisit.id);
+  check(returned.visits.length === 2 && returned.visits[1].id === appended.created[0].visitId && returned.group === "both", "CLI did not append a distinct later visit");
+  const datePatch = { kind: "visits-update", items: [{ id: createdVisit.id, when: "2025-06-15" }] };
+  await api("/api/v1/imports/prepare", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datePatch),
+  }, 400);
+  datePatch.items[0].visitId = firstVisitId;
+  const dateDraft = await api("/api/v1/imports/prepare", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datePatch),
+  });
+  await api(`/api/v1/imports/${dateDraft.draftId}/commit`, { method: "POST" });
+  check((await db.travelMemory.findUniqueOrThrow({ where: { id: firstVisitId } })).happenedAt.toISOString().startsWith("2025-06-15"), "CLI did not update the selected visit");
+
+  const independent = await api("/api/v1/imports/prepare", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "timeline", items: [{
+      year: 2025, date: "2025.06", title: "测试旅途小镇", note: "独立事件", group: "mine", placeIds: [createdVisit.id],
+    }] }),
+  });
+  await api(`/api/v1/imports/${independent.draftId}/commit`, { method: "POST" });
   const timelineEvent = (await api("/api/v1/timeline")).items[0];
   const timelinePatch = { kind: "timeline", items: [{
     id: timelineEvent.id, year: 2025, date: "2025.06", group: "both",
@@ -166,9 +195,12 @@ async function run() {
   const futureDraft = await api("/api/v1/imports/prepare", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(future),
   });
+  check(futureDraft.items[0].currency === "CNY", "Default currency missing from import preview");
+  await db.appSetting.upsert({ where: { key: "currency" }, update: { value: "JPY" }, create: { key: "currency", value: "JPY" } });
   const futureResult = await api("/api/v1/imports/" + futureDraft.draftId + "/commit", { method: "POST" });
   check(futureResult.created.length === 1, "Destination not imported");
   const created = await db.destination.findUnique({ where: { id: futureResult.created[0].id }, include: { guide: { include: { days: true } } } });
+  check(created?.currency === "CNY", "Changing the site default relabeled a previewed estimate");
   check(created?.pickBudget === 5000 && created.guide?.days.length === 1 && created.imagePath?.includes(picture.imageId), "Destination budget, guide or cover incorrect");
 
   const destinationPatch = { kind: "destinations-update", items: [{
@@ -202,11 +234,12 @@ async function run() {
   const appData = join(configDir, "app");
   await mkdir(join(appData, "travelctl"), { recursive: true });
   await writeFile(join(appData, "travelctl", "config.json"), JSON.stringify({ server: host, token }), { mode: 0o600 });
-  const cliEnv = { ...process.env, APPDATA: appData };
+  const cliEnv = { ...process.env, APPDATA: appData, XDG_CONFIG_HOME: appData };
   const checkCli = spawnSync(process.execPath, ["cli/bin/travelctl.mjs", "destinations", "list"], {
     encoding: "utf8", env: cliEnv,
   });
-  check(checkCli.status === 0 && checkCli.stdout.includes("测试未来小岛（修订）"), "CLI read failed");
+  const cliError = (checkCli.stderr || checkCli.error?.message || "").replaceAll(token, "[redacted]").slice(-500);
+  check(checkCli.status === 0 && checkCli.stdout.includes("测试未来小岛（修订）"), `CLI read failed (${checkCli.status}): ${cliError}`);
   if (process.platform === "win32") {
     const savedConfig = JSON.parse(await readFile(join(appData, "travelctl", "config.json"), "utf8"));
     check(savedConfig.credential?.provider === "windows-dpapi" && !savedConfig.token

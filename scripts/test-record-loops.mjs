@@ -49,10 +49,9 @@ export async function verifyRecordLoops({ page, browser, host, prisma, planId, d
     await page.getByRole("button", { name: "归档记录", exact: true }).click();
     await page.getByRole("button", { name: "恢复展示", exact: true }).waitFor();
     await guest.goto(`${host}/visited`);
-    assert.equal(await guest.locator("#place-test-town").count(), 0);
+    assert.equal(await guest.locator('.atlas-photo-entry[href="/visited/test-town"]').count(), 0);
     assert.equal(await guest.locator(".atlas-entry").filter({ hasText: "示例小镇" }).count(), 0, "关联归档足迹的时间轴仍在前台");
-    await guest.goto(`${host}/memories`);
-    assert.equal(await guest.locator(".memory-story").filter({ hasText: "抵达京都的第一天" }).count(), 0);
+    assert.equal((await guest.goto(`${host}/visited/test-town`)).status(), 404);
     assert.equal((await guest.request.get(host + photoUrl)).status(), 404, "归档日记照片被匿名访问");
     const memberPhoto = await page.request.get(host + photoUrl);
     assert.equal(memberPhoto.status(), 200);
@@ -64,7 +63,7 @@ export async function verifyRecordLoops({ page, browser, host, prisma, planId, d
     await page.getByRole("button", { name: "归档记录", exact: true }).waitFor();
     assert.equal((await guest.request.get(host + photoUrl)).status(), 200);
     await guest.goto(`${host}/visited`);
-    assert.equal(await guest.locator("#place-test-town").count(), 1);
+    assert.equal(await guest.locator('.atlas-photo-entry[href="/visited/test-town"]').count(), 1);
     assert.ok((await guest.locator(".atlas-entry").count()) >= 1, "恢复地点后时间轴应重新显示故事");
 
     const oldCover = (await prisma.destination.findUniqueOrThrow({ where: { id: destinationId } })).imagePath;
@@ -79,7 +78,8 @@ export async function verifyRecordLoops({ page, browser, host, prisma, planId, d
 
     // 地点照片只从相册上传，选择相册已有照片作为新封面。
     await page.goto(`${host}/admin/places/test-town`);
-    await page.locator(".place-photo-actions").getByRole("button", { name: "设为封面" }).first().click();
+    await page.locator(".memory-admin-photo details summary").first().click();
+    await page.locator(".memory-admin-photo").first().getByRole("button", { name: "设为封面", exact: true }).click();
     await page.waitForURL(url => url.searchParams.get("coverSaved") === "1");
     assert.equal(await prisma.mediaAsset.findUnique({ where: { id: oldId } }), null,
       "最后一处旧封面引用移除后未清理");

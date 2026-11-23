@@ -20,18 +20,23 @@ export async function issueTokenAction(_state: TokenState, form: FormData): Prom
     return { error: "请至少选择一个有效授权范围", token: "" };
   }
   const raw = "trv_" + randomBytes(32).toString("base64url");
-  await prisma.$transaction(async tx => {
-    const created = await tx.apiToken.create({
-      data: {
-        userId: user.id, title, tokenHash: tokenDigest(raw),
-        scopesJson: JSON.stringify([...new Set(scopes)]),
-        expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
-      },
+  try {
+    await prisma.$transaction(async tx => {
+      const created = await tx.apiToken.create({
+        data: {
+          userId: user.id, title, tokenHash: tokenDigest(raw),
+          scopesJson: JSON.stringify([...new Set(scopes)]),
+          expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+        },
+      });
+      await tx.auditLog.create({
+        data: { actorId: user.id, action: "创建", entity: "CLI授权", entityId: created.id, summary: title },
+      });
     });
-    await tx.auditLog.create({
-      data: { actorId: user.id, action: "创建", entity: "CLI授权", entityId: created.id, summary: title },
-    });
-  });
+  } catch {
+    return { error: "生成授权令牌失败，请稍后重试", token: "" };
+  }
+  revalidatePath("/admin");
   revalidatePath("/admin/tokens");
   return { error: "", token: raw };
 }
@@ -41,11 +46,18 @@ export async function revokeTokenAction(form: FormData): Promise<void> {
   const id = String(form.get("id") || "");
   const token = await prisma.apiToken.findFirst({ where: { id, userId: user.id } });
   if (!token) throw new Error("令牌不存在或不属于当前用户");
+  if (token.revokedAt) {
+    revalidatePath("/admin/tokens");
+    return;
+  }
   await prisma.$transaction(async tx => {
-    await tx.apiToken.update({ where: { id }, data: { revokedAt: new Date() } });
-    await tx.auditLog.create({
-      data: { actorId: user.id, action: "撤销", entity: "CLI授权", entityId: id, summary: token.title },
-    });
+    const updated = await tx.apiToken.updateMany({ where: { id, userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
+    if (updated.count) {
+      await tx.auditLog.create({
+        data: { actorId: user.id, action: "撤销", entity: "CLI授权", entityId: id, summary: token.title },
+      });
+    }
   });
+  revalidatePath("/admin");
   revalidatePath("/admin/tokens");
 }

@@ -27,9 +27,6 @@ export async function saveTimelineAction(_state: TimelineFormState, form: FormDa
   const actor = await requireEditor();
   try {
     const id = field(form, "id", 64);
-    const existing = id ? await prisma.timelineEntry.findUnique({ where: { id }, select: { id: true, sortOrder: true } }) : null;
-    if (id && !existing) throw new Error("这条时间记录不存在，可能已被删除");
-
     const yearText = field(form, "year", 4, true);
     if (!/^\d{4}$/.test(yearText)) throw new Error("年份必须填写四位数字");
     const year = Number(yearText);
@@ -40,26 +37,29 @@ export async function saveTimelineAction(_state: TimelineFormState, form: FormDa
     const group = groupField(form);
     const placeIds = [...new Set(form.getAll("placeIds").map(value => String(value).trim()).filter(Boolean))];
     if (placeIds.length > 40) throw new Error("一条时间记录最多关联 40 个地点");
-    if (placeIds.length) {
-      const matched = await prisma.visitedPlace.count({ where: { id: { in: placeIds } } });
-      if (matched !== placeIds.length) throw new Error("部分关联地点已不存在，请刷新页面后重试");
-    }
 
-    const latest = existing ? null : await prisma.timelineEntry.aggregate({ where: { year }, _max: { sortOrder: true } });
-    const sortOrder = existing?.sortOrder ?? ((latest?._max.sortOrder ?? -1) + 1);
-    const entryId = existing?.id ?? randomUUID();
     await prisma.$transaction(async tx => {
+      const existing = id ? await tx.timelineEntry.findUnique({ where: { id }, select: { id: true, sortOrder: true } }) : null;
+      if (id && !existing) throw new Error("这条时间记录不存在，可能已被删除");
+      if (placeIds.length) {
+        const matched = await tx.visitedPlace.count({ where: { id: { in: placeIds } } });
+        if (matched !== placeIds.length) throw new Error("部分关联地点已不存在，请刷新页面后重试");
+      }
+      const latest = existing ? null : await tx.timelineEntry.aggregate({ where: { year }, _max: { sortOrder: true } });
+      const sortOrder = existing?.sortOrder ?? ((latest?._max.sortOrder ?? -1) + 1);
+      const entryId = existing?.id ?? randomUUID();
       const data = { date, year, title, note, group, sortOrder };
       if (existing) await tx.timelineEntry.update({ where: { id: entryId }, data });
       else await tx.timelineEntry.create({ data: { id: entryId, ...data } });
       await tx.timelinePlace.deleteMany({ where: { timelineEntryId: entryId } });
-      for (const [index, placeId] of placeIds.entries()) {
-        await tx.timelinePlace.create({ data: { timelineEntryId: entryId, placeId, sortOrder: index } });
-      }
+      if (placeIds.length) await tx.timelinePlace.createMany({
+        data: placeIds.map((placeId, sortOrder) => ({ timelineEntryId: entryId, placeId, sortOrder })),
+      });
       await tx.auditLog.create({ data: { actorId: actor.id, action: existing ? "更新" : "新增", entity: "旅行时间轴", entityId: entryId, summary: title } });
     });
     revalidatePath("/visited");
     revalidatePath("/admin");
+    revalidatePath("/admin/places");
     revalidatePath("/admin/timeline");
   } catch (error) {
     return { error: error instanceof Error ? error.message : "保存失败，请稍后重试" };
@@ -72,14 +72,15 @@ export async function deleteTimelineAction(form: FormData): Promise<void> {
   const actor = await requireEditor();
   const id = String(form.get("id") ?? "").trim();
   if (!id || id.length > 64) throw new Error("无效的时间记录编号");
-  const entry = await prisma.timelineEntry.findUnique({ where: { id } });
-  if (!entry) throw new Error("这条时间记录不存在");
   await prisma.$transaction(async tx => {
+    const entry = await tx.timelineEntry.findUnique({ where: { id }, select: { id: true, title: true } });
+    if (!entry) throw new Error("这条时间记录不存在");
     await tx.timelineEntry.delete({ where: { id } });
     await tx.auditLog.create({ data: { actorId: actor.id, action: "删除", entity: "旅行时间轴", entityId: id, summary: entry.title } });
   });
   revalidatePath("/visited");
   revalidatePath("/admin");
+  revalidatePath("/admin/places");
   revalidatePath("/admin/timeline");
   redirect("/admin/timeline?deleted=1");
 }

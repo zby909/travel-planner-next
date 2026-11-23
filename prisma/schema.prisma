@@ -88,6 +88,7 @@ model ImportDraft {
   owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([ownerId, status])
+  @@index([status, expiresAt])
 }
 
 model MediaAsset {
@@ -96,12 +97,15 @@ model MediaAsset {
   fileName  String
   mimeType  String
   byteSize  Int
+  width     Int?
+  height    Int?
   status    String   @default("STAGED")
   createdAt DateTime @default(now())
   owner     User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   travelPhoto TravelPhoto?
 
   @@index([ownerId, status])
+  @@index([status, createdAt])
 }
 
 model Destination {
@@ -118,6 +122,7 @@ model Destination {
   minBudget       Int
   maxBudget       Int
   pickBudget      Int
+  currency        String            @default("CNY")
   rank            Int
   budgetAccommodation Int
   budgetFood          Int
@@ -164,11 +169,11 @@ model GuideDay {
 
 model VisitedPlace {
   id        String          @id
-  group     String
   name      String
   region    String
   image     String
-  whenLabel String
+  coverX    Int             @default(50)
+  coverY    Int             @default(50)
   sortOrder Int
   longitude Float?
   latitude  Float?
@@ -178,9 +183,9 @@ model VisitedPlace {
   mapNote   String?
   isArchived Boolean        @default(false)
   timeline  TimelinePlace[]
-  memory    TravelMemory?
+  visits    TravelMemory[]
 
-  @@index([group, sortOrder])
+  @@index([sortOrder])
 }
 
 model TimelineEntry {
@@ -264,7 +269,12 @@ model TravelMemory {
   title      String
   content    String
   happenedAt DateTime?
-  placeId    String?       @unique
+  whenLabel  String        @default("")
+  group      String?
+  placeId    String?
+  revision   Int           @default(0)
+  albumRevision Int        @default(0)
+  deletedAt  DateTime?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   plan       TravelPlan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
@@ -272,6 +282,7 @@ model TravelMemory {
   photos     TravelPhoto[] @relation("MemoryPhotos")
 
   @@index([planId, happenedAt])
+  @@index([placeId, happenedAt])
 }
 
 model TravelPhoto {
@@ -281,6 +292,7 @@ model TravelPhoto {
   filePath     String
   mediaAssetId String?       @unique
   altText      String?
+  isFeatured   Boolean       @default(false)
   sortOrder    Int           @default(0)
   createdAt    DateTime      @default(now())
   plan         TravelPlan?   @relation("PlanPhotos", fields: [planId], references: [id], onDelete: SetNull)
@@ -289,4 +301,6 @@ model TravelPhoto {
 
   @@index([planId, sortOrder])
   @@index([memoryId, sortOrder])
+  @@index([filePath])
+  @@index([isFeatured, createdAt])
 }

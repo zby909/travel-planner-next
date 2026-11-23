@@ -1,8 +1,10 @@
 import { existsSync, rmSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { preserveTsconfig } from "./preserve-tsconfig.mjs";
 
 const root = process.cwd();
+const restoreTsconfig = preserveTsconfig(root);
 const dbFile = resolve(root, "data", "auth-e2e.db");
 const uploadDir = resolve(root, "data", "auth-e2e-uploads");
 const testBuildDir = resolve(root, ".next-auth-e2e");
@@ -26,7 +28,7 @@ function run(label, args) {
 try {
   // The test database is an explicitly named disposable file; never touch data/travel.db.
   clean();
-  run("TEST: Prisma migrate deploy", ["node_modules/prisma/build/index.js", "migrate", "deploy"]);
+  run("TEST: Prisma migrate deploy", ["scripts/deploy-database.mjs"]);
   run("TEST: generic synthetic fixtures", ["scripts/seed-test-fixtures.mjs"]);
   run("TEST: Chrome login and editor flows", ["scripts/test-auth-e2e.mjs"]);
   console.log("AUTH_E2E_SUCCEEDED");
@@ -34,6 +36,7 @@ try {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 } finally {
+  restoreTsconfig();
   try {
     clean();
   } catch (error) {

@@ -16,7 +16,7 @@ Do not commit runtime databases, uploads, local environment files, CLI credentia
 
 Fresh installations default to **PUBLIC** display:
 
-- The home page, destination pages, visited archive, travel diary archive, and linked public photos can be browsed without login.
+- The home page, destination pages, visited-place directory, individual place details, notes, and linked public photos can be browsed without login.
 - The admin area always requires a valid member session.
 - Future trip plans, planned budgets and external guide links remain in the authenticated admin area.
 
@@ -39,7 +39,7 @@ There is no public registration endpoint. Each member has a separate password an
 
 Direct uploads and CLI uploads accept static JPEG, PNG and WebP images. The server validates the actual image format, limits pixel count, rotates according to orientation, resizes and converts to WebP, and removes EXIF/GPS metadata.
 
-Travel diary photos use managed media records and the same site-visibility gate as other uploaded images. Replacing a cover, deleting a diary/photo or canceling an import releases only assets with no remaining content or active-draft references; archived records retain their photos. Do not upload photos of other people without appropriate permission.
+Travel diary photos use managed media records and the same site-visibility gate as other uploaded images. Soft-deleted visits keep their photos in the trash until explicitly purged. Replacing a cover, removing a photo, purging a trashed visit, or canceling an import releases only assets with no remaining content or active-draft references; archived records retain their photos. Do not upload photos of other people without appropriate permission.
 
 Full-site ZIP export and restore require a same-origin administrator session, not an editor account or CLI Token. Exported ZIPs contain sensitive data and are not encrypted. File hashes detect corruption, not whether an unknown backup source is trustworthy. Restore disables historical login credentials and keeps the new instance administrator. See [Backup and restore](PRIVATE-BACKUP-RESTORE.md).
 

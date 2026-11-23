@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { getSiteContentAccess } from "@/lib/site-access";
 import { hasVisibleLegacyReference } from "@/lib/media-lifecycle";
+import { validBackupImagePath } from "@/lib/backup-format";
+import { restoreDataDir } from "@/lib/backup-restore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,11 +17,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
     return new Response("Not found", { status: 404, headers: { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" } });
   }
   const { path } = await params;
-  if (!Array.isArray(path) || path.length < 2 || path.length > 4
-    || path[0] !== "images" || path.some(part => !/^[a-zA-Z0-9._-]{1,120}$/.test(part) || part.startsWith("."))) {
+  if (!Array.isArray(path) || path[0] !== "images" || !validBackupImagePath(path.join("/"))) {
     return new Response("Not found", { status: 404 });
   }
-  const name = path[path.length - 1];
+  const name = path[path.length - 1].toLowerCase();
   const mime = name.endsWith(".jpg") || name.endsWith(".jpeg") ? "image/jpeg"
     : name.endsWith(".png") ? "image/png"
     : name.endsWith(".svg") ? "image/svg+xml"
@@ -29,7 +30,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
     return new Response("Not found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
   }
   try {
-    const dataDir = process.env.RESTORE_DATA_DIR || (process.env.DATABASE_URL?.startsWith("file:/app/data/") ? "/app/data" : join(process.cwd(), "data"));
+    const dataDir = restoreDataDir();
     const root = process.env.LEGACY_MEDIA_DIR || join(dataDir, "legacy-images");
     const file = join(/* turbopackIgnore: true */ root, ...path);
     const bytes = await readFile(/* turbopackIgnore: true */ file);
@@ -44,6 +45,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
     });
   } catch {
     // A restored DB without its old images should still show a valid placeholder.
-    return NextResponse.redirect(new URL("/images/destination-placeholder.svg", _request.url), { status: 307 });
+    return new Response(null, { status: 307, headers: { Location: "/images/destination-placeholder.svg", "Cache-Control": "no-store" } });
   }
 }

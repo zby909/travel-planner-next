@@ -4,19 +4,20 @@ import sharp from "sharp";
 
 // 模拟网络断开再重试整张照片，验证上传百分比、来源鉴权与单张照片的入库。
 export async function verifyPhotoUpload({ page, host, placeId, prisma }) {
+  const { id: visitId } = await prisma.travelMemory.findFirstOrThrow({ where: { placeId }, select: { id: true } });
   const pixels = randomBytes(600 * 600 * 3);
   const photo = await sharp(pixels, { raw: { width: 600, height: 600, channels: 3 } }).png().toBuffer();
   const endpoint = host + "/api/admin/place-photos";
 
   const denied = await page.request.post(endpoint, {
     headers: { Origin: "https://attacker.example" },
-    multipart: { placeId, image: { name: "test.png", mimeType: "image/png", buffer: photo } },
+    multipart: { placeId, visitId, image: { name: "test.png", mimeType: "image/png", buffer: photo } },
   });
   assert.equal(denied.status(), 403, "Cross-origin photo upload was accepted");
 
   const invalid = await page.request.post(endpoint, {
     headers: { Origin: host },
-    multipart: { placeId, requestId: randomUUID(),
+    multipart: { placeId, visitId, requestId: randomUUID(),
       image: { name: "invalid.png", mimeType: "image/png", buffer: Buffer.from("not-an-image-file-at-all") } },
   });
   assert.equal(invalid.status(), 400, "Corrupt image was accepted");
@@ -47,7 +48,7 @@ export async function verifyPhotoUpload({ page, host, placeId, prisma }) {
   assert.ok(connectionFailed && attempts === 2, "Failed single-photo upload was not retried correctly");
   assert.equal(await page.locator('progress[aria-label="照片上传进度"]').getAttribute("value"), "100");
   const note = await prisma.travelMemory.findUniqueOrThrow({
-    where: { placeId }, include: { photos: { include: { mediaAsset: true } } },
+    where: { id: visitId }, include: { photos: { include: { mediaAsset: true } } },
   });
   assert.equal(note.photos.length, 1, "Retry created duplicate or missing photos");
   assert.equal(note.photos[0].mediaAsset?.mimeType, "image/webp");
@@ -56,7 +57,7 @@ export async function verifyPhotoUpload({ page, host, placeId, prisma }) {
   // 模拟服务端已成功但响应丢失：同一编号再次提交不应追加第二张照片。
   const repeated = await page.request.post(endpoint, {
     headers: { Origin: host },
-    multipart: { placeId, requestId: note.photos[0].mediaAssetId,
+    multipart: { placeId, visitId, requestId: note.photos[0].mediaAssetId,
       image: { name: "progress-test.png", mimeType: "image/png", buffer: photo } },
   });
   assert.equal(repeated.status(), 201, "Retry after lost response was not accepted");

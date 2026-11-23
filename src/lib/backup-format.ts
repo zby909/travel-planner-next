@@ -1,6 +1,9 @@
-export const MAX_BACKUP_ZIP = 48 * 1024 * 1024;
-export const MAX_BACKUP_UNCOMPRESSED = 350 * 1024 * 1024;
-export const MAX_BACKUP_ENTRIES = 800;
+export const MAX_BACKUP_ZIP = 512 * 1024 * 1024;
+export const MAX_BACKUP_UNCOMPRESSED = 2 * 1024 * 1024 * 1024;
+export const MAX_BACKUP_ENTRIES = 10000;
+export const MAX_DIRECT_BACKUP_ZIP = 48 * 1024 * 1024;
+export const MAX_BACKUP_MANIFEST = 4 * 1024 * 1024;
+export const BACKUP_SIZE_LABEL = "512 MiB";
 
 export type BackupFileEntry = { path: string; size: number; sha256: string };
 export type BackupManifest = {

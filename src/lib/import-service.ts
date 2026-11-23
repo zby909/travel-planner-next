@@ -5,6 +5,8 @@ import { importPayloadSchema, type ImportPayload } from "@/lib/import-schema";
 import { commitRecordChange, prepareRecordChange } from "@/lib/record-change-service";
 import { releaseUnusedMedia } from "@/lib/media-lifecycle";
 import { removeStoredMediaFiles } from "@/lib/media-storage";
+import { visitDateFromImport } from "@/lib/visit-input";
+import { getSiteSettings } from "@/lib/site-settings";
 
 export async function loadImportImage(imageId: string | undefined, ownerId: string) {
   if (!imageId) return null;
@@ -28,10 +30,15 @@ export async function prepareImport(payload: unknown, ownerId: string) {
     const placeKeys = new Set<string>();
     for (const item of data.items) {
       const key = (item.name + "::" + item.region).toLowerCase();
-      if (placeKeys.has(key)) throw new Error(`导入批次中存在重复地点：${item.name}`);
-      placeKeys.add(key);
+      if (!item.append) {
+        if (placeKeys.has(key)) throw new Error(`导入批次中存在重复地点：${item.name}`);
+        placeKeys.add(key);
+      }
       const existing = await prisma.visitedPlace.findFirst({ where: { name: item.name, region: item.region }, select: { id: true } });
-      if (existing) warnings.push(`${item.name}：地点已存在，确认导入后将跳过，避免覆盖现有数据`);
+      if (item.append) {
+        if (!existing) throw Error(`没有找到要追加到访的地点：${item.name} · ${item.region}`);
+        warnings.push(`${item.name}：将保留既有记录并新增一次到访`);
+      } else if (existing) warnings.push(`${item.name}：地点已存在，确认导入后将跳过，避免覆盖现有数据`);
       if (item.latitude === undefined && !existing) {
         warnings.push(`${item.name}：缺少经纬度，将保存到足迹列表，但不会在地图上生成坐标点`);
       }
@@ -39,7 +46,9 @@ export async function prepareImport(payload: unknown, ownerId: string) {
     }
   } else {
     const names = new Set<string>();
+    const { currency } = await getSiteSettings();
     for (const item of data.items) {
+      item.currency ??= currency;
       const key = item.title.toLowerCase();
       if (names.has(key)) throw new Error(`导入批次包含重复目的地：${item.title}`);
       names.add(key);
@@ -80,37 +89,37 @@ export async function commitImport(draftId: string, ownerId: string) {
       data: { status: "COMMITTING" },
     });
     if (locked.count !== 1) throw new Error("草稿已被其他请求提交，请勿重复执行");
-    const created: { id: string; name: string }[] = [];
+    const created: { id: string; name: string; visitId?: string }[] = [];
+    const publishedIds = new Set<string>();
     const skipped: string[] = [];
     if (data.kind === "visits") {
       let sortOrder = (await tx.visitedPlace.aggregate({ _max: { sortOrder: true } }))._max.sortOrder ?? -1;
       for (const item of data.items) {
         const existing = await tx.visitedPlace.findFirst({ where: { name: item.name, region: item.region } });
-        if (existing) { skipped.push(item.name); continue; }
-        const place = await tx.visitedPlace.create({
+        if (item.append && !existing) throw Error(`提交时未找到地点：${item.name} · ${item.region}`);
+        if (existing && !item.append) { skipped.push(item.name); continue; }
+        const place = existing ?? await tx.visitedPlace.create({
           data: {
             id: randomUUID(),
-            group: item.group, name: item.name, region: item.region,
+            name: item.name, region: item.region,
             image: item.imageId ? `api/media/${item.imageId}` : "images/place-placeholder.svg",
-            whenLabel: item.when || "",
             sortOrder: ++sortOrder,
             longitude: item.longitude ?? null, latitude: item.latitude ?? null,
             country: item.country ?? null, province: item.province ?? null, city: item.city ?? null,
             mapNote: item.note ?? null,
           },
         });
-        if (item.when) {
-          const [year, month] = item.when.split("-");
-          const date = month ? `${year}.${month}` : year;
-          const timeline = await tx.timelineEntry.create({
-            data: { id: randomUUID(), year: Number(year), date, group: item.group, title: item.name, note: item.note ?? "", sortOrder: 0 },
-          });
-          await tx.timelinePlace.create({ data: { timelineEntryId: timeline.id, placeId: place.id, sortOrder: 0 } });
-        }
-        created.push({ id: place.id, name: item.name });
+        const visit = await tx.travelMemory.create({ data: {
+          placeId: place.id, group: item.group, ...visitDateFromImport(item.when ?? ""),
+          title: item.visitTitle ?? "", content: item.journal ?? "",
+        }, select: { id: true } });
+        if (item.imageId) publishedIds.add(item.imageId);
+        created.push({ id: place.id, name: item.name, visitId: visit.id });
       }
     } else {
       let rank = (await tx.destination.aggregate({ _max: { rank: true } }))._max.rank ?? 0;
+      const oldDraftCurrency = data.items.some(item => !item.currency)
+        ? (await tx.appSetting.findUnique({ where: { key: "currency" } }))?.value ?? "CNY" : undefined;
       for (const item of data.items) {
         const found = await tx.destination.findFirst({ where: { title: item.title } });
         if (found) { skipped.push(item.title); continue; }
@@ -122,6 +131,7 @@ export async function commitImport(draftId: string, ownerId: string) {
             title: item.title, subtitle: item.subtitle, flag: "🌍", kind: "旅行计划",
             typesJson: "[]", months: item.months ?? "", seasonsJson: "[]", days: item.days ?? "",
             minBudget: item.minBudget ?? sum, maxBudget: item.maxBudget ?? sum, pickBudget: sum,
+            currency: item.currency ?? oldDraftCurrency,
             rank: ++rank,
             budgetFood: b.food, budgetAccommodation: b.accommodation,
             budgetTransport: b.transport, budgetOther: b.other,
@@ -142,12 +152,11 @@ export async function commitImport(draftId: string, ownerId: string) {
           });
         }
         created.push({ id: dest.id, name: item.title });
+        if (item.imageId) publishedIds.add(item.imageId);
       }
     }
-    for (const id of mediaIds) {
-      if (data.items.some(i => i.imageId === id && created.some(c => c.name === ("name" in i ? i.name : i.title)))) {
-        await tx.mediaAsset.update({ where: { id, ownerId }, data: { status: "PUBLIC" } });
-      }
+    for (const id of publishedIds) {
+      await tx.mediaAsset.update({ where: { id, ownerId }, data: { status: "PUBLIC" } });
     }
     await tx.importDraft.update({ where: { id: draftId }, data: { status: "COMMITTED", committedAt: new Date() } });
     await tx.auditLog.create({

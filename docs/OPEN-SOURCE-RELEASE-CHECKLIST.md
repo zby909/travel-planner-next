@@ -8,8 +8,8 @@ This checklist is for the repository maintainer before changing the GitHub repos
 - [x] Align package.json, package-lock.json and cli/package.json license metadata with MIT; include the MIT text in cli/LICENSE for npm distribution.
 - [ ] Confirm that fonts, map data, icons, images and other bundled assets may be redistributed under their own terms.
 - [ ] Confirm that all source code and dependencies have compatible licenses.
-- [ ] Add the full Apache 2.0 license text and applicable NOTICE material for the bundled ECharts file.
-- [ ] Verify the offline map geometry source and redistribution license.
+- [x] Include the ECharts 5.6.0 LICENSE and NOTICE alongside the bundled renderer.
+- [x] Identify the offline map geometry sources and verify the bundled artifact against the original build.
 - [ ] Keep third-party assets outside the project's MIT grant unless their owners explicitly permit MIT relicensing.
 
 ## Private data and repository history
@@ -17,7 +17,7 @@ This checklist is for the repository maintainer before changing the GitHub repos
 **Known release note (reviewed 2026-11-04):** Git history includes a commit (6758d2c) that removed legacy files from the current tree, but the deleted blobs remain reachable from history/tags. The maintainer has confirmed that the historical travel records do not need to be withheld for privacy reasons. The history still contains third-party photos and incomplete attribution records, so privacy approval does not establish copyright or redistribution rights. See [Third-party assets and license notes](THIRD-PARTY-NOTICES.md).
 
 - [ ] Review historical image assets and their attribution records. The legacy manifest identifies some Wikimedia Commons files as CC BY-SA 3.0 / 4.0, while many entries do not record a complete author/license. Preserve the original license and attribution, or remove assets from history if redistribution rights cannot be established.
-- [ ] Verify the provenance and license of public/maps/map-geo-data.js; its header refers to SOURCES.txt, which is not present in the current checkout.
+- [ ] Before a public release, obtain distribution terms covering the Amap China boundaries and the world outlines, or replace the affected layers with documented alternatives. See the [map source inventory](../public/maps/SOURCES.txt).
 - [ ] Keep the existing Git history only if all historical third-party assets and notices may lawfully remain available. Otherwise, back up the repository and plan a history rewrite or a clean public snapshot before release.
 - [ ] Review the current Git index and working tree for .env, database files, uploads, backups, logs, credentials and private deployment configuration.
 - [ ] Inspect **all Git history and tags**, not only the current checkout, for personal travel records, photos, old seed files, domains, tokens and credentials.
@@ -48,7 +48,7 @@ This checklist is for the repository maintainer before changing the GitHub repos
 
 ## Product and privacy review
 
-- [ ] Confirm that public mode is clearly documented as public, including travel diary text and photos.
+- [ ] Confirm that public mode is clearly documented as public, including visited-place notes and photos.
 - [ ] Confirm that private mode protects all travel pages and media routes.
 - [ ] Verify the blank installation contains no personal travel records or photos.
 - [ ] Review backup/restore instructions and retention expectations.

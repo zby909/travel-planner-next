@@ -2,22 +2,35 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { photoPreviewUrl } from "@/lib/media";
 
 export type PhotoGallerySelection = {
   title: string;
+  titles?: string[];
   images: string[];
+  altTexts?: string[];
+  captions?: string[];
 };
 
-// 为旅行目的地提供原静态版的照片放大、左右翻页与键盘浏览功能。
-export function DestinationPhotoLightbox({ selection, onClose }: { selection: PhotoGallerySelection; onClose: () => void }) {
-  const [index, setIndex] = useState(0);
+// 为旅行地点与心愿目的地提供大图、左右翻页和键盘浏览。
+export function DestinationPhotoLightbox({ selection, onClose, initialIndex = 0 }: { selection: PhotoGallerySelection; onClose: () => void; initialIndex?: number }) {
+  const count = selection.images.length;
+  const safeInitial = count > 0 ? Math.min(Math.max(0, initialIndex), count - 1) : 0;
+  const [index, setIndex] = useState(safeInitial);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const touchStart = useRef<number | null>(null);
-  const count = selection.images.length;
+  const onCloseRef = useRef(onClose);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const stripStart = Math.max(0, Math.min(index - 2, count - 5));
 
   useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (count === 0) return;
     const oldOverflow = document.body.style.overflow;
+    const trigger = document.activeElement;
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
 
@@ -25,11 +38,11 @@ export function DestinationPhotoLightbox({ selection, onClose }: { selection: Ph
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
-      } else if (event.key === "ArrowRight") {
+        onCloseRef.current();
+      } else if (event.key === "ArrowRight" && count > 1) {
         event.preventDefault();
         setIndex(current => (current + 1) % count);
-      } else if (event.key === "ArrowLeft") {
+      } else if (event.key === "ArrowLeft" && count > 1) {
         event.preventDefault();
         setIndex(current => (current + count - 1) % count);
       } else if (event.key === "Tab") {
@@ -37,10 +50,15 @@ export function DestinationPhotoLightbox({ selection, onClose }: { selection: Ph
         if (buttons.length === 0) return;
         const first = buttons[0];
         const last = buttons[buttons.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
+        const active = document.activeElement;
+        const insideButtons = active instanceof HTMLButtonElement && buttons.includes(active);
+        if (!insideButtons) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        } else if (event.shiftKey && active === first) {
           event.preventDefault();
           last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
+        } else if (!event.shiftKey && active === last) {
           event.preventDefault();
           first.focus();
         }
@@ -51,28 +69,49 @@ export function DestinationPhotoLightbox({ selection, onClose }: { selection: Ph
     return () => {
       document.body.style.overflow = oldOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus({ preventScroll: true });
     };
-  }, [count, onClose]);
+  }, [count]);
 
-  // 手指水平滑动时切换相邻照片，不阻止正常的缩放与触摸行为。
-  function handleTouchEnd(clientX: number) {
-    if (touchStart.current === null || count < 2) return;
-    const delta = clientX - touchStart.current;
-    if (Math.abs(delta) > 55) setIndex(current => (current + (delta < 0 ? 1 : count - 1)) % count);
+  if (count === 0) return null;
+
+  // 手指水平滑动时切换相邻照片，忽略纵向滚动和双指缩放手势。
+  function handleTouchEnd(clientX: number | undefined, clientY: number | undefined) {
+    const start = touchStart.current;
     touchStart.current = null;
+    if (!start || clientX === undefined || clientY === undefined || count < 2) return;
+    const deltaX = clientX - start.x;
+    const deltaY = clientY - start.y;
+    if (Math.abs(deltaX) > 55 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+      setIndex(current => (current + (deltaX < 0 ? 1 : count - 1)) % count);
+    }
   }
+
+  const activeTitle = selection.titles?.[index] || selection.title;
 
   return (
     <div className="cinematic-lightbox-overlay" role="presentation" onClick={event => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <div className="cinematic-lightbox" role="dialog" aria-modal="true" aria-label={`${selection.title}的旅行照片`} ref={dialogRef}>
+      <div className="cinematic-lightbox" role="dialog" aria-modal="true" aria-label={`${activeTitle}的旅行照片`} ref={dialogRef}>
         <div className="cinematic-lightbox-top">
-          <div><span>TRAVEL POSTCARDS / PHOTO GALLERY</span><h2>{selection.title}</h2></div>
+          <h2>{activeTitle}</h2>
           <button type="button" ref={closeRef} className="cinematic-lightbox-close" aria-label="关闭照片查看器" onClick={onClose}>×</button>
         </div>
-        <div className="cinematic-lightbox-stage" onTouchStart={event => { touchStart.current = event.changedTouches[0]?.clientX ?? null; }} onTouchEnd={event => handleTouchEnd(event.changedTouches[0]?.clientX ?? 0)}>
-          <Image key={selection.images[index]} unoptimized src={selection.images[index]} alt={`${selection.title}景点照片 ${index + 1}`} fill sizes="(max-width: 720px) 100vw, 85vw" />
+        <div
+          className="cinematic-lightbox-stage"
+          onTouchStart={event => {
+            if (event.touches.length !== 1) { touchStart.current = null; return; }
+            const touch = event.changedTouches[0];
+            touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+          }}
+          onTouchEnd={event => {
+            const touch = event.changedTouches[0];
+            handleTouchEnd(touch?.clientX, touch?.clientY);
+          }}
+          onTouchCancel={() => { touchStart.current = null; }}
+        >
+          <Image key={index} unoptimized src={selection.images[index]} alt={selection.altTexts?.[index] ?? `${selection.title}照片 ${index + 1}`} fill sizes="(max-width: 720px) 100vw, 85vw" />
           {count > 1 && (
             <>
               <button className="cinematic-lightbox-arrow is-prev" type="button" aria-label="上一张照片" onClick={() => setIndex(current => (current + count - 1) % count)}>‹</button>
@@ -80,22 +119,25 @@ export function DestinationPhotoLightbox({ selection, onClose }: { selection: Ph
             </>
           )}
         </div>
+        {selection.captions?.[index] ? <p className="cinematic-lightbox-caption">{selection.captions[index]}</p> : null}
         <div className="cinematic-lightbox-bottom">
-          <span>{selection.title} · FRAME {String(index + 1).padStart(2, "0")}</span>
           {count > 1 && (
             <div className="cinematic-lightbox-filmstrip" role="group" aria-label="选择旅行照片">
-              {selection.images.map((src, thumbnailIndex) => (
+              {selection.images.slice(stripStart, stripStart + 5).map((src, offset) => {
+                const thumbnailIndex = stripStart + offset;
+                return (
                 <button
                   type="button"
-                  key={src}
+                  key={thumbnailIndex}
                   className={thumbnailIndex === index ? "is-current" : ""}
                   onClick={() => setIndex(thumbnailIndex)}
                   aria-label={`查看第 ${thumbnailIndex + 1} 张照片`}
                   aria-pressed={thumbnailIndex === index}
                 >
-                  <Image src={src} unoptimized alt="" fill sizes="52px" />
+                  <Image src={photoPreviewUrl(src, 320)} unoptimized alt="" fill sizes="52px" />
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
           <span aria-live="polite">{String(index + 1).padStart(2, "0")} / {String(count).padStart(2, "0")}</span>

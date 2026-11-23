@@ -1,4 +1,5 @@
 import Link from "next/link";
+import "../studio.css";
 import { requireEditor } from "@/lib/auth";
 import { logoutAction } from "@/app/login/actions";
 import { getSiteSettings } from "@/lib/site-settings";
@@ -12,12 +13,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="admin-shell">
       <aside className="admin-bar">
-        <Link className="brand" href="/admin"><span className="brand-mark">✳</span><span className="brand-name">{settings.siteName}<small>THE EDITORIAL DESK</small></span></Link>
-        <div className="admin-sidebar-heading"><span>PRIVATE EDITION</span><h2>旅行的，<br /><em>编辑室。</em></h2><p>收集照片，编排远方。<br />我们的故事，在这里继续。</p></div>
+        <Link className="brand" href="/admin"><span className="brand-mark">✳</span><span className="brand-name">{settings.siteName}<small>私人编辑室</small></span></Link>
+        <div className="admin-sidebar-heading"><span>两个人的手记</span><h2>旅行的，<br /><em>编辑室。</em></h2><p>收集照片，记录远方。<br />我们的故事，在这里继续。</p></div>
         <AdminNavigation role={user.role} />
         <div className="admin-side-footer">
           <Link href="/" className="admin-public-link">← 回到旅行杂志</Link>
-          <div className="admin-identity"><span>{user.displayName}<small>EDITOR / {user.role}</small></span><form action={logoutAction}><button type="submit" className="admin-signout">退出</button></form></div>
+          <div className="admin-identity"><span>{user.displayName}<small>{user.role === "ADMIN" ? "ADMIN · 管理员" : "EDITOR · 编辑者"}</small></span><form action={logoutAction}><button type="submit" className="admin-signout">退出</button></form></div>
         </div>
       </aside>
       <div className="admin-body">{children}</div>

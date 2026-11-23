@@ -7,11 +7,12 @@ import { getSiteVisibility } from "@/lib/site-settings";
 export async function getSiteContentAccess() {
   const [visibility, user] = await Promise.all([getSiteVisibility(), getCurrentUser()]);
   const isMember = Boolean(user && ["ADMIN", "EDITOR"].includes(user.role));
-  return { visibility, isMember, allowed: visibility === "PUBLIC" || isMember };
+  return { visibility, isMember, member: isMember ? user : null, allowed: visibility === "PUBLIC" || isMember };
 }
 
 // 私密站点拒绝匿名页面访问，并保留登录后的原始访问地址。
-export async function requireSiteContentAccess(path: string): Promise<void> {
+export async function requireSiteContentAccess(path: string) {
   const access = await getSiteContentAccess();
   if (!access.allowed) redirect(`/login?next=${encodeURIComponent(path)}`);
+  return access.member;
 }

@@ -28,6 +28,8 @@ const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "star
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => server.kill(signal));
 }
+// 由测试进程启动时，父进程断开后同步关闭 Web 服务，避免 Windows 遗留监听进程。
+if (process.connected) process.once("disconnect", () => server.kill("SIGTERM"));
 
 server.on("error", (error) => {
   console.error("Failed to start Next.js:", error);

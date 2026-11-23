@@ -11,7 +11,9 @@ const db = new DatabaseSync(":memory:");
 try {
   db.exec(`
     PRAGMA foreign_keys=ON;
-    CREATE TABLE "VisitedPlace" ("id" TEXT PRIMARY KEY, "name" TEXT NOT NULL);
+    CREATE TABLE "VisitedPlace" ("id" TEXT PRIMARY KEY, "name" TEXT NOT NULL, "group" TEXT NOT NULL,
+      "whenLabel" TEXT NOT NULL, "sortOrder" INT NOT NULL);
+    CREATE INDEX "VisitedPlace_group_sortOrder_idx" ON "VisitedPlace"("group", "sortOrder");
     CREATE TABLE "AppSetting" ("key" TEXT PRIMARY KEY, "value" TEXT NOT NULL, "updatedAt" INTEGER NOT NULL);
     CREATE TABLE "TravelMemory" (
       "id" TEXT PRIMARY KEY, "planId" TEXT, "placeId" TEXT, "title" TEXT NOT NULL,
@@ -22,7 +24,8 @@ try {
       "mediaAssetId" TEXT, "sortOrder" INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY ("memoryId") REFERENCES "TravelMemory"("id") ON DELETE SET NULL
     );
-    INSERT INTO "VisitedPlace" VALUES ('kyoto', '京都'), ('osaka', '大阪');
+    INSERT INTO "VisitedPlace" VALUES ('kyoto', '京都', 'mine', '2024 年秋天', 0),
+      ('osaka', '大阪', 'both', '2023-09', 1), ('nara', '奈良', 'her', '2022', 2);
     INSERT INTO "TravelMemory" VALUES
       ('a-memory',NULL,'kyoto','抵达的那天','傍晚散步',1730419200000,1,1),
       ('b-memory',NULL,'kyoto','第二天','雨后的街道',1730505600000,2,2),
@@ -57,6 +60,32 @@ try {
   assert.throws(() => db.exec(`INSERT INTO "TravelMemory"("id","placeId","title","content")
     VALUES ('duplicate','kyoto','无效','重复')`), /UNIQUE/i, "Database does not enforce one note per place");
   console.log("PLACE_NOTE_MIGRATION_PASS: merge multiple stories, preserve photos/notes, reject duplicate place entry");
+  const visitsMigration = await readFile(join(process.cwd(), "prisma", "migrations",
+    "20261116090000_multiple_place_visits", "migration.sql"), "utf8");
+  db.exec(visitsMigration);
+  const firstVisit = db.prepare('SELECT * FROM "TravelMemory" WHERE "id"=?').get(kyoto.id);
+  assert.equal(firstVisit.group, "mine");
+  assert.equal(firstVisit.whenLabel, "2024 年秋天");
+  assert.equal(firstVisit.happenedAt, kyoto.happenedAt);
+  assert.equal(firstVisit.content, kyoto.content);
+  assert.equal(db.prepare('SELECT "group" FROM "TravelMemory" WHERE "placeId"=?').get("nara").group, "her");
+  assert.equal(db.prepare('SELECT "content" FROM "TravelMemory" WHERE "id"=?').get("d-orphan").content, "还未指定地点");
+  db.exec(`INSERT INTO "TravelMemory"("id","placeId","title","content","group","whenLabel")
+    VALUES ('kyoto-return','kyoto','再次同行','新手记','both','2025-05')`);
+  assert.equal(db.prepare('SELECT COUNT(*) AS total FROM "TravelMemory" WHERE "placeId"=?').get("kyoto").total, 2);
+  assert.equal(db.prepare('SELECT COUNT(*) AS total FROM "TravelPhoto" WHERE "memoryId"=?').get(kyoto.id).total, 2);
+  assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);
+  console.log("MULTIPLE_PLACE_VISITS_MIGRATION_PASS: preserve historical visits, metadata and album IDs");
+  db.exec('CREATE TABLE "MediaAsset" ("id" TEXT PRIMARY KEY)');
+  db.exec(await readFile(join(process.cwd(), "prisma/migrations/20261117090000_photo_editorial_and_visit_safety/migration.sql"), "utf8"));
+  const safeVisit = db.prepare('SELECT * FROM "TravelMemory" WHERE "id"=?').get(kyoto.id);
+  assert.equal(safeVisit.revision, 0);
+  assert.equal(safeVisit.albumRevision, 0);
+  assert.equal(safeVisit.deletedAt, null);
+  assert.equal(safeVisit.content, kyoto.content);
+  assert.equal(db.prepare('SELECT "coverX" FROM "VisitedPlace" WHERE "id"=?').get("kyoto").coverX, 50);
+  assert.equal(db.prepare('SELECT "isFeatured" FROM "TravelPhoto" WHERE "id"=?').get("photo-a").isFeatured, 0);
+  console.log("PHOTO_EDITORIAL_MIGRATION_PASS: retain journals and photos while initializing safe defaults");
 } finally {
   db.close();
 }

@@ -1,0 +1,24 @@
+.grid.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.grid .card { height: auto; aspect-ratio: auto; overflow: visible; background: #fbfaf5; border: 1px solid #d9ded1; }
+.image { position: relative; height: 200px; background: #e2e6db; }
+.card .image img { object-fit: contain; }
+.coverLabel { position: absolute; left: 8px; bottom: 8px; padding: 4px 8px; background: #264737e6; color: white; font-size: 12px; }
+.saveRow { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin: 18px 0; }
+.saveRow small { color: #55664f; }
+.controls { display: flex; gap: 7px; align-items: center; padding: 10px 12px 0; }
+.controls button { border: 1px solid #cdd6c6; border-radius: 3px; padding: 6px 10px; background: #fffdf8; cursor: pointer; }
+.controls .dragHandle { margin-right: auto; cursor: grab; }
+.controls button:disabled { opacity: .4; cursor: default; }
+.caption { display: grid; gap: 6px; padding: 12px; font-size: 12px; }
+.caption textarea { width: 100%; min-width: 0; min-height: 65px; padding: 8px; resize: vertical; border: 1px solid #cdd6c6; background: white; font: inherit; }
+.featured { display: flex; gap: 8px; align-items: center; padding: 0 12px 12px; font-size: 12px; }
+.crop { margin: 0 12px 12px; font-size: 12px; }
+.crop summary { cursor: pointer; color: #2b5940; }
+.card .crop form { position: static; display: grid; gap: 9px; margin-top: 10px; }
+.crop label { display: grid; gap: 5px; }
+.crop input { width: 100%; }
+.cropPreview { position: relative; aspect-ratio: 1.8; overflow: hidden; background: #dae1d3; }
+.cropPreview img { object-fit: cover; }
+.card .delete { position: static; margin: 0; padding: 12px; border-top: 1px solid #e4e6db; }
+.delete button { border: 0; padding: 0; background: none; color: #8a463b; font-size: 12px; cursor: pointer; }
+@media (max-width: 560px) { .grid.grid { grid-template-columns: minmax(0, 1fr); } .image { height: 240px; } }

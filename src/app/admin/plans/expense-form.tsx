@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { currencyFractionDigits } from "@/lib/money";
+import { PreservingForm } from "@/components/preserving-form";
+import { currencyFractionDigits, maxExpenseMajorAmount } from "@/lib/money";
 import { saveTravelExpenseAction, deleteTravelExpenseAction, type ExpenseFormState } from "./expense-actions";
 import { EXPENSE_CATEGORIES } from "@/lib/expenses";
 
@@ -14,9 +15,10 @@ export type ExpenseInput = { id: string; category: string; amountMinor: number; 
 export function ExpenseForm({ planId, currency, initial }: { planId: string; currency: string; initial?: ExpenseInput }) {
   const [state, action, pending] = useActionState(saveTravelExpenseAction, INITIAL_STATE);
   const fractionDigits = currencyFractionDigits(currency);
+  const maxAmount = maxExpenseMajorAmount(currency);
   const step = fractionDigits === 0 ? "1" : `0.${"0".repeat(fractionDigits - 1)}1`;
 
-  return <form action={action} className="admin-form expense-form">
+  return <PreservingForm action={action} className="admin-form expense-form">
     <input type="hidden" name="planId" value={planId} />
     <input type="hidden" name="id" value={initial?.id ?? ""} />
     <input type="hidden" name="currency" value={currency} />
@@ -27,7 +29,7 @@ export function ExpenseForm({ planId, currency, initial }: { planId: string; cur
         </select>
       </label>
       <label>金额（{currency}）
-        <input name="amount" type="number" inputMode="decimal" min={step} max="1000000" step={step} required defaultValue={initial ? (initial.amountMinor / 10 ** fractionDigits).toFixed(fractionDigits) : ""} placeholder={fractionDigits ? "例如 128.50" : "例如 128"} />
+        <input name="amount" type="number" inputMode="decimal" min={step} max={maxAmount} step={step} required defaultValue={initial ? (initial.amountMinor / 10 ** fractionDigits).toFixed(fractionDigits) : ""} placeholder={fractionDigits ? "例如 128.50" : "例如 128"} />
       </label>
       <label>消费日期（可选）
         <input name="spentAt" type="date" defaultValue={initial?.spentAt ?? ""} />
@@ -41,7 +43,7 @@ export function ExpenseForm({ planId, currency, initial }: { planId: string; cur
       {initial ? <Link className="admin-back" href={`/admin/plans/${planId}#plan-expenses`}>取消编辑</Link> : null}
       <button className="button button-dark" type="submit" disabled={pending}>{pending ? "保存中…" : initial ? "保存费用修改" : "记录这笔费用"}</button>
     </div>
-  </form>;
+  </PreservingForm>;
 }
 
 // 删除费用前确认，避免误触移除旅行记录。

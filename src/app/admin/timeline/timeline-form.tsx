@@ -1,22 +1,23 @@
 "use client";
 
 import { useActionState } from "react";
+import { PreservingForm } from "@/components/preserving-form";
 import { saveTimelineAction, type TimelineFormState } from "./actions";
 
 const INITIAL_STATE: TimelineFormState = { error: "" };
 
-type PlaceOption = { id: string; name: string; region: string; group: string; isArchived: boolean };
+type PlaceOption = { id: string; name: string; region: string; isArchived: boolean };
 type TimelineData = { id: string; date: string; year: number; group: string; title: string; note: string; placeIds: string[] };
 
 // 编辑一条旅行时间记录，并选择它关联的足迹地点。
-export function TimelineForm({ places, groupLabels, initial }: { places: PlaceOption[]; groupLabels: { both: string; her: string; mine: string }; initial?: TimelineData }) {
+export function TimelineForm({ places, groupLabels, defaultYear, initial }: { places: PlaceOption[]; groupLabels: { both: string; her: string; mine: string }; defaultYear: number; initial?: TimelineData }) {
   const [state, action, pending] = useActionState(saveTimelineAction, INITIAL_STATE);
   return (
-    <form action={action} className="admin-form timeline-form">
+    <PreservingForm action={action} className="admin-form timeline-form">
       <input type="hidden" name="id" value={initial?.id ?? ""} />
       <div className="admin-form-grid">
-        <label>时间描述<input name="date" required defaultValue={initial?.date ?? ""} placeholder="例如：2025.10 或 2025.10.01" /></label>
-        <label>所属年份<input name="year" type="number" required min={1900} max={2200} defaultValue={initial?.year ?? new Date().getFullYear()} /></label>
+        <label>时间描述<input name="date" required maxLength={40} defaultValue={initial?.date ?? ""} placeholder="例如：2025.10 或 2025.10.01" /></label>
+        <label>所属年份<input name="year" type="number" required min={1900} max={2200} defaultValue={initial?.year ?? defaultYear} /></label>
         <label>旅行归属<select name="group" defaultValue={initial?.group ?? "both"}><option value="both">{groupLabels.both}</option><option value="her">{groupLabels.her}</option><option value="mine">{groupLabels.mine}</option></select></label>
         <label>事件标题<input name="title" required maxLength={120} defaultValue={initial?.title ?? ""} placeholder="例如：第一次一起去京都" /></label>
       </div>
@@ -27,15 +28,15 @@ export function TimelineForm({ places, groupLabels, initial }: { places: PlaceOp
         {places.length ? <div className="timeline-place-options">{places.map(place => (
           <label key={place.id}>
             <input type="checkbox" name="placeIds" value={place.id} defaultChecked={initial?.placeIds.includes(place.id) ?? false} />
-            <span><strong>{place.name}{place.isArchived ? "（已归档）" : ""}</strong><small>{place.region} · {groupLabels[place.group as keyof typeof groupLabels] ?? "已到访"}</small></span>
+            <span><strong>{place.name}{place.isArchived ? "（已归档）" : ""}</strong><small>{place.region}</small></span>
           </label>
-        ))}</div> : <p className="muted-copy">还没有足迹地点，可以先到「旅行足迹」新增地点。</p>}
+        ))}</div> : <p className="muted-copy">还没有足迹地点，可以先到「去过的地方」新增地点。</p>}
       </fieldset>
       <div className="admin-save-row">
         {state.error ? <p className="form-error" role="alert">{state.error}</p> : null}
         <button className="button button-dark" type="submit" disabled={pending}>{pending ? "保存中…" : initial ? "保存时间记录" : "新增时间记录"}</button>
       </div>
-    </form>
+    </PreservingForm>
   );
 }
 

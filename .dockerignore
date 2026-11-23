@@ -1,11 +1,13 @@
 node_modules
 .next
+.next-*
+.history
+*.tsbuildinfo
 dist
 .git
 .env
 .env.*
 data
-travel-2027-deploy.zip
 .claude
 .github
 cli

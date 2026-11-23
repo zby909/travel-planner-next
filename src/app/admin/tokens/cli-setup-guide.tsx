@@ -8,11 +8,19 @@ const subscribeToOrigin = () => () => {};
 export function CliSetupGuide() {
   const server = useSyncExternalStore(subscribeToOrigin, () => window.location.origin, () => "");
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
   const command = server ? `travelctl auth login --server ${server}` : "travelctl auth login";
 
+  // 复制命令到剪贴板；非 HTTPS 或权限受限时给出提示而不抛出未处理异常。
   async function copyCommand() {
-    await navigator.clipboard.writeText(command);
-    setCopied(true);
+    setCopyError("");
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+      setCopyError("浏览器未能写入剪贴板，请手动选中上方命令复制。");
+    }
   }
 
   return (
@@ -27,7 +35,7 @@ export function CliSetupGuide() {
           <strong>① 安装 CLI</strong>
           <p>Windows 用户直接下载 <code>travelctl.exe</code> 并放入固定文件夹。加入 PATH 后可直接输入 <code>travelctl</code>；如果不加入 PATH，首次使用时把 EXE 完整路径提供给 AI Skill，Skill 会通过完整路径调用。无需安装 Node.js 或 npm。</p>
           <p><a className="source-link" href={`${repo}/releases/latest/download/travelctl.exe`} target="_blank" rel="noopener noreferrer">下载 Windows EXE（最新版）</a> · <a className="source-link" href={`${repo}/releases`} target="_blank" rel="noopener noreferrer">所有版本 / 校验信息</a></p>
-          <p className="muted-copy">首次发布版本 v0.1.0 已通过 Windows 原生构建与 CLI 联调；EXE 无代码签名，Windows 可能显示 SmartScreen 提醒。请从 GitHub 官方 Release 下载。</p>
+          <p className="muted-copy">当前 CLI 版本 v0.1.1 已通过 Windows 原生构建与联调；EXE 无代码签名，Windows 可能显示 SmartScreen 提醒。请从 GitHub 官方 Release 下载。</p>
         </div>
         <div>
           <strong>② 安装 AI Skill</strong>
@@ -39,8 +47,9 @@ export function CliSetupGuide() {
           <p>先在下方创建授权令牌，在本地终端运行：</p>
           <div className="cli-copy-row">
             <code>{command}</code>
-            <button className="admin-signout" type="button" onClick={copyCommand}>{copied ? "已复制" : "复制命令"}</button>
+            <button className="button button-dark" type="button" onClick={copyCommand}>{copied ? "已复制" : "复制命令"}</button>
           </div>
+          {copyError ? <p className="form-error" role="alert">{copyError}</p> : null}
           <p className="muted-copy">
             CLI 将在本地隐藏输入 Token 并检查有效性；不会将 Token 添加到命令参数或 AI 对话中。Windows 会使用当前账户的 DPAPI 加密保存 Token。
             也可以只执行 <code>travelctl auth login</code>，由 CLI 询问网站地址。

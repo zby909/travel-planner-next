@@ -26,20 +26,39 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "请求来源不合法" }, { status: 403 });
   }
-  const host = request.headers.get("host");
+  const host = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || request.headers.get("host");
   const allowedOrigin = process.env.APP_ORIGIN?.trim();
   if (!originHost || (originHost !== host && (!allowedOrigin || origin !== allowedOrigin))) {
     return NextResponse.json({ error: "跨站请求已拒绝" }, { status: 403 });
   }
-  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+  const contentType = request.headers.get("content-type");
+  if (!contentType?.toLowerCase().startsWith("application/x-www-form-urlencoded")) {
     return NextResponse.json({ error: "不支持的表单格式" }, { status: 415 });
   }
-  if (Number(request.headers.get("content-length") || 0) > 4096) {
-    return NextResponse.json({ error: "请求内容过大" }, { status: 413 });
+  const declaredHeader = request.headers.get("content-length");
+  if (declaredHeader !== null) {
+    const declared = Number(declaredHeader);
+    if (!Number.isSafeInteger(declared) || declared < 1 || declared > 4096) {
+      return NextResponse.json({ error: "请求内容过大" }, { status: 413 });
+    }
   }
   let form: FormData;
   try {
-    form = await request.formData();
+    const reader = request.body?.getReader();
+    if (!reader) return NextResponse.json({ error: "无效的表单" }, { status: 400 });
+    const parts: Buffer[] = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > 4096) {
+        await reader.cancel();
+        return NextResponse.json({ error: "请求内容过大" }, { status: 413 });
+      }
+      parts.push(Buffer.from(value));
+    }
+    form = await new Response(new Uint8Array(Buffer.concat(parts, total)), { headers: { "Content-Type": contentType } }).formData();
   } catch {
     return NextResponse.json({ error: "无效的表单" }, { status: 400 });
   }
@@ -58,17 +77,22 @@ export async function POST(request: NextRequest) {
   const user = await prisma.user.findUnique({ where: { username } });
   const matched = await verifyPassword(password, user?.passwordHash ?? null);
   if (!user || !user.isActive || !matched) {
-    const failures = throttle && now.getTime() - throttle.updatedAt.getTime() < 15 * 60 * 1000
-      ? throttle.failures + 1 : 1;
-    await prisma.loginThrottle.upsert({
-      where: { username },
-      create: { username, failures, lockedUntil: failures >= 5 ? new Date(now.getTime() + 900000) : null },
-      update: { failures, lockedUntil: failures >= 5 ? new Date(now.getTime() + 900000) : null },
+    await prisma.$transaction(async tx => {
+      const time = new Date();
+      const windowMs = 15 * 60 * 1000;
+      await tx.loginThrottle.deleteMany({ where: { username, OR: [
+        { lockedUntil: { lte: time } }, { lockedUntil: null, updatedAt: { lte: new Date(time.getTime() - windowMs) } },
+      ] } });
+      const attempt = await tx.loginThrottle.upsert({ where: { username },
+        create: { username, failures: 1 }, update: { failures: { increment: 1 } } });
+      if (attempt.failures >= 5 && !attempt.lockedUntil) {
+        await tx.loginThrottle.update({ where: { username }, data: { lockedUntil: new Date(time.getTime() + windowMs) } });
+      }
     });
     return loginError(request, "1", nextPath);
   }
-  await prisma.loginThrottle.deleteMany({ where: { username } });
-  const session = await createSession(user.id);
+  const session = await createSession(user.id, user.passwordHash);
+  if (!session) return loginError(request, "1", nextPath);
   const response = NextResponse.redirect(new URL(nextPath, origin || request.url), { status: 303 });
   response.cookies.set(SESSION_COOKIE_NAME, session.token, {
     httpOnly: true,

@@ -1,18 +1,34 @@
 import { spawn } from "node:child_process";
 import { randomBytes, scrypt as scryptCallback } from "node:crypto";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { chromium } from "playwright-core";
 import sharp from "sharp";
 import { verifyRecordLoops } from "./test-record-loops.mjs";
 import { verifyPhotoUpload } from "./test-photo-upload.mjs";
+import { verifyPlaceVisits } from "./test-place-visits.mjs";
 
 const host = "http://127.0.0.1:3014";
 const prisma = new PrismaClient();
 let server;
 let browser;
+let serverErrors = "";
 
 function assert(value, message) {
   if (!value) throw new Error(message);
+}
+
+// 查找可用的本地 Chrome 可执行文件，找不到时回退到 Playwright 自带 Chromium
+function resolveBrowserExecutable() {
+  if (process.env.TRAVEL_TEST_CHROME) return process.env.TRAVEL_TEST_CHROME;
+  if (process.platform !== "win32") return undefined;
+  const candidates = [
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, "Google\\Chrome\\Application\\chrome.exe") : "",
+  ].filter(Boolean);
+  return candidates.find(candidate => existsSync(candidate));
 }
 
 async function waitForServer() {
@@ -50,11 +66,10 @@ async function run() {
   });
   // Drain output without echoing sensitive request details.
   server.stdout.on("data", () => {});
-  let serverErrors = "";
   server.stderr.on("data", (chunk) => { serverErrors = (serverErrors + String(chunk)).slice(-2500); });
   await waitForServer();
   browser = await chromium.launch({
-    executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    executablePath: resolveBrowserExecutable(),
     headless: true,
     args: ["--no-sandbox"],
   });
@@ -107,6 +122,12 @@ async function run() {
   await page.goto(host + "/admin/restore");
   await page.getByText("站点已有旅行记录").waitFor();
   assert(await page.locator('input[type="file"]').count() === 0, "Backup upload must be disabled on nonempty site");
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name: "生成并下载备份 ZIP" }).click();
+  const downloaded = await downloading;
+  assert(/^travel-backup-.*\.zip$/.test(downloaded.suggestedFilename()) && await downloaded.failure() === null,
+    "Native backup download did not complete");
+  assert(new URL(page.url()).pathname === "/admin/restore", "A successful download replaced the backup page");
 
   await page.goto(host + "/admin/settings");
   assert(await page.locator('select[name="visibility"]').inputValue() === "PUBLIC", "A fresh site must default to public visibility");
@@ -126,11 +147,12 @@ async function run() {
   await page.goto(host + "/admin/destinations/new");
   await page.locator('input[name="title"]').fill("新增目的地·端到端测试");
   await page.locator('input[name="subtitle"]').fill("自动化测试地区");
-  await page.locator('input[name="kind"]').fill("城市");
-  await page.locator('input[name="types"]').fill("城市，美食");
   await page.locator('input[name="seasons"]').fill("春，秋");
   await page.locator('input[name="months"]').fill("4—5 月");
   await page.locator('input[name="days"]').fill("3 天");
+  await page.locator(".destination-create-form details summary").click();
+  await page.locator('input[name="kind"]').fill("城市");
+  await page.locator('input[name="types"]').fill("城市，美食");
   await page.locator('textarea[name="spotItems"]').fill("测试老街\n测试博物馆");
   await page.locator('textarea[name="routeItems"]').fill("测试城市 → 测试老街");
   await page.getByRole("button", { name: "创建目的地" }).click();
@@ -148,7 +170,7 @@ async function run() {
   await page.waitForURL(url => url.searchParams.get("photo") === "1");
   await page.goto(host + "/");
   const destinationCover = await page.locator(".editorial-destination").filter({ hasText: "新增目的地·端到端测试" }).locator("img").first().getAttribute("src");
-  assert(/^\/api\/media\/[a-f0-9-]{36}$/.test(destinationCover ?? ""), "Web-uploaded destination cover not present on shared wishlist");
+  assert(/^\/api\/media\/[a-f0-9-]{36}(\?w=960)?$/.test(destinationCover ?? ""), "Web-uploaded destination cover not present on shared wishlist");
   const destinationCoverResponse = await page.request.get(host + destinationCover);
   assert(destinationCoverResponse.ok() && destinationCoverResponse.headers()["content-type"] === "image/webp", "Destination cover file not publicly readable");
 
@@ -157,8 +179,8 @@ async function run() {
   await page.locator('input[name="region"]').fill("自动化测试地区");
   await page.locator('select[name="group"]').selectOption("her");
   await page.locator('input[name="whenLabel"]').fill("2026 年春季");
-  await page.locator('input[name="storyDate"]').fill("2026-03-18");
-  await page.locator('textarea[name="storyContent"]').fill("第一次走进这个地方。新建地点时只留一份文字。");
+  await page.locator('input[name="happenedAt"]').fill("2026-03-18");
+  await page.locator('textarea[name="content"]').fill("第一次走进这个地方，沿河岸走到天黑。");
   await page.locator(".place-create-form details summary").click();
   await page.locator('input[name="country"]').fill("测试国家");
   await page.locator('input[name="province"]').fill("测试省份");
@@ -168,8 +190,8 @@ async function run() {
   await page.getByRole("button", { name: "保存这个去过的地方" }).click();
   await page.waitForURL(url => url.pathname.startsWith("/admin/places/") && url.searchParams.get("created") === "1");
   const createdPlaceId = new URL(page.url()).pathname.split("/").at(-1);
-  assert((await page.locator(".place-note-form").innerText()).includes("关于新增足迹·端到端测试的记录"),
-    "New place did not present the single note editor");
+  assert((await page.locator(".place-note-form textarea").inputValue()).includes("第一次走进这个地方"),
+    "New place did not present the first visit editor");
   assert(await prisma.travelMemory.count({ where: { placeId: createdPlaceId, planId: null } }) === 1,
     "Initial note must not require a travel plan");
   await verifyPhotoUpload({ page, host, placeId: createdPlaceId, prisma });
@@ -177,8 +199,8 @@ async function run() {
   const visitedText = await page.locator("body").innerText();
   assert(visitedText.includes("新增足迹·端到端测试") && visitedText.includes("旅行者乙单独去过"), "Manually created place or custom member label was not shown");
   const placeCover = await page.locator(".atlas-photo-entry").filter({ hasText: "新增足迹·端到端测试" }).locator(".atlas-photo-frame img").getAttribute("src");
-  assert((await page.locator(".atlas-place-stories").first().count()) > 0, "The visit story is not accessible from the public place card");
-  assert(/^\/api\/media\/[a-f0-9-]{36}$/.test(placeCover ?? ""), "Web-uploaded visited photo not shown in shared archive");
+  assert(await page.locator(`.atlas-photo-entry[href="/visited/${createdPlaceId}"]`).count() === 1, "Public place card does not link to the place detail");
+  assert(/^\/api\/media\/[a-f0-9-]{36}\?w=960$/.test(placeCover ?? ""), "Shared archive did not use the uploaded cover preview");
   const placeCoverResponse = await page.request.get(host + placeCover);
   assert(placeCoverResponse.ok() && placeCoverResponse.headers()["content-type"] === "image/webp", "Visited cover file not publicly readable");
 
@@ -194,7 +216,7 @@ async function run() {
 
   await page.goto(host + "/admin/places/test-town");
   await page.locator(".place-more-options summary").click();
-  await page.locator('input[name="whenLabel"]').fill("示例小镇·测试");
+  await page.locator('.place-settings input[name="region"]').fill("示例小镇·测试");
   await page.getByRole("button", { name: "保存足迹修改" }).click();
   await page.waitForURL("**/admin/places/test-town?saved=1");
   await page.goto(host + "/visited");
@@ -265,15 +287,15 @@ async function run() {
   assert(updatedExpenseSummary.includes("2,300.75") && updatedExpenseSummary.includes("2,699.25"),
     "Deleting an expense did not recalculate the trip budget balance");
 
-  // 旅行计划不再管理日记，地点仅允许一份文字，照片逐张上传并显示进度。
+  // 编辑首次到访，并确认照片逐张保存到当前记录。
   assert(await page.locator(".place-note-form").count() === 0, "Travel plan exposed a duplicate place note");
   await page.goto(host + "/admin/places/test-town");
   const memoryForm = page.locator(".place-note-form");
   await memoryForm.locator('input[name="happenedAt"]').fill("2026-12-01");
   await memoryForm.locator('textarea[name="content"]').fill("抵达京都的第一天。傍晚抵达后，在小镇街道慢慢散步。");
-  await memoryForm.getByRole("button", { name: "保存旅行文字" }).click();
-  await page.waitForURL(url => url.searchParams.get("storySaved") === "1");
-  const createdMemoryId = (await prisma.travelMemory.findUnique({ where: { placeId: "test-town" } }))?.id;
+  await memoryForm.getByRole("button", { name: "保存到访记录" }).click();
+  await page.waitForURL(url => url.searchParams.get("noteSaved") === "1");
+  const createdMemoryId = new URL(page.url()).searchParams.get("visit");
   assert(createdMemoryId, "Place note was not created");
   const secondPhoto = await sharp({ create: { width: 64, height: 64, channels: 3, background: "#a06485" } }).png().toBuffer();
   await page.locator('.photo-upload input[type="file"]').setInputFiles([
@@ -294,20 +316,16 @@ async function run() {
     "More than one text entry was created for the same place");
 
   const memoriesPage = await page.goto(host + "/memories");
-  assert(memoriesPage?.status() === 200 && (await page.locator(".memory-story").filter({ hasText: "抵达京都的第一天" }).innerText()).includes("抵达京都的第一天"),
-    "Public travel memory archive did not display the saved diary");
-  assert((await page.locator(".memory-story").filter({ hasText: "抵达京都的第一天" }).locator(".memory-story-meta").innerText()).includes("示例小镇"),
-    "Travel story did not link to its visited place");
-  await page.goto(host + "/visited");
-  const storyCard = page.locator("#place-test-town");
-  await storyCard.locator(".atlas-place-stories summary").click();
-  assert((await storyCard.innerText()).includes("抵达京都的第一天"),
-    "Travel story and album are not available directly inside the visited place");
-  assert((await page.locator(".atlas-timeline").innerText()).includes("示例小镇"),
-    "Dated place note did not appear in the visited timeline");
-  await page.goto(host + "/memories");
-  const memoryPhotoUrl = await page.locator(".memory-story").filter({ hasText: "抵达京都的第一天" }).locator(".memory-story-photos img").first().getAttribute("src");
-  assert(/^\/api\/media\/[a-f0-9-]{36}$/.test(memoryPhotoUrl ?? ""), "Travel memory photo URL is invalid");
+  assert(memoriesPage?.status() === 200 && new URL(page.url()).pathname === "/visited"
+    && (await memoriesPage.request().redirectedFrom()?.response())?.status() === 308, "Legacy memory URL did not permanently redirect");
+  assert(await page.locator(`.atlas-timeline a[href="/visited/test-town#visit-${createdMemoryId}"]`).count() === 1,
+    "Dated visit did not appear in the timeline with a direct link");
+  await page.locator('.atlas-photo-entry[href="/visited/test-town"]').click();
+  await page.waitForURL("**/visited/test-town");
+  const publicStory = page.locator(`#visit-${createdMemoryId}`);
+  assert((await publicStory.innerText()).includes("抵达京都的第一天"), "Visit details did not display the saved journal");
+  const memoryPhotoUrl = await publicStory.getByRole("group", { name: /照片相册/ }).locator("img").first().getAttribute("src");
+  assert(/^\/api\/media\/[a-f0-9-]{36}\?w=960$/.test(memoryPhotoUrl ?? ""), "Travel memory thumbnail URL is invalid");
   const memoryPhotoResponse = await page.request.get(host + memoryPhotoUrl);
   assert(memoryPhotoResponse.ok() && memoryPhotoResponse.headers()["content-type"] === "image/webp",
     "Travel memory photo was not publicly readable");
@@ -315,8 +333,8 @@ async function run() {
   await page.goto(host + "/admin/places/test-town");
   const editMemoryForm = page.locator(".place-note-form");
   await editMemoryForm.locator('textarea[name="content"]').fill("抵达京都的第一天·修订版。和对象一起慢慢走过街道。");
-  await editMemoryForm.getByRole("button", { name: "保存旅行文字" }).click();
-  await page.waitForURL(url => url.searchParams.get("storySaved") === "1");
+  await editMemoryForm.getByRole("button", { name: "保存到访记录" }).click();
+  await page.waitForURL(url => url.searchParams.get("noteSaved") === "1");
   assert((await prisma.travelMemory.findUnique({ where: { id: createdMemoryId } }))?.content.includes("修订版"),
     "Single place note edit was not saved");
 
@@ -329,11 +347,11 @@ async function run() {
   assert(deletedPhoto.mediaAssetId
     && !(await prisma.mediaAsset.findUnique({ where: { id: deletedPhoto.mediaAssetId } })),
   "Deleting a memory photo did not remove its media asset");
-  await page.goto(host + "/memories");
-  assert((await page.locator(".memory-story").filter({ hasText: "抵达京都的第一天·修订版" }).locator(".memory-story-photos img").count()) === 1,
-    "Public story archive did not reflect the updated photo gallery");
+  await page.goto(host + "/visited/test-town");
+  assert((await publicStory.innerText()).includes("修订版") && await publicStory.getByRole("group", { name: /照片相册/ }).locator("img").count() === 1,
+    "Visit details did not reflect the updated journal and photo gallery");
 
-  // 再次上传只能追加照片，不能生成第二份文字。删图也不能删除那份文字。
+  // 再次上传应追加到原访次，删图后手记仍可浏览。
   await page.goto(host + "/admin/places/test-town");
   const thirdPhoto = await sharp({ create: { width: 65, height: 65, channels: 3, background: "#3c6570" } }).png().toBuffer();
   await page.locator('.photo-upload input[type="file"]').setInputFiles({
@@ -404,7 +422,7 @@ async function run() {
   await page.waitForURL(url => url.searchParams.get("guideSaved") === "1" && url.searchParams.get("guideId") === fullGuideId);
   assert((await page.locator(".plan-guide-list").innerText()).includes("日本七日完整旅行手册·修订版"), "Guide link edit was not saved");
   await page.goto(host + "/admin/plans");
-  assert((await page.locator("body").innerText()).includes("2 份 HTML 攻略"), "Plan list does not summarize its external guides");
+  assert((await page.locator("body").innerText()).includes("2 份攻略链接"), "Plan list does not summarize its external guides");
 
   await page.goto(host + "/admin/timeline");
   await page.locator('input[name="date"]').fill("2026.03");
@@ -458,7 +476,7 @@ async function run() {
   const editorPage = await page.goto(host + "/admin/places/test-town");
   assert(editorPage?.status() === 200, "Partner cannot edit the shared travel archive");
   await page.locator(".place-more-options summary").click();
-  await page.locator('input[name="whenLabel"]').fill("示例小镇·两人编辑测试");
+  await page.locator('.place-settings input[name="region"]').fill("示例小镇·两人编辑测试");
   await page.getByRole("button", { name: "保存足迹修改" }).click();
   await page.waitForURL("**/admin/places/test-town?saved=1");
   await page.goto(host + "/visited");
@@ -488,11 +506,13 @@ async function run() {
   assert((await prisma.appSetting.findUnique({ where: { key: "visibility" } }))?.value === "PRIVATE", "Private visibility setting was not persisted");
 
   const privateGuest = await browser.newPage();
-  for (const path of ["/", "/visited", "/memories", "/destinations/test-island"]) {
+  for (const path of ["/", "/visited", "/visited/test-town", "/destinations/test-island"]) {
     await privateGuest.goto(host + path);
     const current = new URL(privateGuest.url());
     assert(current.pathname === "/login" && current.searchParams.get("next") === path, `Anonymous access to ${path} was not redirected safely`);
   }
+  await privateGuest.goto(host + "/memories");
+  assert(new URL(privateGuest.url()).searchParams.get("next") === "/visited", "Legacy redirect bypassed private archive mode");
   const anonymousUpload = await privateGuest.request.get(host + placeCover);
   assert(anonymousUpload.status() === 404 && (anonymousUpload.headers()["cache-control"] ?? "").includes("no-store"),
     "Anonymous access to uploaded images was not blocked without caching");
@@ -533,8 +553,8 @@ async function run() {
   const publicVisited = await publicGuest.goto(host + "/visited");
   assert(publicVisited?.status() === 200 && new URL(publicGuest.url()).pathname === "/visited",
     "Switching back to public did not restore anonymous page access");
-  const publicMemories = await publicGuest.goto(host + "/memories");
-  assert(publicMemories?.status() === 200 && (await publicGuest.locator(".memory-story").filter({ hasText: "抵达京都的第一天·修订版" }).innerText()).includes("抵达京都的第一天·修订版"),
+  const publicMemories = await publicGuest.goto(host + "/visited/test-town");
+  assert(publicMemories?.status() === 200 && (await publicGuest.locator(`#visit-${createdMemoryId}`).innerText()).includes("抵达京都的第一天·修订版"),
     "Switching back to public did not restore travel diary access");
   const publicUpload = await publicGuest.request.get(host + placeCover);
   assert(publicUpload.ok() && (publicUpload.headers()["cache-control"] ?? "").includes("max-age=0"),
@@ -553,10 +573,10 @@ async function run() {
   const assignForm = page.locator(".place-assign-row").filter({ hasText: "待归类的老故事" });
   await assignForm.locator('select[name="placeId"]').selectOption("test-town");
   await assignForm.getByRole("button", { name: "归入地点" }).click();
-  await page.waitForURL(url => url.searchParams.get("storySaved") === "1");
-  assert(!(await prisma.travelMemory.findUnique({ where: { id: orphan.id } }))
-    && (await prisma.travelMemory.findUnique({ where: { placeId: "test-town" } }))?.content.includes("待归类的老故事"),
-    "Legacy story content was not merged into the existing single place note");
+  await page.waitForURL(url => url.searchParams.get("noteSaved") === "1");
+  const assigned = await prisma.travelMemory.findUnique({ where: { id: orphan.id } });
+  assert(assigned?.placeId === "test-town" && assigned.planId === createdPlanId && assigned.content === "保留旧版记录",
+    "Old journal was not retained as a separate visit");
 
   // 模拟以前附属于计划的故事及照片，删除计划后必须仍在地点相册中。
   const originalStory = await prisma.travelMemory.findFirstOrThrow({
@@ -582,6 +602,8 @@ async function run() {
     "Deleting the gallery cover photo did not reset the place cover");
   assert((await page.request.get(host + placeCover)).status() === 404,
     "Removed gallery cover photo is still publicly accessible");
+
+  await verifyPlaceVisits({ page, browser, host, prisma, placeId: createdPlaceId, firstVisitId: originalStory.id, photoBuffer });
 
   // Both people can log in independently; changing a password revokes only that account's sessions.
   const secondaryContext = await browser.newContext();
@@ -611,13 +633,15 @@ async function run() {
   await page.goto(host + "/admin");
   assert(page.url().endsWith("/login"), "Logout did not revoke session");
 
-  console.log("E2E_PASS: one note per place, per-photo upload progress, network retry, image validation, shared couple accounts, public/private permissions, plans, expenses, gallery photo deletion, archive, legacy note merge, plan deletion preserving album, HTML guide links, session revocation and logout");
+  console.log("E2E_PASS: independent visits and albums, upload retry, shared accounts, permissions, plans, expenses, archive and restore, legacy journal assignment, plan deletion and session revocation");
 }
 
 try {
   await run();
 } catch (error) {
   console.error("E2E_FAIL:", error instanceof Error ? error.stack : String(error));
+  if (serverErrors) console.error("TEST_SERVER_ERROR:", serverErrors.slice(-1500));
+  console.error("TEST_SERVER_EXIT:", server?.exitCode, server?.signalCode);
   process.exitCode = 1;
 } finally {
   await browser?.close();

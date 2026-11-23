@@ -32,21 +32,14 @@ export async function saveTravelExpenseAction(_state: ExpenseFormState, form: Fo
   let planId = "";
   try {
     planId = expenseField(form, "planId", 64, true);
-    const plan = await prisma.travelPlan.findUnique({
-      where: { id: planId },
-      select: { id: true, title: true, currency: true },
-    });
-    if (!plan) throw new Error("旅行计划不存在或已被删除");
-
     const category = expenseField(form, "category", 20, true);
     if (!EXPENSE_CATEGORIES.some(item => item.value === category)) throw new Error("请选择餐饮、住宿、交通或其它分类");
-    const amountMinor = parseMoneyToMinorUnits(expenseField(form, "amount", 24, true), plan.currency);
+    const rawAmount = expenseField(form, "amount", 24, true);
     const spentAt = expenseDate(expenseField(form, "spentAt", 10));
     const note = expenseField(form, "description", 160);
     const requestedId = expenseField(form, "id", 64);
     const id = requestedId || randomUUID();
     const currency = expenseField(form, "currency", 3, true);
-    if (currency !== plan.currency) throw new Error("旅行币种已变化，请刷新后重新记录");
     const categoryLabel = getExpenseCategoryLabel(category);
 
     await prisma.$transaction(async tx => {
@@ -54,9 +47,11 @@ export async function saveTravelExpenseAction(_state: ExpenseFormState, form: Fo
         where: { id: planId },
         select: { title: true, currency: true },
       });
-      if (!currentPlan || currentPlan.currency !== plan.currency) {
+      if (!currentPlan) throw new Error("旅行计划不存在或已被删除");
+      if (currentPlan.currency !== currency) {
         throw new Error("旅行计划币种已变化，请刷新页面后重新记录");
       }
+      const amountMinor = parseMoneyToMinorUnits(rawAmount, currentPlan.currency);
       const data = { category, amountMinor, description: note || categoryLabel, spentAt };
       if (requestedId) {
         const result = await tx.expense.updateMany({ where: { id, planId }, data });
@@ -74,6 +69,7 @@ export async function saveTravelExpenseAction(_state: ExpenseFormState, form: Fo
         },
       });
     });
+    revalidatePath("/admin");
     revalidatePath("/admin/plans");
     revalidatePath(`/admin/plans/${planId}`);
   } catch (error) {
@@ -89,18 +85,17 @@ export async function deleteTravelExpenseAction(form: FormData): Promise<void> {
   const planId = String(form.get("planId") ?? "").trim();
   if (!id || id.length > 64 || !planId || planId.length > 64) throw new Error("无效的费用记录编号");
 
-  const expense = await prisma.expense.findFirst({
-    where: { id, planId },
-    select: {
-      id: true,
-      category: true,
-      amountMinor: true,
-      plan: { select: { title: true, currency: true } },
-    },
-  });
-  if (!expense) throw new Error("费用记录不存在或不属于这趟旅行");
-
   await prisma.$transaction(async tx => {
+    const expense = await tx.expense.findFirst({
+      where: { id, planId },
+      select: {
+        id: true,
+        category: true,
+        amountMinor: true,
+        plan: { select: { title: true, currency: true } },
+      },
+    });
+    if (!expense) throw new Error("费用记录不存在或不属于这趟旅行");
     await tx.expense.delete({ where: { id: expense.id } });
     await tx.auditLog.create({
       data: {

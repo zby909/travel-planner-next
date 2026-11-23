@@ -1,0 +1,28 @@
+Offline map geometry
+
+map-geo-data.js preserves the offline map geometry bundle byte for byte.
+SHA-256: 9e40f54cabfc4d49e0f048ad3ce3f161190609fb05b8c2ebf4720271007bf885
+
+World outlines (177 features)
+Holtzy, The D3 Graph Gallery, DATA/world.geojson
+https://github.com/holtzy/D3-graph-gallery/blob/master/DATA/world.geojson
+The gallery repository uses the MIT license, copyright (c) 2023 Holtz Yan.
+See licenses/LICENSE-d3-graph-gallery and the gallery's own notice:
+https://github.com/holtzy/D3-graph-gallery/blob/master/LICENSE.md
+171 of the 177 input features also match both a name and its complete geometry in
+johan/world.geo.json. That project's README describes the data's legal status as uncertain.
+https://github.com/johan/world.geo.json/blob/master/README.md
+
+China provinces and prefectures (35 provincial features and 179 mixed features)
+Alibaba Cloud DataV.GeoAtlas
+https://datav.aliyun.com/portal/school/atlas/area_selector
+https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json
+Prefecture inputs use the same endpoint with {adcode}_full.json for
+360000, 430000, 510000, 530000, 340000, 350000, 520000, 440000, 450000, 330000 and 320000.
+The original build retained geometry, selected feature properties and combined the regional inputs.
+Alibaba Cloud identifies Amap Open Platform as the source and describes use for
+learning and communication only. It refers copyright questions to Amap.
+https://help.aliyun.com/en/datav/datav-7-0/user-guide/datav-geoatlas-widgets/
+
+Renderer: Apache ECharts 5.6.0. See LICENSE-echarts.txt and NOTICE-echarts.txt.
+https://github.com/apache/echarts/tree/5.6.0

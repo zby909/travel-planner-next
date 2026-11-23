@@ -50,11 +50,11 @@ If the reverse proxy rewrites the Host header, configure APP_ORIGIN to the exact
 
 New installations default to public display. The administrator can switch to members-only mode under /admin/settings. The admin area always requires a member session.
 
-In public mode, visited-place stories and their photos are visible to visitors. In private mode, travel pages and media require an authenticated member session. A private-mode switch cannot revoke content already copied, downloaded, cached, or indexed by visitors.
+In public mode, visited-place details, notes, and their photos are visible to visitors. In private mode, travel pages and media require an authenticated member session. A private-mode switch cannot revoke content already copied, downloaded, cached, or indexed by visitors.
 
 ## GitHub Actions and GHCR
 
-The Docker workflow runs on pushes to main and manual dispatch. It performs lint, TypeScript checks, production build, blank-install smoke tests, backup/restore tests, and a Linux amd64 container smoke test before pushing the image to:
+The Docker workflow runs on pushes to main and manual dispatch. It performs lint, TypeScript checks, production build, historical visit-migration preservation tests, initial admin bootstrap tests, CLI/import E2E tests, browser auth/visit/album E2E tests, blank-install smoke tests, backup/restore tests, and a Linux amd64 container smoke test before pushing images from `main` to:
 
 ~~~text
 ghcr.io/<owner>/<repository>:latest
@@ -68,7 +68,9 @@ Prefer deploying a fixed SHA tag when reproducibility matters.
 
 The repository builds and publishes images; it does **not** automatically deploy to StackNest. After the image build succeeds, manually update the existing application in StackNest or use `stacknest-deploy app deploy` with the existing image address, application-scoped Token file, and current generation. Keep any configured registry proxy prefix. Do not silently switch a configured `:latest` address to another tag or digest.
 
-Before an upgrade, download a current backup from `/admin/restore`. Keep `/app/data` mounted, and never recreate the data volume during an image update. The image applies pending Prisma migrations at startup. Migration `20261106230000_one_note_per_place` merges historical multiple diaries for each place into a single text while retaining all photo references and unassigned memories. The container first creates a consistent SQLite snapshot at `/app/data/pre-migration-backups/before-one-note-per-place-20261107.db` when that migration is pending and place notes exist; keep this file and the existing uploads directory safe. Also download an administrator backup when available. A successful container rollback alone does not roll back a database migration.
+Before an upgrade, download a current backup from `/admin/restore`, including SQLite and the uploads directory. Keep the existing volume mounted at `/app/data` during the image update. The image applies pending Prisma migrations at startup. Migration `20261116090000_multiple_place_visits` moves date descriptions and companions to visit records while preserving existing journal and photo IDs. Databases that still need the earlier one-note migration get a pre-migration SQLite snapshot in `/app/data/pre-migration-backups/`. Rolling back across schema versions also requires the matching database and media backup.
+
+Migration `20261117090000_photo_editorial_and_visit_safety` adds journal and album revisions, reversible visit deletion, photo dimensions, homepage selections and cover focus. Existing visits start with revision zero and remain active. Existing images retain their files and fall back to an uncropped preview when dimensions are unknown. Web backups support ZIPs up to 512 MiB with file-backed download and chunked restore.
 
 Wait for the exact deployment generation to become `ready`, then check `/api/health` and the public or members-only pages. Only report success after both task completion and application verification. See [Backup and restore](PRIVATE-BACKUP-RESTORE.md) for recovery.
 

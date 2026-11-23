@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateApi } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { latestPlaceVisit, visitDateSelect } from "@/lib/place-visits";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
     include: {
       places: {
         orderBy: { sortOrder: "asc" },
-        include: { place: { select: { id: true, name: true, region: true, group: true, whenLabel: true, isArchived: true } } },
+        include: { place: { select: { id: true, name: true, region: true, isArchived: true, visits: { where: { deletedAt: null }, select: visitDateSelect } } } },
       },
     },
   });
@@ -20,7 +21,10 @@ export async function GET(request: NextRequest) {
     items: entries.map(({ places, ...entry }) => ({
       ...entry,
       placeIds: places.map(link => link.placeId),
-      places: places.map(link => link.place),
+      places: places.map(({ place: { visits, ...place } }) => {
+        const latest = latestPlaceVisit(visits);
+        return { ...place, group: latest?.group ?? null, whenLabel: latest?.happenedAt?.toISOString().slice(0, 10) ?? latest?.whenLabel ?? "" };
+      }),
     })),
   }, { headers: { "Cache-Control": "no-store" } });
 }

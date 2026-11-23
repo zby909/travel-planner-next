@@ -15,12 +15,7 @@
 
 # next.js
 /.next/
-/.next-auth-e2e/
-/.next-import-e2e/
-/.next-backup-e2e/
-/.next-review-build/
-/.next-quality-review/
-/.next-plan-review/
+/.next-*/
 /out/
 
 # production
@@ -45,6 +40,7 @@ yarn-error.log*
 .claude/
 AGENTS.md
 legacy/
+/.history/
 
 # vercel
 .vercel
@@ -53,15 +49,6 @@ legacy/
 *.tsbuildinfo
 next-env.d.ts
 
-# SQLite database and user uploads are persistent runtime data.
-/data/legacy-images/
-/data/*.db
-/data/*.db-journal
-/data/*.db-shm
-/data/*.db-wal
-/data/uploads/
-/data/*-e2e.db*
-/data/auth-e2e-uploads/
-/data/production-smoke.db*
-/data/production-smoke-uploads/
-/data/restore-e2e/
+# Runtime data includes private backup ZIPs, staged restores and migration snapshots.
+/data/*
+!/data/.gitkeep

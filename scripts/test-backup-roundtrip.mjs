@@ -9,7 +9,7 @@ import { ZipFile } from "yazl";
 
 // 只在测试专用目录内创建或升级数据库。
 function migrate(url, schema = resolve("prisma/schema.prisma")) {
-  const result = spawnSync(process.execPath, [resolve("node_modules/prisma/build/index.js"), "migrate", "deploy", "--schema", schema], {
+  const result = spawnSync(process.execPath, [resolve("scripts/deploy-database.mjs"), "--schema", schema], {
     cwd: process.cwd(), env: { ...process.env, DATABASE_URL: url }, encoding: "utf8", timeout: 60_000,
   });
   assert.equal(result.status, 0, result.stderr + result.stdout);
@@ -58,7 +58,7 @@ async function oldVersionBackup(base) {
   await mkdir(join(schemaDir, "migrations"), { recursive: true });
   await cp(resolve("prisma/schema.prisma"), join(schemaDir, "schema.prisma"));
   for (const entry of await readdir(resolve("prisma/migrations"))) {
-    if (entry === "20261106100000_close_lightweight_records") continue;
+    if (entry !== "migration_lock.toml" && entry > "20261105100000_simplify_travel_costs") continue;
     await cp(resolve("prisma/migrations", entry), join(schemaDir, "migrations", entry), { recursive: true });
   }
   const path = join(root, "travel.db");
@@ -71,6 +71,13 @@ async function oldVersionBackup(base) {
     await db.$executeRawUnsafe('UPDATE "TravelPlan" SET "actualBudget" = 1234 WHERE id = ?', "old-plan");
     await db.$executeRawUnsafe('UPDATE "Expense" SET "paidBy" = ?, "receiptPath" = ? WHERE id = ?', "合成付款人", "old-receipt", "old-expense");
     await db.$executeRawUnsafe('INSERT INTO "TravelPlanDay" (id, planId, dayNumber, title, details) VALUES (?, ?, ?, ?, ?)', "old-day", "old-plan", 1, "旧版第一天", "保留历史日程");
+    await db.$executeRaw`INSERT INTO "VisitedPlace" ("id", "name", "region", "image", "group", "whenLabel", "sortOrder")
+      VALUES ('old-place', '旧版地点', '地区', 'images/place-placeholder.svg', 'her', '2023-07', 0)`;
+    await db.$executeRaw`INSERT INTO TravelMemory (id, placeId, title, content, updatedAt)
+      VALUES ('first-old', 'old-place', '晨间散步', '第一篇原文', CURRENT_TIMESTAMP),
+             ('second-old', 'old-place', '夜间重访', '第二篇原文', CURRENT_TIMESTAMP)`;
+    await db.$executeRaw`INSERT INTO TravelPhoto (id, memoryId, filePath)
+      VALUES ('photo-first', 'first-old', 'old-a.jpg'), ('photo-second', 'second-old', 'old-b.jpg')`;
   } finally { await db.$disconnect(); }
   return makeZip(new Map([["travel.db", await readFile(path)]]));
 }
@@ -80,10 +87,12 @@ export async function verifyBackupRoundtrip({ host, session, base, photoId, star
   const exported = await fetch(host + "/api/admin/backup", {
     method: "POST", headers: { Origin: host, Cookie: "travel_session=" + session }, signal: AbortSignal.timeout(150_000),
   });
-  assert.equal(exported.status, 200, await exported.clone().text().then(text => text.slice(0, 600)));
+  if (!exported.ok) assert.fail(`导出失败 HTTP ${exported.status} ${(await exported.text()).slice(0, 600)}`);
   assert.equal(exported.headers.get("content-type"), "application/zip");
   assert.match(exported.headers.get("cache-control"), /no-store/);
   const bytes = Buffer.from(await exported.arrayBuffer());
+  assert.ok(bytes.length > 48 * 1024 ** 2, "Large backup did not exceed the previous capacity");
+  if (exported.headers.has("content-length")) assert.equal(Number(exported.headers.get("content-length")), bytes.length);
   const entries = await readZip(bytes);
   const manifest = JSON.parse(entries.get("backup.json"));
   assert.equal(manifest.format, "travel-planner-backup");
@@ -96,7 +105,7 @@ export async function verifyBackupRoundtrip({ host, session, base, photoId, star
   await stopServer();
   const target = join(base, "roundtrip-target");
   await mkdir(target, { recursive: true });
-  const url = "file:" + join(target, "travel.db").replace(/\\/g, "/");
+  const url = "file:" + join(target, "custom-travel.db").replace(/\\/g, "/");
   migrate(url);
   const adminId = randomUUID();
   const auth = randomBytes(32).toString("base64url");
@@ -121,6 +130,23 @@ export async function verifyBackupRoundtrip({ host, session, base, photoId, star
 
   // 通过真实 multipart 恢复入口提交备份。
   async function prepare(archive, status = 200) {
+    if (archive.length > 48 * 1024 ** 2) {
+      const chunkSize = 512 * 1024;
+      const chunks = [];
+      for (let index = 0; index < archive.length; index += chunkSize) chunks.push(archive.subarray(index, index + chunkSize));
+      const hashes = chunks.map(chunk => createHash("sha256").update(chunk).digest("hex"));
+      const initialized = await request("/api/admin/restore/upload/init", JSON.stringify({
+        filename: "large-roundtrip.zip", size: archive.length, digestMode: "chunks",
+        sha256: createHash("sha256").update(JSON.stringify(hashes)).digest("hex"), chunkHashes: hashes,
+      }));
+      for (const [index, chunk] of chunks.entries()) {
+        const response = await fetch(host + "/api/admin/restore/upload/chunk", { method: "POST", body: chunk,
+          headers: { Origin: host, Cookie: "travel_session=" + auth, "Content-Type": "application/octet-stream", "X-Upload-Id": initialized.uploadId,
+            "X-Chunk-Index": String(index), "X-Chunk-SHA256": hashes[index] } });
+        assert.equal(response.status, 200);
+      }
+      return request("/api/admin/restore/upload/finalize", JSON.stringify({ uploadId: initialized.uploadId }), status);
+    }
     const form = new FormData();
     form.append("backup", new Blob([archive], { type: "application/zip" }), "roundtrip.zip");
     return request("/api/admin/restore/prepare", form, status);
@@ -130,6 +156,11 @@ export async function verifyBackupRoundtrip({ host, session, base, photoId, star
   corrupt.set(`uploads/${photoId}.webp`, Buffer.from("tampered-photo"));
   const rejected = await prepare(await makeZip(corrupt), 400);
   assert.match(rejected.error, /校验失败/);
+  const withoutPhotos = new Map([
+    ["travel.db", entries.get("travel.db")],
+    ["backup.json", Buffer.from(JSON.stringify({ ...manifest, files: manifest.files.filter(file => file.path === "travel.db") }))],
+  ]);
+  assert.match((await prepare(await makeZip(withoutPhotos), 400)).error, /受管图片/);
   const oldPreview = await prepare(await oldVersionBackup(base));
   assert.ok(oldPreview.warnings.some(value => value.includes("升级")));
   const oldStaged = new PrismaClient({ datasources: { db: { url: "file:" + join(target, "restore-staging", oldPreview.id, "travel.db").replace(/\\/g, "/") } } });
@@ -139,10 +170,22 @@ export async function verifyBackupRoundtrip({ host, session, base, photoId, star
     assert.equal(saved.actualBudgets[0].actualBudget, 1234);
     assert.equal(saved.expenseExtras[0].paidBy, "合成付款人");
     assert.equal((await oldStaged.expense.findUniqueOrThrow({ where: { id: "old-expense" } })).amountMinor, 10050);
+    const oldVisit = await oldStaged.travelMemory.findUniqueOrThrow({ where: { id: "first-old" }, include: { photos: true } });
+    assert.equal(oldVisit.content, "第一篇原文");
+    assert.equal(oldVisit.photos[0].id, "photo-first");
+    const oldRevisit = await oldStaged.travelMemory.findUniqueOrThrow({ where: { id: "second-old" }, include: { photos: true } });
+    assert.equal(oldRevisit.title, "夜间重访");
+    assert.equal(oldRevisit.content, "第二篇原文");
+    assert.equal(oldRevisit.photos[0].id, "photo-second");
+    assert.equal(oldRevisit.group, null);
+    assert.equal(oldVisit.whenLabel, "2023-07");
+    assert.equal(oldVisit.group, "her");
+    assert.equal(oldVisit.revision, 0);
+    assert.equal(oldVisit.deletedAt, null);
   } finally { await oldStaged.$disconnect(); }
   const preview = await prepare(bytes);
   assert.equal(preview.counts.plans, 1);
-  assert.equal(preview.counts.memories, 1);
+  assert.equal(preview.counts.memories, 2);
   assert.equal(preview.counts.expenses, 1);
   await request("/api/admin/restore/commit", JSON.stringify({ id: preview.id }));
   await stopServer();
@@ -157,6 +200,14 @@ export async function verifyBackupRoundtrip({ host, session, base, photoId, star
     assert.equal((await restored.destination.findUniqueOrThrow({ where: { id: "test-island" } })).isArchived, true);
     assert.equal((await restored.expense.findUniqueOrThrow({ where: { id: "backup-expense" } })).amountMinor, 12550);
     const memory = await restored.travelMemory.findUniqueOrThrow({ where: { id: "backup-memory" }, include: { photos: true } });
+    const revisit = await restored.travelMemory.findUniqueOrThrow({ where: { id: "backup-revisit" } });
+    assert.equal(revisit.placeId, memory.placeId);
+    assert.equal(revisit.group, "both");
+    assert.equal(revisit.whenLabel, "2026-03");
+    const featured = await restored.travelPhoto.findMany({ where: { memoryId: revisit.id } });
+    assert.equal(featured.length, 5);
+    assert.equal(featured[0].isFeatured, true);
+    assert.equal(featured[0].altText, "备份恢复的照片说明");
     assert.equal(memory.photos[0].mediaAssetId, photoId);
     await restored.authSession.create({ data: { userId: adminId, tokenHash: createHash("sha256").update(auth).digest("hex"), expiresAt: new Date(Date.now() + 3600_000) } });
   } finally { await restored.$disconnect(); }

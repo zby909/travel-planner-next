@@ -11,6 +11,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: file:/app/data/travel.db
       UPLOAD_DIR: /app/data/uploads
+      APP_ORIGIN: ${APP_ORIGIN:-}
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-owner}
       BOOTSTRAP_ADMIN_DISPLAY_NAME: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:-管理员}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}

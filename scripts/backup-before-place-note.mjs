@@ -1,14 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, rename, rm } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { sqliteDatabasePath } from "./sqlite-path.mjs";
 
 // 在合并多篇旧日记前自动创建完整 SQLite 快照；失败则阻止迁移和应用启动。
 export async function backupBeforePlaceNoteMigration(databaseUrl = process.env.DATABASE_URL) {
-  if (!databaseUrl?.startsWith("file:")) throw Error("迁移前快照要求 DATABASE_URL 使用 SQLite file: 路径");
-  const raw = databaseUrl.slice(5);
-  const databaseFile = isAbsolute(raw) ? raw : resolve(process.cwd(), "prisma", raw);
+  const databaseFile = sqliteDatabasePath(databaseUrl);
   if (!existsSync(databaseFile)) return null;
 
   const database = new DatabaseSync(databaseFile, { readOnly: true });
@@ -21,7 +20,8 @@ export async function backupBeforePlaceNoteMigration(databaseUrl = process.env.D
       "SELECT 1 FROM _prisma_migrations WHERE migration_name = ? AND finished_at IS NOT NULL LIMIT 1",
     ).get("20261106230000_one_note_per_place")) return null;
 
-    const directory = join(dirname(databaseFile), "pre-migration-backups");
+    const root = join(dirname(databaseFile), "pre-migration-backups");
+    const directory = basename(databaseFile) === "travel.db" ? root : join(root, basename(databaseFile));
     const destination = join(directory, "before-one-note-per-place-20261107.db");
     if (existsSync(destination)) return destination;
     await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -40,5 +40,6 @@ export async function backupBeforePlaceNoteMigration(databaseUrl = process.env.D
 
 // 容器通过 Node 直接运行本脚本；可单独导入供隔离测试。
 if (process.argv[1]?.endsWith("backup-before-place-note.mjs")) {
+  if (!process.env.DATABASE_URL && existsSync(".env")) process.loadEnvFile(".env");
   await backupBeforePlaceNoteMigration();
 }

@@ -1,4 +1,5 @@
-import { createHash } from "node:crypto";
+import { fileChecksum } from "./file-checksum.mjs";
+import { sqliteDatabasePath } from "./sqlite-path.mjs";
 import { existsSync } from "node:fs";
 import { copyFile, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { migrateBackupDatabase } from "./migrate-backup.mjs";
@@ -6,17 +7,18 @@ import { installRestoreMedia, rollbackRestoreMedia } from "./restore-media.mjs";
 import { join, resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 
+if (!process.env.DATABASE_URL && existsSync(".env")) process.loadEnvFile(".env");
 const data = process.env.RESTORE_DATA_DIR
   ? resolve(process.env.RESTORE_DATA_DIR)
   : process.env.DATABASE_URL?.startsWith("file:/app/data/") ? "/app/data" : join(process.cwd(), "data");
 const root = join(data, "restore-staging");
 const pendingPath = join(root, "pending.json");
-const dbPath = join(data, "travel.db");
 let databaseSwitched = false;
 
 // 启动前应用已确认的恢复任务，保留当前管理员并在切换失败时回退。
 async function apply() {
   if (!existsSync(pendingPath)) return;
+  const dbPath = process.env.DATABASE_URL ? sqliteDatabasePath(process.env.DATABASE_URL) : join(data, "travel.db");
   const pending = JSON.parse(await readFile(pendingPath, "utf8"));
   if (!/^[a-f0-9-]{36}$/.test(pending.id) || typeof pending.ownerId !== "string") throw Error("恢复任务编号非法");
   const dir = join(root, pending.id);
@@ -48,7 +50,7 @@ async function apply() {
     return;
   }
   if (!existsSync(input) || !existsSync(dbPath)) throw Error("原数据库或上传的恢复数据库不存在");
-  const actualSha = createHash("sha256").update(await readFile(input)).digest("hex");
+  const { sha256: actualSha } = await fileChecksum(input);
   if (actualSha !== pending.sha256) throw Error("原始备份校验值不一致，拒绝恢复");
   const currentDb = new PrismaClient({ datasources: { db: { url: "file:" + dbPath.replace(/\\/g, "/") } } });
   let currentAdmin;
@@ -72,11 +74,12 @@ async function apply() {
     const check = await newDb.$queryRawUnsafe("PRAGMA integrity_check");
     if (check.length !== 1 || Object.values(check[0])[0] !== "ok") throw Error("恢复数据库损坏");
     await newDb.$transaction(async tx => {
-      // Old password hashes, sessions and API tokens must never become active again.
+      // Old password hashes, sessions, invites and API tokens must never become active again.
       await tx.authSession.deleteMany();
       await tx.apiToken.deleteMany();
       await tx.importDraft.deleteMany();
       await tx.loginThrottle.deleteMany();
+      await tx.appSetting.deleteMany({ where: { key: "partner_invite_v1" } });
       await tx.user.updateMany({ data: { isActive: false, role: "EDITOR" } });
       const collision = await tx.user.findFirst({
         where: { username: currentAdmin.username, NOT: { id: currentAdmin.id } },
@@ -85,6 +88,9 @@ async function apply() {
         where: { id: collision.id }, data: { username: "archived_" + collision.id.slice(0, 30), isActive: false },
       });
       await tx.appSetting.upsert({ where: { key: "admin_bootstrap_v1" }, update: { value: "completed" }, create: { key: "admin_bootstrap_v1", value: "completed" } });
+      const verification = JSON.stringify({ at: manifest.createdAt, sha256: manifest.sha256, photos: manifest.counts.photos });
+      await tx.appSetting.upsert({ where: { key: "lastBackupVerification" },
+        create: { key: "lastBackupVerification", value: verification }, update: { value: verification } });
       await tx.user.upsert({
         where: { id: currentAdmin.id },
         create: {

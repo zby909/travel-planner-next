@@ -1,7 +1,6 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import { copyFile, lstat, mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -10,17 +9,19 @@ import { ZipFile } from "yazl";
 import { prisma } from "@/lib/prisma";
 import { restoreDataDir } from "@/lib/backup-restore";
 import { getUploadDirectory } from "@/lib/media-storage";
-import { MAX_BACKUP_ENTRIES, MAX_BACKUP_UNCOMPRESSED, MAX_BACKUP_ZIP, validBackupImagePath, type BackupFileEntry, type BackupManifest } from "@/lib/backup-format";
+import { MAX_BACKUP_ENTRIES, MAX_BACKUP_MANIFEST, MAX_BACKUP_UNCOMPRESSED, MAX_BACKUP_ZIP, validBackupImagePath, type BackupFileEntry, type BackupManifest } from "@/lib/backup-format";
+import { fileChecksum } from "../../scripts/file-checksum.mjs";
 
 let exporting = false;
 
 // 生成受大小约束的快照包；数据库写锁只覆盖快照与文件复制，不覆盖 ZIP 压缩和下载。
-export async function createBackupArchive(actorId: string): Promise<{ bytes: Buffer; fileName: string }> {
+export async function createBackupArchive(actorId: string) {
   if (exporting) throw Error("已有备份正在生成，请稍后再试");
   exporting = true;
   const root = join(restoreDataDir(), "backup-exports");
   let folder = "";
   let source: PrismaClient | undefined;
+  let handedOff = false;
   try {
     await mkdir(root, { recursive: true, mode: 0o700 });
     for (const entry of await readdir(root, { withFileTypes: true })) {
@@ -30,23 +31,23 @@ export async function createBackupArchive(actorId: string): Promise<{ bytes: Buf
       }
     }
     folder = await mkdtemp(join(root, "export-"));
-    const files: BackupFileEntry[] = [];
+    const paths: string[] = [];
     let total = 0;
 
-    // 为每个文件保存校验和，禁止符号链接或超出恢复端限制的包。
-    async function includeFile(path: string, name: string, copy = true): Promise<void> {
+    // 锁内只检查并复制文件，校验和在释放写锁后从副本计算。
+    async function includeFile(path: string, name: string, expectedSize?: number): Promise<void> {
       const info = await lstat(path);
       if (!info.isFile() || info.isSymbolicLink()) throw Error("备份不支持符号链接或特殊文件");
       total += info.size;
-      if (total > MAX_BACKUP_UNCOMPRESSED || files.length >= MAX_BACKUP_ENTRIES - 1) throw Error("备份超过网页恢复容量，请使用停机备份");
+      if (total > MAX_BACKUP_UNCOMPRESSED || paths.length >= MAX_BACKUP_ENTRIES - 1) throw Error("备份超过网页恢复容量，请使用停机备份");
+      if (expectedSize !== undefined && info.size !== expectedSize) throw Error("媒体文件大小与数据库记录不符，请先核对图片");
       if (info.size > (name === "travel.db" ? 100 : 18) * 1024 * 1024) throw Error("备份包含过大的文件，请使用停机备份");
       const target = join(folder, name);
-      if (copy) {
+      if (path !== target) {
         await mkdir(join(target, ".."), { recursive: true, mode: 0o700 });
         await copyFile(path, target);
       }
-      const bytes = await readFile(target);
-      files.push({ path: name, size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
+      paths.push(name);
     }
 
     // 复制允许恢复的历史图片，绝不打包运行时配置、日志或恢复暂存目录。
@@ -73,23 +74,29 @@ export async function createBackupArchive(actorId: string): Promise<{ bytes: Buf
       // 即使设置表为空，这条写语句也会取得 SQLite 写锁，阻止引用在复制期间变化。
       await tx.$executeRaw`UPDATE "AppSetting" SET "value" = "value" WHERE "key" = 'visibility'`;
       await source!.$executeRawUnsafe("VACUUM main INTO ?", snapshot);
-      await includeFile(snapshot, "travel.db", false);
-      const assets = await tx.mediaAsset.findMany({ select: { id: true, fileName: true } });
+      await includeFile(snapshot, "travel.db");
+      const assets = await tx.mediaAsset.findMany({ select: { id: true, fileName: true, byteSize: true } });
       for (const asset of assets) {
         if (!/^[a-f0-9-]{36}$/i.test(asset.id) || asset.fileName !== `${asset.id}.webp`) throw Error("存在不受管的媒体记录，请先核对图片数据");
-        await includeFile(join(getUploadDirectory(), asset.fileName), `uploads/${asset.fileName}`).catch((error: NodeJS.ErrnoException) => {
+        await includeFile(join(getUploadDirectory(), asset.fileName), `uploads/${asset.fileName}`, asset.byteSize).catch((error: NodeJS.ErrnoException) => {
           if (error.code === "ENOENT") throw Error("有媒体记录缺少原始文件，未生成不完整的备份；请先修复图片");
           throw error;
         });
       }
-      const legacyRoot = process.env.LEGACY_MEDIA_DIR || join(restoreDataDir(), "legacy-images");
-      await includeLegacy(join(legacyRoot, "images"), "legacy-images/images");
-      await tx.auditLog.create({ data: { actorId, action: "导出", entity: "整站备份", entityId: "site", summary: `数据库与 ${files.length - 1} 个媒体文件` } });
     }, { timeout: 120_000, maxWait: 5_000 });
     await source.$disconnect();
     source = undefined;
+    // 历史图片目录为只读静态素材，放在数据库写锁外复制以减少后台写阻塞时间。
+    const legacyRoot = process.env.LEGACY_MEDIA_DIR || join(restoreDataDir(), "legacy-images");
+    await includeLegacy(join(legacyRoot, "images"), "legacy-images/images");
 
+    const files: BackupFileEntry[] = [];
+    for (const path of paths) files.push({ path, ...await fileChecksum(join(folder, path)) });
     const manifest: BackupManifest = { format: "travel-planner-backup", version: 1, createdAt: new Date().toISOString(), files };
+    const manifestBytes = Buffer.from(JSON.stringify(manifest));
+    if (manifestBytes.length > MAX_BACKUP_MANIFEST || total + manifestBytes.length > MAX_BACKUP_UNCOMPRESSED) {
+      throw Error("备份超过网页恢复容量，请使用停机备份");
+    }
     const archive = new ZipFile();
     const output = join(folder, "backup.zip");
     let zipBytes = 0;
@@ -97,19 +104,28 @@ export async function createBackupArchive(actorId: string): Promise<{ bytes: Buf
       // 在压缩输出阶段限制包体，生成的 ZIP 一定可由网页恢复入口接收。
       transform(chunk: Buffer, _encoding, callback) {
         zipBytes += chunk.length;
-        callback(zipBytes > MAX_BACKUP_ZIP ? new Error("ZIP 超过 48 MiB，请使用停机备份") : null, chunk);
+        callback(zipBytes > MAX_BACKUP_ZIP ? new Error("ZIP 超过 512 MiB，请使用停机备份") : null, chunk);
       },
     });
     archive.on("error", error => limiter.destroy(error));
     const done = pipeline(archive.outputStream, limiter, createWriteStream(output, { flags: "wx", mode: 0o600 }));
     for (const file of files) archive.addFile(join(folder, file.path), file.path);
-    archive.addBuffer(Buffer.from(JSON.stringify(manifest)), "backup.json");
+    archive.addBuffer(manifestBytes, "backup.json");
     archive.end();
     await done;
-    return { bytes: await readFile(output), fileName: `travel-backup-${manifest.createdAt.replace(/[:.]/g, "-")}.zip` };
+    const value = JSON.stringify({ at: manifest.createdAt, bytes: zipBytes, files: files.length });
+    await prisma.$transaction([
+      prisma.appSetting.upsert({ where: { key: "lastBackupExport" }, create: { key: "lastBackupExport", value }, update: { value } }),
+      prisma.auditLog.create({ data: { actorId, action: "导出", entity: "整站备份", entityId: "site", summary: `数据库与 ${files.length - 1} 个媒体文件` } }),
+    ]);
+    handedOff = true;
+    return { path: output, size: zipBytes, fileName: `travel-backup-${manifest.createdAt.replace(/[:.]/g, "-")}.zip`,
+      // 下载结束或被取消后删除本次临时包。
+      cleanup: () => rm(folder, { recursive: true, force: true }),
+    };
   } finally {
     exporting = false;
     await source?.$disconnect();
-    if (folder) await rm(folder, { recursive: true, force: true });
+    if (folder && !handedOff) await rm(folder, { recursive: true, force: true });
   }
 }

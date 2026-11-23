@@ -1,9 +1,9 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { MAX_BACKUP_ENTRIES, validBackupImagePath } from "@/lib/backup-format";
+import { fileChecksum } from "../../scripts/file-checksum.mjs";
 
 const manifestSchema = z.object({
   format: z.literal("travel-planner-backup"), version: z.literal(1), createdAt: z.iso.datetime(),
@@ -22,7 +22,9 @@ export async function validateBackupManifest(folder: string, extracted: string[]
     throw error;
   });
   if (raw === null) return;
-  const parsed = manifestSchema.safeParse(JSON.parse(raw));
+  let json: unknown;
+  try { json = JSON.parse(raw); } catch { throw Error("备份清单格式或版本不兼容"); }
+  const parsed = manifestSchema.safeParse(json);
   if (!parsed.success) throw Error("备份清单格式或版本不兼容");
   const expected = new Set(parsed.data.files.map(file => file.path));
   const actual = extracted.filter(path => path !== "backup.json");
@@ -30,8 +32,8 @@ export async function validateBackupManifest(folder: string, extracted: string[]
     throw Error("备份文件与清单不一致");
   }
   for (const file of parsed.data.files) {
-    const bytes = await readFile(join(folder, file.path));
-    if (bytes.length !== file.size || createHash("sha256").update(bytes).digest("hex") !== file.sha256) {
+    const actual = await fileChecksum(join(folder, file.path));
+    if (actual.size !== file.size || actual.sha256 !== file.sha256) {
       throw Error("备份文件 SHA-256 校验失败");
     }
   }

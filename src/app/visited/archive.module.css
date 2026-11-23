@@ -1,0 +1,49 @@
+.archive { background: #f7f4ec; }
+.archive .hero, .archive .heroInner { min-height: clamp(425px, 60svh, 650px); }
+.archive .heroInner { justify-content: flex-end; padding-bottom: clamp(32px, 6vw, 72px); }
+.archive .heroInner h1 { margin-bottom: 9px; }
+.archive .heroInner > p { margin-bottom: 20px; font-variant-numeric: tabular-nums; }
+
+.heroNav { display: flex; flex-wrap: wrap; gap: 8px; }
+.heroNav a { padding: 9px 15px; border: 1px solid #f4e8d488; border-radius: 4px; color: #fff7e8; background: #19372cbb; }
+.heroNav a:first-child { color: #263d31; background: #f2dfbd; border-color: #f2dfbd; }
+.heroNav a:hover { text-decoration: underline; }
+
+.archive .directory, .archive .timeline, .archive .map { scroll-margin-top: 70px; padding-block: clamp(42px, 7vw, 90px); }
+.directoryHead { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px 24px; margin-bottom: 22px; }
+.directoryHead h2, .timeline h2, .map h2 {
+  margin: 0;
+  color: #263f36;
+  font: 640 clamp(1.8rem, 4.5vw, 3.65rem)/1.25 var(--ed-serif, Georgia, serif);
+}
+.directoryHead p { margin: 8px 0 0; color: #58665c; font-size: .85rem; }
+.filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filter input, .filter select, .filter button {
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid #c8d0c4;
+  border-radius: 4px;
+  background: #fffdf8;
+  color: #263f36;
+  font: inherit;
+  font-size: .85rem;
+}
+.filter input { min-width: 0; }
+.filter button { padding-inline: 15px; color: #fffdf8; background: #285343; border-color: #285343; cursor: pointer; }
+.filter a { color: #38594a; font-size: .85rem; text-decoration: underline; }
+.cardArrow { font-size: 1.2rem; color: #3a6250; }
+.card:focus-visible { outline-offset: 4px; }
+.empty, .mapEmpty { color: #58665c; line-height: 1.7; margin: 20px 0; }
+.timeline h2, .map h2 { margin-bottom: 28px; }
+.year { margin: 0; color: #395547; font: 600 clamp(1.4rem, 4vw, 3rem)/1.2 var(--ed-serif, Georgia, serif); }
+.timelineEntry h4 { margin: 4px 0 8px; color: #263f36; font-size: 1.1rem; }
+.timelineEntry .excerpt { overflow-wrap: anywhere; font-size: .84rem; line-height: 1.65; }
+.map h2, .mapEmpty { color: #f6ebd6; }
+
+@media (max-width: 540px) {
+  .archive .hero, .archive .heroInner { min-height: 360px; }
+  .heroNav a { padding-inline: 12px; }
+  .filter { width: 100%; }
+  .filter input { flex: 1 1 8rem; }
+  .timelineEntry h4 { font-size: 1rem; }
+}

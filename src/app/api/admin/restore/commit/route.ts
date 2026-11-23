@@ -5,12 +5,12 @@ import { queueRestore } from "@/lib/backup-restore";
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   const user = await restoreAdministrator(request);
-  if (!user) return NextResponse.json({ error: "仅允许同源管理员确认恢复" }, { status: 403 });
-  if (!request.headers.get("content-type")?.startsWith("application/json"))
-    return NextResponse.json({ error: "需要 application/json" }, { status: 415 });
+  if (!user) return NextResponse.json({ error: "仅允许同源管理员确认恢复" }, { status: 403, headers: noStore });
+  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json"))
+    return NextResponse.json({ error: "需要 application/json" }, { status: 415, headers: noStore });
   try {
     const value = await request.json();
-    if (typeof value?.id !== "string") return NextResponse.json({ error: "缺少恢复任务编号" }, { status: 400 });
+    if (typeof value?.id !== "string") return NextResponse.json({ error: "缺少恢复任务编号" }, { status: 400, headers: noStore });
     const preview = await queueRestore(value.id, user.id);
     return NextResponse.json({ queued: true, id: preview.id, message: "恢复已排队。现在从 StackNest 重启该应用，容器会自动恢复备份。" }, { headers: noStore });
   } catch (e) {

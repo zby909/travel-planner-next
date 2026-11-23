@@ -7,26 +7,24 @@ export function formatMoney(value: number | null | undefined, currency = "CNY"):
   }
 }
 
-export function formatCny(value: number | null | undefined): string {
-  return formatMoney(value, "CNY");
-}
-
-export function parseJsonArray<T = string>(value: string | null | undefined): T[] {
+// 旧库可能包含损坏的文本数组，保留其中仍可显示和编辑的文字。
+export function parseJsonArray(value: string | null | undefined): string[] {
   if (!value) return [];
   try {
     const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
   } catch {
     return [];
   }
 }
 
+const dateFormat = new Intl.DateTimeFormat("zh-CN", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  timeZone: "UTC",
+});
+
 export function formatDate(value: Date | null | undefined): string {
-  if (!value) return "日期未记录";
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "UTC",
-  }).format(value);
+  return value ? dateFormat.format(value) : "日期未记录";
 }

@@ -1,14 +1,19 @@
 import { z } from "zod";
+import { SUPPORTED_CURRENCIES } from "@/lib/money";
 
 const safeText = (max: number) => z.string().trim().min(1).max(max);
 const optionalText = (max: number) => z.string().trim().max(max).optional();
 const coordinate = z.number().finite();
+const visitWhen = z.union([z.string().regex(/^\d{4}(?:-(?:0[1-9]|1[0-2]))?$/), z.iso.date()]);
 
 export const visitItemSchema = z.object({
   name: safeText(100),
   region: safeText(160),
-  when: z.string().regex(/^\d{4}(-(?:0[1-9]|1[0-2]))?$/).optional(),
+  when: visitWhen.optional(),
   group: z.enum(["mine", "her", "both"]).default("mine"),
+  append: z.literal(true).optional(),
+  visitTitle: optionalText(150),
+  journal: optionalText(20000),
   country: optionalText(80),
   province: optionalText(80),
   city: optionalText(100),
@@ -16,15 +21,20 @@ export const visitItemSchema = z.object({
   longitude: coordinate.min(-180).max(180).optional(),
   note: optionalText(600),
   imageId: z.uuid().optional(),
-}).strict().refine((v) => (v.latitude === undefined) === (v.longitude === undefined), {
-  message: "经纬度必须同时填写",
+}).strict().superRefine((item, ctx) => {
+  if ((item.latitude === undefined) !== (item.longitude === undefined)) {
+    ctx.addIssue({ code: "custom", message: "经纬度必须同时填写" });
+  }
+  if (item.append && [item.country, item.province, item.city, item.latitude, item.longitude, item.note, item.imageId].some(value => value !== undefined)) {
+    ctx.addIssue({ code: "custom", message: "追加到访时请使用 visitTitle 和 journal；地点资料可单独更新" });
+  }
 });
 
 export const budgetSchema = z.object({
-  food: z.number().int().min(0).max(1_000_000).default(0),
-  accommodation: z.number().int().min(0).max(1_000_000).default(0),
-  transport: z.number().int().min(0).max(1_000_000).default(0),
-  other: z.number().int().min(0).max(1_000_000).default(0),
+  food: z.number().int().min(0).max(100_000_000).default(0),
+  accommodation: z.number().int().min(0).max(100_000_000).default(0),
+  transport: z.number().int().min(0).max(100_000_000).default(0),
+  other: z.number().int().min(0).max(100_000_000).default(0),
 }).strict();
 
 export const destinationItemSchema = z.object({
@@ -40,12 +50,13 @@ export const destinationItemSchema = z.object({
     title: safeText(150), detail: safeText(1500),
   }).strict()).max(30).default([]),
   budget: budgetSchema.optional(),
-  minBudget: z.number().int().min(0).max(2_000_000).optional(),
-  maxBudget: z.number().int().min(0).max(2_000_000).optional(),
+  currency: z.enum(SUPPORTED_CURRENCIES).optional(),
+  minBudget: z.number().int().min(0).max(400_000_000).optional(),
+  maxBudget: z.number().int().min(0).max(400_000_000).optional(),
   imageId: z.uuid().optional(),
 }).strict().superRefine((item, ctx) => {
   const sum = Object.values(item.budget ?? {}).reduce((a, b) => a + b, 0);
-  if (item.minBudget !== undefined && item.minBudget > sum && sum !== 0) {
+  if (item.minBudget !== undefined && item.minBudget > sum) {
     ctx.addIssue({ code: "custom", message: "预算下限不能超过分项合计" });
   }
   if (item.maxBudget !== undefined && item.maxBudget < sum) {
@@ -63,10 +74,14 @@ const visitGroup = z.enum(["mine", "her", "both"]);
 
 export const visitUpdateItemSchema = z.object({
   id: safeText(64),
+  visitId: safeText(64).optional(),
+  visitRevision: z.number().int().nonnegative().optional(),
   name: safeText(100).optional(),
   region: safeText(160).optional(),
-  when: z.union([z.string().regex(/^\d{4}(?:-(?:0[1-9]|1[0-2]))?$/), z.literal("")]).optional(),
+  when: z.union([visitWhen, z.literal("")]).optional(),
   group: visitGroup.optional(),
+  visitTitle: optionalText(150),
+  journal: optionalText(20000),
   country: optionalNullableText(80),
   province: optionalNullableText(80),
   city: optionalNullableText(100),
@@ -78,22 +93,26 @@ export const visitUpdateItemSchema = z.object({
   sortOrder: z.number().int().min(-100000).max(100000).optional(),
 }).strict().superRefine((item, ctx) => {
   if (Object.keys(item).length === 1) ctx.addIssue({ code: "custom", message: "至少提供一个需要更新的字段" });
-  if ((item.latitude === undefined) !== (item.longitude === undefined)) {
+  if ((item.visitId || item.visitRevision !== undefined) && [item.when, item.group, item.visitTitle, item.journal].every(value => value === undefined)) {
+    ctx.addIssue({ code: "custom", message: "指定到访编号或版本时请同时提供要修改的到访字段" });
+  }
+  if ((item.latitude === undefined) !== (item.longitude === undefined) || (item.latitude === null) !== (item.longitude === null)) {
     ctx.addIssue({ code: "custom", message: "经纬度必须同时提供；清除坐标时两者都传 null" });
   }
 });
 
 const budgetPatchSchema = z.object({
-  food: z.number().int().min(0).max(1_000_000).optional(),
-  accommodation: z.number().int().min(0).max(1_000_000).optional(),
-  transport: z.number().int().min(0).max(1_000_000).optional(),
-  other: z.number().int().min(0).max(1_000_000).optional(),
+  food: z.number().int().min(0).max(100_000_000).optional(),
+  accommodation: z.number().int().min(0).max(100_000_000).optional(),
+  transport: z.number().int().min(0).max(100_000_000).optional(),
+  other: z.number().int().min(0).max(100_000_000).optional(),
 }).strict().refine(value => Object.keys(value).length > 0, "预算补丁至少需要一个金额字段");
 
 export const destinationUpdateItemSchema = z.object({
   id: safeText(64),
   title: safeText(100).optional(),
   subtitle: safeText(160).optional(),
+  flag: optionalText(12),
   months: optionalText(100),
   days: optionalText(50),
   vibe: optionalText(220),
@@ -101,9 +120,10 @@ export const destinationUpdateItemSchema = z.object({
   groupText: optionalText(1500),
   route: z.array(safeText(200)).max(40).optional(),
   spots: z.array(safeText(120)).max(40).optional(),
+  currency: z.enum(SUPPORTED_CURRENCIES).optional(),
   budget: budgetPatchSchema.optional(),
-  minBudget: z.number().int().min(0).max(2_000_000).optional(),
-  maxBudget: z.number().int().min(0).max(2_000_000).optional(),
+  minBudget: z.number().int().min(0).max(400_000_000).optional(),
+  maxBudget: z.number().int().min(0).max(400_000_000).optional(),
   guideDays: z.array(z.object({ title: safeText(150), detail: safeText(1500) }).strict()).max(30).optional(),
   imageId: nullableImageId,
   isArchived: z.boolean().optional(),

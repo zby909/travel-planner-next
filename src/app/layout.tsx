@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "./homepage.css";
 import "./journal.css";
-import "./studio.css";
 import "./cinematic.css";
 import "./motion.css";
 export const metadata: Metadata = {
@@ -12,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" data-scroll-behavior="smooth">
       <body>{children}</body>
     </html>
   );

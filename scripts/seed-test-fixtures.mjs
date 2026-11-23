@@ -15,8 +15,8 @@ try {
   await db.visitedPlace.create({
     data: {
       id: "test-town", name: "示例小镇", region: "虚构测试地区",
-      image: "images/place-placeholder.svg", group: "mine",
-      whenLabel: "2025", sortOrder: 0, longitude: 110, latitude: 30,
+      image: "images/place-placeholder.svg", sortOrder: 0, longitude: 110, latitude: 30,
+      visits: { create: { id: "test-town-first-visit", title: "", content: "", group: "mine", whenLabel: "2025" } },
     },
   });
   console.log("Test fixtures: 1 destination, 1 place (no private records).");

@@ -1,0 +1,7 @@
+.panel { display: grid; grid-template-columns: 1fr 1.25fr 1.25fr; gap: 20px; align-items: center; padding-block: 24px; border-bottom: 1px solid #d8dbd0; color: #365143; }
+.panel p { font-size: .95rem; }
+.panel a { display: grid; gap: 7px; padding-left: 20px; border-left: 1px solid #d8dbd0; }
+.panel small { color: #647360; font-size: .77rem; }
+.panel strong { font-weight: 550; }
+.panel a:hover strong { text-decoration: underline; }
+@media (max-width: 680px) { .panel { grid-template-columns: 1fr 1fr; gap: 12px; } .panel p { grid-column: 1 / -1; margin: 0; } .panel a { padding-left: 0; border-left: 0; } }

@@ -30,8 +30,8 @@ The `travelctl` CLI connects this agent to the **user's own** Travel Planner web
 ## General workflow
 
 1. Before changing past trips, run `travelctl visits list`; before changing future plans, run `travelctl destinations list`; before chronology work, run `travelctl timeline list`. Treat live API results as the source of truth. Do not assume remembered conversation data is already in the database.
-2. Preserve date precision: known year only → `when: "2025"`; known month → `when: "2025-05"`. Never invent exact dates, companions, locations or coordinates. **Future intentions are never past visits.**
-3. For a local photo the user wants attached, run `travelctl media upload path/to/photo.jpg` and use the returned `imageId`. Images are re-encoded as WebP and stripped of EXIF. Do not fetch third-party images without authorization. Staged images remain private until a confirmed import references them.
+2. Preserve date precision with `when: "2025"`, `when: "2025-05"` or `when: "2025-05-20"` according to the information provided. Record verified dates, companions, locations and coordinates for trips that already happened.
+3. For a local photo the user wants attached, run `travelctl media upload path/to/photo.jpg` and use the returned `imageId` (JPEG, PNG, or WebP, max 8 MiB for CLI uploads). Images are re-encoded as WebP and stripped of EXIF. Do not fetch third-party images without authorization. Staged images remain private until a confirmed import references them.
 4. Use JSON with an `items` array. Past visit example:
    ```json
    {"items":[{"name":"东京","region":"日本","when":"2025-05","group":"mine","country":"日本","latitude":35.68,"longitude":139.69,"imageId":"<uploaded-id>"}]}
@@ -41,23 +41,23 @@ The `travelctl` CLI connects this agent to the **user's own** Travel Planner web
    ```json
    {"items":[{"title":"京都","subtitle":"日本·关西","months":"10-11月","days":"5天","route":["京都","宇治"],"spots":["伏见稻荷大社"],"reason":"红叶季","imageId":"<uploaded-id>"}]}
    ```
-   Optional `budget:{food,accommodation,transport,other}` is the CNY total for two people, not per person. Keep estimates broad; missing budgets stay missing.
+   Optional `budget:{food,accommodation,transport,other}` is the total for two people in the optional three-letter `currency` (or the site default currency when omitted), not per person. Keep estimates broad; missing budgets stay missing.
 6. Create new records with `travelctl visits prepare file.json` or `travelctl destinations prepare file.json`. Review the returned preview and warnings, summarize additions, and obtain explicit user confirmation.
 7. Only after confirmation run `travelctl import commit DRAFT_ID --confirm`. Otherwise run `travelctl import cancel DRAFT_ID`. Never silently commit.
 
 ## Updating existing visits
 
-Use `travelctl visits update prepare visit-updates.json`. Each item must include its existing `id` plus only fields to change. Supported fields: `name`, `region`, `when`, `group`, `country`, `province`, `city`, `latitude`, `longitude`, `note`, `imageId`, `sortOrder`, `isArchived`.
+Use `travelctl visits update prepare visit-updates.json`. Each item includes the place `id` and the fields to change. `visits list` returns the visit records for a place under `visits`. If a place has several visits, specify the `visitId` when editing `when`, `group`, `visitTitle` or `journal`.
 
-- `isArchived: true` archives the visit; `false` restores it. Lists include archived records. Archiving also hides linked timeline events, diaries and their anonymous media access until restored; data and associations remain intact. Explain this effect before asking for confirmation.
+- `isArchived: true` archives the place; `false` restores it. Archiving hides all its visits, linked timeline events and anonymous access to their photos. Lists include archived places.
 - Use `imageId: null` to clear its cover and `when: ""` to clear its date label.
 - Latitude and longitude must be supplied together; use both null to clear coordinates.
 - Name/region changes are checked for duplicate records.
-- Editing a visit does not silently edit its linked timeline event. Review the timeline separately if the date, title or group should also change.
+- To record a later visit, use `visits prepare` with `append: true`, the existing place's exact `name` and `region`, and only visit-level fields (`when`, `group`, optional `visitTitle` and `journal`). Do not include place-level fields (`country`, coordinates, `mapNote`, `imageId`) when `append: true`; update place fields with `visits update prepare`.
 
 ## Updating future destinations
 
-Use `travelctl destinations update prepare destination-updates.json`. Each item must include its existing `id`. Supported fields include title/subtitle, months/days, vibe/reason, groupText, route/spots, partial four-category CNY budget breakdown, min/max budget, guide days and cover image.
+Use `travelctl destinations update prepare destination-updates.json`. Each item must include its existing `id`. Supported fields include title/subtitle, months/days, vibe/reason, groupText, route/spots, partial four-category budget breakdown (in the destination's existing currency), min/max budget, guide days and cover image.
 - `isArchived: true` hides the destination's public page and wishlist card without deleting its trip plans; `false` restores it. Always preview and confirm this change.
 - `guideDays`, when supplied, replaces the existing guide-day list.
 - Use `imageId: null` to clear the cover.
@@ -66,7 +66,7 @@ Use `travelctl destinations update prepare destination-updates.json`. Each item 
 
 ## Timeline operations
 
-Use `travelctl timeline list` to read event IDs, dates, titles, notes and linked visit IDs.
+Use `travelctl timeline list` to read independent events and their linked place IDs. Use `travelctl visits list` to read the individual visits that also appear in the website timeline.
 
 Use `travelctl timeline prepare timeline-changes.json` to create or update events:
 - New event: omit `id`, and provide `year`, `date` (YYYY or YYYY.MM), `group`, `title`, and one or more `placeIds`.
@@ -77,9 +77,9 @@ Use `travelctl timeline prepare timeline-changes.json` to create or update event
 
 ## Safety and current limits
 
-- All create/update/timeline writes create a preview draft. The preview includes current values, proposed changes and warnings. Obtain explicit user confirmation before `travelctl import commit DRAFT_ID --confirm`; if not approved, cancel it.
-- New visits with a known `when` automatically create one linked timeline entry in the same transaction. A visit without a reliable date does not create one. Existing duplicate visits do not gain a new event.
-- Exact duplicate *new* visits (same name + region) and destinations (same title) are warned about and skipped. Updates target explicit IDs and reject conflicting duplicate names.
+- All create/update/timeline writes create a preview draft. Create previews include proposed items and warnings; update/timeline previews also include current values and proposed changes. Obtain explicit user confirmation before `travelctl import commit DRAFT_ID --confirm`; if not approved, cancel it.
+- The website timeline displays visits from their own date fields. Use a timeline entry for an independent event such as a multi-place journey.
+- New places with the same name and region, and destinations with the same title, are warned about and skipped. Use `append: true` to add a revisit to an existing place.
 - Never bypass the API by editing SQLite directly. Tokens only authorize their selected scopes; do not attempt to circumvent them.
 - Replacing/clearing photos or canceling a draft reclaims only media with no remaining content/active-draft reference. Archived records still retain their media. Do not assume an old `imageId` remains reusable after its last reference is removed.
-- One image per record is supported. No video upload or automatic remote image fetching.
+- `imageId` sets a place or destination cover. Upload photos to a visit's album in the web editor.

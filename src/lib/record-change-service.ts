@@ -1,12 +1,32 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ImportPayload } from "@/lib/import-schema";
 import { mediaIdFromPath, releaseUnusedMedia } from "@/lib/media-lifecycle";
 import { removeStoredMediaFiles } from "@/lib/media-storage";
+import { visitDateFromImport } from "@/lib/visit-input";
+import { parseJsonArray } from "@/lib/format";
 
 type ChangePayload = Extract<ImportPayload, { kind: "visits-update" | "destinations-update" | "timeline" }>;
 type ChangeItem = ChangePayload["items"][number];
+type VisitUpdate = Extract<ChangePayload, { kind: "visits-update" }>["items"][number];
+
+// 单次到访沿用旧 CLI 更新方式，有多次记录时通过 visitId 精确选择。
+async function visitPatch(db: Prisma.TransactionClient, item: VisitUpdate) {
+  if ([item.when, item.group, item.visitTitle, item.journal].every(value => value === undefined)) return null;
+  const visits = await db.travelMemory.findMany({ where: { id: item.visitId, placeId: item.id, deletedAt: null }, take: 2 });
+  if (visits.length > 1) throw Error("地点已有多次到访，请先查询 visits 列表并指定 visitId");
+  if (item.visitId && !visits.length) throw Error("该到访不存在或不属于这个地点");
+  if (item.visitRevision !== undefined && visits[0]?.revision !== item.visitRevision) throw Error("到访记录已被修改，请重新生成导入预览");
+  return {
+    current: visits[0] ?? null,
+    data: {
+      ...(item.when !== undefined ? visitDateFromImport(item.when) : {}),
+      group: item.group, title: item.visitTitle, content: item.journal,
+    },
+  };
+}
 
 async function validateImage(imageId: string | null | undefined, ownerId: string) {
   if (!imageId) return;
@@ -20,11 +40,6 @@ async function validatePlaceIds(placeIds: string[] | undefined) {
   if (!placeIds?.length) return;
   const found = await prisma.visitedPlace.findMany({ where: { id: { in: placeIds } }, select: { id: true } });
   if (found.length !== placeIds.length) throw new Error("时间轴关联的足迹地点不存在或已被删除");
-}
-
-function parseArray(value: string): unknown[] {
-  try { const parsed: unknown = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; }
-  catch { return []; }
 }
 
 function destinationBudget(existing: {
@@ -65,7 +80,9 @@ export async function prepareRecordChange(payload: ChangePayload, ownerId: strin
         throw new Error(`另一个足迹已使用相同名称和地区：${nextName} · ${nextRegion}`);
       }
       await validateImage(item.imageId, ownerId);
-      before.push({ id: item.id, current: existing, changes: item });
+      const visit = await visitPatch(prisma, item);
+      if (visit?.current) { item.visitId = visit.current.id; item.visitRevision = visit.current.revision; }
+      before.push({ id: item.id, current: { ...existing, visit: visit?.current }, changes: item });
     }
   } else if (payload.kind === "destinations-update") {
     for (const item of payload.items) {
@@ -83,13 +100,14 @@ export async function prepareRecordChange(payload: ChangePayload, ownerId: strin
       destinationBudget(existing, item);
       await validateImage(item.imageId, ownerId);
       before.push({ id: item.id, current: {
-        id: existing.id, title: existing.title, subtitle: existing.subtitle, months: existing.months, days: existing.days,
+        id: existing.id, title: existing.title, subtitle: existing.subtitle, flag: existing.flag,
+        currency: existing.currency, months: existing.months, days: existing.days,
         minBudget: existing.minBudget, maxBudget: existing.maxBudget, pickBudget: existing.pickBudget,
         budget: { food: existing.budgetFood, accommodation: existing.budgetAccommodation,
           transport: existing.budgetTransport, other: existing.budgetOther },
         vibe: existing.vibe, reason: existing.reason, imagePath: existing.imagePath,
         groupText: existing.groupText, isArchived: existing.isArchived,
-        route: parseArray(existing.routeJson), spots: parseArray(existing.spotsJson),
+        route: parseJsonArray(existing.routeJson), spots: parseJsonArray(existing.spotsJson),
         guideDays: existing.guide?.days.map(day => ({ title: day.title, detail: day.detail })) ?? [],
       }, changes: item });
     }
@@ -147,8 +165,6 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
         await tx.visitedPlace.update({ where: { id: item.id }, data: {
           ...(item.name !== undefined ? { name: item.name } : {}),
           ...(item.region !== undefined ? { region: item.region } : {}),
-          ...(item.when !== undefined ? { whenLabel: item.when } : {}),
-          ...(item.group !== undefined ? { group: item.group } : {}),
           ...(item.country !== undefined ? { country: item.country } : {}),
           ...(item.province !== undefined ? { province: item.province } : {}),
           ...(item.city !== undefined ? { city: item.city } : {}),
@@ -158,8 +174,19 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
           ...(item.sortOrder !== undefined ? { sortOrder: item.sortOrder } : {}),
           ...(item.isArchived !== undefined ? { isArchived: item.isArchived } : {}),
           ...(item.imageId !== undefined ? { image: item.imageId ? `api/media/${item.imageId}` : "images/place-placeholder.svg" } : {}),
+          ...(item.imageId !== undefined ? { coverX: 50, coverY: 50 } : {}),
         } });
-        if (typeof item.imageId === "string") await tx.mediaAsset.update({ where: { id: item.imageId }, data: { status: "PUBLIC" } });
+        const visit = await visitPatch(tx, item);
+        if (visit?.current) {
+          if (!item.visitId) throw Error("预览后已有新的到访记录，请重新生成预览并核对要修改的到访");
+          const saved = await tx.travelMemory.updateMany({ where: { id: visit.current.id, revision: visit.current.revision, deletedAt: null },
+            data: { ...visit.data, revision: { increment: 1 } } });
+          if (!saved.count) throw Error("到访在导入期间已变更，请重新生成预览");
+        }
+        else if (visit) await tx.travelMemory.create({ data: {
+          ...visit.data, placeId: item.id, title: visit.data.title ?? "", content: visit.data.content ?? "",
+        } });
+        if (typeof item.imageId === "string") await tx.mediaAsset.update({ where: { id: item.imageId, ownerId }, data: { status: "PUBLIC" } });
         updated.push({ id: item.id, name });
       }
     } else if (payload.kind === "destinations-update") {
@@ -176,6 +203,8 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
         await tx.destination.update({ where: { id: item.id }, data: {
           ...(item.title !== undefined ? { title: item.title } : {}),
           ...(item.subtitle !== undefined ? { subtitle: item.subtitle } : {}),
+          ...(item.flag !== undefined ? { flag: item.flag || "🌍" } : {}),
+          ...(item.currency !== undefined ? { currency: item.currency } : {}),
           ...(item.months !== undefined ? { months: item.months } : {}),
           ...(item.days !== undefined ? { days: item.days } : {}),
           ...(item.vibe !== undefined ? { vibe: item.vibe } : {}),
@@ -198,12 +227,12 @@ export async function commitRecordChange(draftId: string, payload: ChangePayload
           const guide = await tx.destinationGuide.findUnique({ where: { destinationId: item.id }, select: { destinationId: true } });
           if (guide) {
             await tx.guideDay.deleteMany({ where: { guideId: item.id } });
-            await tx.destinationGuide.update({ where: { destinationId: item.id }, data: { days: { create: days } } });
-          } else {
+            if (days.length) await tx.destinationGuide.update({ where: { destinationId: item.id }, data: { days: { create: days } } });
+          } else if (days.length) {
             await tx.destinationGuide.create({ data: { destinationId: item.id, intro: "AI 更新的待确认行程", pace: "", stay: "", transport: "", days: { create: days } } });
           }
         }
-        if (typeof item.imageId === "string") await tx.mediaAsset.update({ where: { id: item.imageId }, data: { status: "PUBLIC" } });
+        if (typeof item.imageId === "string") await tx.mediaAsset.update({ where: { id: item.imageId, ownerId }, data: { status: "PUBLIC" } });
         updated.push({ id: item.id, name: title });
       }
     } else {

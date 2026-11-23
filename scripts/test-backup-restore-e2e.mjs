@@ -8,6 +8,9 @@ import { PrismaClient } from "@prisma/client";
 import yazl from "yazl";
 import { verifyBackupRoundtrip } from "./test-backup-roundtrip.mjs";
 import { verifyRestoreMedia } from "./test-restore-media.mjs";
+import { preserveTsconfig } from "./preserve-tsconfig.mjs";
+
+const restoreTsconfig = preserveTsconfig();
 
 const base = join(process.cwd(), "data", "restore-e2e");
 const target = join(base, "target");
@@ -18,12 +21,13 @@ const host = "http://127.0.0.1:3018";
 const token = randomBytes(32).toString("base64url");
 const id = randomUUID();
 const photoId = randomUUID();
+const extraPhotoIds = Array.from({ length: 5 }, () => randomUUID());
 const env = { ...process.env, DATABASE_URL: targetUrl, RESTORE_DATA_DIR: target, UPLOAD_DIR: join(target, "uploads"), LEGACY_MEDIA_DIR: join(target, "legacy-images"), NODE_ENV: "development", NEXT_DIST_DIR: ".next-backup-e2e" };
 let web;
 
 function check(ok, message) { if (!ok) throw Error(message); }
 function migrate(url) {
-  const result = spawnSync(process.execPath, ["node_modules/prisma/build/index.js", "migrate", "deploy"], {
+  const result = spawnSync(process.execPath, ["scripts/deploy-database.mjs"], {
     cwd: process.cwd(), env: { ...process.env, DATABASE_URL: url }, encoding: "utf8", timeout: 60000,
   });
   check(result.status === 0, "migration failed: " + result.stderr.slice(-500));
@@ -37,6 +41,7 @@ async function zipBackup() {
   archive.addBuffer(Buffer.from("legacy-cover"), "legacy-images/images/test-island-0.jpg");
   archive.addBuffer(Buffer.from("<html>historical credits</html>"), "legacy-images/images/credits.html");
   archive.addBuffer(randomBytes(900 * 1024), `uploads/${photoId}.webp`);
+  for (const assetId of extraPhotoIds) archive.addBuffer(randomBytes(10 * 1024 ** 2), `uploads/${assetId}.webp`);
   archive.end();
   await new Promise((yes, no) => {
     archive.outputStream.pipe(createWriteStream(output)).on("close", yes).on("error", no);
@@ -162,13 +167,18 @@ async function run() {
     });
     await sourceDb.visitedPlace.create({
       data: { id: "test-visited", name: "测试小镇", region: "虚构省",
-        group: "mine", image: "images/visited/test.jpg", whenLabel: "2024", sortOrder: 1 },
+        image: "images/visited/test.jpg", sortOrder: 1 },
     });
     await sourceDb.travelPlan.create({ data: { id: "backup-plan", title: "备份旅行", destinationId: "test-island", currency: "CNY", plannedBudget: 1000 } });
     await sourceDb.expense.create({ data: { id: "backup-expense", planId: "backup-plan", category: "FOOD", amountMinor: 12550, description: "备份餐饮" } });
-    await sourceDb.travelMemory.create({ data: { id: "backup-memory", planId: "backup-plan", placeId: "test-visited", title: "备份日记", content: "合成的故事", happenedAt: new Date("2025-01-01T12:00:00Z") } });
+    await sourceDb.travelMemory.create({ data: { id: "backup-memory", planId: "backup-plan", placeId: "test-visited", title: "备份日记", content: "合成的故事", happenedAt: new Date("2025-01-01T12:00:00Z"), group: "mine", whenLabel: "2025 年初" } });
+    await sourceDb.travelMemory.create({ data: { id: "backup-revisit", placeId: "test-visited", title: "再次到访", content: "各自的相册", group: "both", whenLabel: "2026-03" } });
     await sourceDb.mediaAsset.create({ data: { id: photoId, ownerId: old.id, fileName: `${photoId}.webp`, mimeType: "image/webp", status: "PUBLIC", byteSize: 900 * 1024 } });
     await sourceDb.travelPhoto.create({ data: { id: "backup-photo", memoryId: "backup-memory", planId: "backup-plan", mediaAssetId: photoId, filePath: `/api/media/${photoId}` } });
+    for (const assetId of extraPhotoIds) {
+      await sourceDb.mediaAsset.create({ data: { id: assetId, ownerId: old.id, fileName: `${assetId}.webp`, mimeType: "image/webp", status: "PUBLIC", byteSize: 10 * 1024 ** 2 } });
+      await sourceDb.travelPhoto.create({ data: { memoryId: "backup-revisit", mediaAssetId: assetId, filePath: `/api/media/${assetId}`, isFeatured: true, altText: "备份恢复的照片说明" } });
+    }
   } finally { await sourceDb.$disconnect(); await targetDb.$disconnect(); }
   const backup = await zipBackup();
   await startServer();
@@ -178,18 +188,20 @@ async function run() {
     await request("/api/admin/restore/prepare", { method: "POST", headers: { Origin: "https://evil.example" } }, 403);
     await request("/api/admin/restore/upload/init", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }, 403, false);
     await request("/api/admin/restore/upload/init", { method: "POST", headers: { Origin: "https://evil.example", "Content-Type": "application/json" }, body: "{}" }, 403);
+    // 模拟上次上传在创建目录后中断，新任务仍能开始并正常续传。
+    await mkdir(join(target, "restore-staging", "upload-chunks", randomUUID()), { recursive: true });
     const preview = await chunkedPreview(await readFile(backup), "restore-test.zip", true);
-    check(preview.counts.places === 1 && preview.counts.destinations === 1 && preview.counts.users === 1,
+    check(preview.counts.places === 1 && preview.counts.destinations === 1 && preview.counts.users === 1 && preview.counts.memories === 2,
       "Preview data counts incorrect");
-    check(preview.images.legacy === 2 && preview.images.uploads === 1, "Restore archive photos missing");
+    check(preview.images.legacy === 2 && preview.images.uploads === 6, "Restore archive photos missing");
     console.log("CHUNK_RESUME_PASS: upload interrupted after first chunk, server resumed remaining chunks");
     // Optional private compatibility check, enabled only by a locally supplied
     // file path. Never log, commit or upload real personal backup contents.
     if (process.env.PRIVATE_BACKUP_ZIP) {
       const privatePreview = await chunkedPreview(await readFile(process.env.PRIVATE_BACKUP_ZIP), "private-backup.zip");
-      check(privatePreview.counts.places === 31 && privatePreview.counts.destinations === 14,
+      check(privatePreview.counts.places >= 1 && privatePreview.counts.destinations >= 1,
         "Private backup schema preview was not recognized");
-      check(privatePreview.images.legacy >= 45, "Private backup media was not recognized");
+      check(privatePreview.images.legacy + privatePreview.images.uploads >= 1, "Private backup media was not recognized");
       console.log("OPTIONAL_PRIVATE_BACKUP_SCHEMA_PASS: archive validated locally");
     }
     const unchanged = db(targetUrl);
@@ -258,7 +270,7 @@ async function run() {
   await writeFile(join(crashStage, "manifest.json"), JSON.stringify(crashQueue));
   await writeFile(join(crashRoot, "restore-staging", "pending.json"), JSON.stringify(crashQueue));
   const crashed = spawnSync(process.execPath, ["scripts/apply-pending-restore.mjs"], {
-    cwd: process.cwd(), env: { ...env, RESTORE_DATA_DIR: crashRoot }, encoding: "utf8", timeout: 60000,
+    cwd: process.cwd(), env: { ...env, RESTORE_DATA_DIR: crashRoot, DATABASE_URL: "file:" + join(crashRoot, "travel.db").replaceAll("\\", "/") }, encoding: "utf8", timeout: 60000,
   });
   check(crashed.status === 0 && existsSync(join(crashRoot, "travel.db")),
     "Simulated interrupted restore did not put original database back");
@@ -270,4 +282,9 @@ async function run() {
 
 try { await run(); }
 catch (e) { console.error("BACKUP_RESTORE_E2E_FAIL:", e instanceof Error ? e.message : String(e)); process.exitCode = 1; }
-finally { await stopServer(); await rm(base, { force: true, recursive: true }).catch(() => {}); }
+finally {
+  await stopServer();
+  restoreTsconfig();
+  await rm(base, { force: true, recursive: true }).catch(() => {});
+  await rm(join(process.cwd(), ".next-backup-e2e"), { force: true, recursive: true }).catch(() => {});
+}

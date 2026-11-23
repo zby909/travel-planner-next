@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { PreservingForm } from "@/components/preserving-form";
+import { SUPPORTED_CURRENCIES } from "@/lib/money";
 import {
   createTravelPlanAction,
   saveTravelPlanAction,
@@ -9,7 +11,6 @@ import {
 } from "./actions";
 
 const INITIAL_STATE: PlanFormState = { error: "" };
-const CURRENCIES = ["CNY", "SGD", "JPY", "USD", "EUR", "GBP", "AUD", "CAD", "HKD", "TWD", "KRW", "THB", "MYR", "IDR", "VND", "PHP", "INR", "NZD", "CHF"] as const;
 
 type DestinationOption = { id: string; title: string };
 type PlanInput = {
@@ -42,7 +43,7 @@ export function TravelPlanForm({ destinations, currency, initial }: {
 }) {
   const formAction = initial ? saveTravelPlanAction : createTravelPlanAction;
   const [state, action, pending] = useActionState(formAction, INITIAL_STATE);
-  return <form action={action} className="admin-form" id="plan-overview">
+  return <PreservingForm action={action} className="admin-form" id="plan-overview">
     {initial ? <input type="hidden" name="id" value={initial.id} /> : null}
     <section className="admin-panel">
       <h2>旅行基本信息</h2>
@@ -58,7 +59,7 @@ export function TravelPlanForm({ destinations, currency, initial }: {
            <input type="hidden" name="currency" value={initial.currency} />
            <input value={initial.currency} disabled readOnly aria-label="已锁定的预算币种" />
            <small>已有费用记录，币种已锁定，避免历史金额被错误换算。</small>
-         </> : <select name="currency" defaultValue={initial?.currency ?? currency}>{CURRENCIES.map(code => <option key={code} value={code}>{code}</option>)}</select>}
+         </> : <select name="currency" defaultValue={initial?.currency ?? currency}>{SUPPORTED_CURRENCIES.map(code => <option key={code} value={code}>{code}</option>)}</select>}
        </label>
       </div>
       <label>旅行备注<textarea name="notes" rows={4} maxLength={4000} defaultValue={initial?.notes ?? ""} placeholder="住宿、交通、同行安排或出发前需要记住的事情" /></label>
@@ -67,38 +68,38 @@ export function TravelPlanForm({ destinations, currency, initial }: {
       {state.error ? <p className="form-error" role="alert">{state.error}</p> : null}
       <button className="button button-dark" type="submit" disabled={pending}>{pending ? "保存中…" : initial ? "保存旅行计划" : "创建旅行计划"}</button>
     </div>
-  </form>;
+  </PreservingForm>;
 }
 
-// 管理一份部署在 Stack-Nest 等外部平台的 HTML 旅行攻略入口。
+// 管理一份外部参考攻略链接（支持小红书、Notion、博客或自托管网页）。
 export function TravelGuideLinkForm({ planId, initial }: { planId: string; initial?: GuideInput }) {
   const [state, action, pending] = useActionState(saveTravelGuideLinkAction, INITIAL_STATE);
-  return <form action={action} className="admin-form plan-guide-form">
+  return <PreservingForm action={action} className="admin-form plan-guide-form">
     <input type="hidden" name="planId" value={planId} />
     <input type="hidden" name="id" value={initial?.id ?? ""} />
     <div className="admin-form-grid">
       <label>攻略名称<input name="title" required maxLength={120} defaultValue={initial?.title ?? ""} placeholder="例如：日本七日漫游手册" /></label>
       <label>关联日期<input name="dayDate" type="date" defaultValue={initial?.dayDate ?? ""} /><small>留空表示整趟旅行；填写日期表示当天攻略。</small></label>
-      <label className="plan-guide-url">部署后的访问地址<input name="url" required maxLength={1000} inputMode="url" defaultValue={initial?.url ?? ""} placeholder="https://your-guide.example.com/" /><small>直接填写 Stack-Nest CLI 部署完成后的 URL，不需要上传 HTML。</small></label>
+      <label className="plan-guide-url">访问地址<input name="url" required maxLength={1000} inputMode="url" defaultValue={initial?.url ?? ""} placeholder="https://..." /><small>支持任意 HTTP/HTTPS 网页地址，例如笔记、文档或自托管攻略页。</small></label>
       <label>封面图片地址（可选）<input name="coverImage" maxLength={1000} inputMode="url" defaultValue={initial?.coverImage ?? ""} placeholder="https://..." /></label>
       <label>显示顺序<input name="sortOrder" type="number" min={0} max={10000} step={1} defaultValue={initial?.sortOrder ?? ""} placeholder="留空自动追加" /></label>
     </div>
-    <label>攻略简介（可选）<textarea name="description" rows={2} maxLength={600} defaultValue={initial?.description ?? ""} placeholder="简单介绍这份攻略的内容或设计特色" /></label>
+    <label>攻略简介（可选）<textarea name="description" rows={2} maxLength={600} defaultValue={initial?.description ?? ""} placeholder="简单记下这份攻略的亮点或备忘" /></label>
     {state.error ? <p className="form-error" role="alert">{state.error}</p> : null}
     <div className="admin-save-row"><button className="button button-dark" type="submit" disabled={pending}>{pending ? "保存中…" : initial ? "保存攻略入口" : "添加攻略入口"}</button></div>
-  </form>;
+  </PreservingForm>;
 }
 
 // 删除计划前说明关联数据的处理方式并要求再次确认。
 export function DeleteTravelPlanButton() {
   return <button className="admin-danger" type="submit" onClick={event => {
-    if (!window.confirm("确定删除这趟旅行计划吗？只删除计划、费用和攻略入口；已记录的地点故事及照片会保留。Stack-Nest 上的 HTML 页面不会被删除。")) event.preventDefault();
+    if (!window.confirm("确定删除这趟旅行计划吗？只删除计划、费用和攻略入口；已记录的地点故事及照片会保留，外部原网页不会受影响。")) event.preventDefault();
   }}>删除旅行计划</button>;
 }
 
-// 删除攻略入口前确认只移除本地链接，不会删除外部部署内容。
+// 删除攻略入口前确认只移除本地链接，不会删除外部页面。
 export function DeleteTravelGuideButton() {
   return <button className="admin-text-action" type="submit" onClick={event => {
-    if (!window.confirm("确定移除这条攻略入口吗？Stack-Nest 上的原始页面不会受到影响。")) event.preventDefault();
+    if (!window.confirm("确定移除这条攻略入口吗？原始外部网页不会受到影响。")) event.preventDefault();
   }}>移除入口</button>;
 }

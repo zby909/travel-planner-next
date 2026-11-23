@@ -6,7 +6,7 @@ import { DestinationEditForm } from "@/components/admin-forms";
 import { RecordArchiveForm } from "@/components/record-archive-form";
 import { CoverUploadForm } from "@/components/cover-upload-form";
 import { parseJsonArray } from "@/lib/format";
-import { getSiteSettings } from "@/lib/site-settings";
+import { getDestinationCoverUrl } from "@/lib/media";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; created?: string; photo?: string }> };
 
@@ -14,13 +14,10 @@ export default async function DestinationEdit({ params, searchParams }: Props) {
   await requireEditor();
   const { id } = await params;
   const { saved, created, photo } = await searchParams;
-  const [data, settings] = await Promise.all([
-    prisma.destination.findUnique({
-      where: { id },
-      include: { guide: { include: { days: { orderBy: { sortOrder: "asc" } } } }, _count: { select: { plans: true } } },
-    }),
-    getSiteSettings(),
-  ]);
+  const data = await prisma.destination.findUnique({
+    where: { id },
+    include: { guide: { include: { days: { orderBy: { sortOrder: "asc" } } } }, _count: { select: { plans: true } } },
+  });
   if (!data) notFound();
   return (
     <main>
@@ -30,15 +27,15 @@ export default async function DestinationEdit({ params, searchParams }: Props) {
       {saved === "1" ? <p className="form-success" role="status">{data.isArchived ? "修改已保存；归档记录仍仅在编辑室保留。" : "保存成功，公开页面已更新。"}</p> : null}
       {photo === "1" ? <p className="form-success" role="status">封面照片已更新。</p> : null}
       <RecordArchiveForm key={String(data.isArchived)} id={id} kind="destination" isArchived={data.isArchived} relatedCount={data._count.plans} />
-      <CoverUploadForm id={id} kind="destination" imageUrl={data.imagePath ?? "/images/destination-placeholder.svg"} />
-      <DestinationEditForm key={id} data={{
+      <CoverUploadForm id={id} imageUrl={getDestinationCoverUrl(id, data.imagePath)} />
+      <DestinationEditForm key={`${id}:${data.updatedAt.getTime()}`} data={{
         ...data,
-        types: parseJsonArray<string>(data.typesJson),
-        seasons: parseJsonArray<string>(data.seasonsJson),
-        route: parseJsonArray<string>(data.routeJson),
-        spots: parseJsonArray<string>(data.spotsJson),
+        types: parseJsonArray(data.typesJson),
+        seasons: parseJsonArray(data.seasonsJson),
+        route: parseJsonArray(data.routeJson),
+        spots: parseJsonArray(data.spotsJson),
         guide: data.guide ? { ...data.guide, days: data.guide.days.map(({ day, title, detail }) => ({ day, title, detail })) } : null,
-      }} currency={settings.currency} />
+      }} currency={data.currency} />
     </main>
   );
 }
